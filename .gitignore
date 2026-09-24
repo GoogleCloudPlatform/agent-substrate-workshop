@@ -1,0 +1,16 @@
+# Design specs and implementation plans are kept locally, not in the repo
+docs/superpowers/
+
+# Local workshop config and generated state
+workshop.env
+.workshop/
+
+# Build output
+bin/
+dist/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
