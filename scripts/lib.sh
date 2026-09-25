@@ -131,7 +131,7 @@ actor_names() { _actors_list "$1" | jq -r '.[].metadata.name'; }
 # count_actors_in_state <atespace> <STATE> [name-prefix]
 count_actors_in_state() {
   _actors_list "$1" | jq --arg s "$2" --arg p "${3:-}" \
-    '[.[] | select(.status.state == $s and (.metadata.name | startswith($p)))] | length'
+    '[.[] | select(((.status.state // "") | sub("^ACTOR_STATE_"; "")) == $s and (.metadata.name | startswith($p)))] | length'
 }
 
 # gateway_chat <actor> <message>: one chat turn through the gateway's front door.

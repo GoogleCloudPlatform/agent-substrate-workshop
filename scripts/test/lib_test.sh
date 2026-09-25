@@ -109,7 +109,7 @@ case "$*" in
     [[ -f "$KSTATE" ]] || exit 1
     printf '{"metadata":{"name":"a1"},"status":{"state":"%s"}}\n' "$(cat "$KSTATE")" ;;
   "ate get actors -a ws -o json")
-    printf '{"actors":[{"metadata":{"name":"a1"},"status":{"state":"%s"}},{"metadata":{"name":"b1"},"status":{"state":"RUNNING"}}]}\n' "$(cat "$KSTATE")" ;;
+    printf '{"actors":[{"metadata":{"name":"a1"},"status":{"state":"%s"}},{"metadata":{"name":"b1"},"status":{"state":"ACTOR_STATE_RUNNING"}}]}\n' "$(cat "$KSTATE")" ;;
   "ate create actor a1 --template=t -a ws") echo SUSPENDED >"$KSTATE" ;;
   "ate suspend actor a1 -a ws") echo SUSPENDED >"$KSTATE" ;;
   *) exit 1 ;;
