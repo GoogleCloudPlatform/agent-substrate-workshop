@@ -140,3 +140,19 @@ func TestWorkshopPolicyFilesParse(t *testing.T) {
 		}
 	}
 }
+
+// The policy file optional lab H applies to the ate-env atespace must parse too.
+func TestOptionalLabHPolicyFileParses(t *testing.T) {
+	const f = "../../../optional/H-env/egress-pypi.yaml"
+	b, err := os.ReadFile(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := ParsePolicy(b)
+	if err != nil {
+		t.Fatalf("%s: %v", f, err)
+	}
+	if got := p.GetRules()[0].GetHostnames().GetPatterns(); len(got) != 2 || got[0] != "pypi.org" || got[1] != "files.pythonhosted.org" {
+		t.Fatalf("patterns = %v", got)
+	}
+}
