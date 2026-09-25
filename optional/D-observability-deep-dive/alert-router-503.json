@@ -1,0 +1,13 @@
+{
+  "displayName": "Workshop: chat turns failing",
+  "combiner": "OR",
+  "conditions": [{
+    "displayName": "error turns > 10% for 5m",
+    "conditionPrometheusQueryLanguage": {
+      "query": "sum(rate(workshop_chat_turns_total{outcome=\"error\"}[5m])) / sum(rate(workshop_chat_turns_total[5m])) > 0.1",
+      "duration": "300s",
+      "evaluationInterval": "60s"
+    }
+  }],
+  "documentation": {"content": "Users are getting errors. Usually all workers are busy and nothing is idle-suspending (IDLE_AFTER), or egress is missing.", "mimeType": "text/markdown"}
+}

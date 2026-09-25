@@ -1,0 +1,13 @@
+{
+  "displayName": "Workshop: actors crashing",
+  "combiner": "OR",
+  "conditions": [{
+    "displayName": "any actor crash in the workshop atespace in 15m",
+    "conditionPrometheusQueryLanguage": {
+      "query": "sum(increase({\"ate.actor.crashes\", \"ate.template.atespace\"=\"workshop\"}[15m])) > 0",
+      "duration": "0s",
+      "evaluationInterval": "60s"
+    }
+  }],
+  "documentation": {"content": "An actor moved to CRASHED — a permanent loss of that actor's state (see `docs/metrics/registry/metrics.yaml`'s `ate.actor.crashes` entry in the substrate checkout). Find which one and why: filter Cloud Logging on `resource.labels.namespace_name=\"ate-system\"` and `\"Actor state changed\"` with `labels.\"ate.atespace\"=\"workshop\"`, then `kubectl ate delete actor <name> -a workshop --any-state` once you've captured what you need.", "mimeType": "text/markdown"}
+}
