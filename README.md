@@ -1,10 +1,77 @@
 # Agent Substrate Workshop
 
-Build and operate your own fleet of AI agent actors on [Agent Substrate](https://github.com/agent-substrate/substrate), starting from a bare GKE cluster.
+Build and operate your own fleet of AI agents on [Agent Substrate](https://github.com/agent-substrate/substrate),
+starting from a bare GKE cluster. In about 85 minutes you will:
 
-> Full agenda, prerequisites, and paths are completed in the final docs task.
+- install Substrate, and learn what each of its components does;
+- build a Go agent, run it as a Substrate **actor**, and suspend and resume it across workers;
+- give it a model (Vertex Gemini) through an always-on gateway, and lock down its egress;
+- run 20 agents on 2 workers with request parking and idle suspend;
+- watch the whole fleet in Prometheus and Cloud Console dashboards.
+
+Everything you deploy, you build: the agent, the gateway, and (in source mode) Substrate itself go into your own Artifact Registry.
+
+## Agenda
+
+| # | Module | Min | You'll learn |
+|---|---|---|---|
+| 0 | [Setup](modules/00-setup/README.md) | 10 | GCP prerequisites; the install starts in the background |
+| 1 | [Architecture tour](modules/01-architecture/README.md) | 10 | Actors vs Pods; ateapi, atelet, router, egress; CRDs vs records |
+| 2 | [Hello actor](modules/02-hello-actor/README.md) | 15 | WorkerPool, ActorTemplate + golden snapshot, Actor, routing header |
+| 3 | [Suspend and resume](modules/03-suspend-resume/README.md) | 12 | FULL vs DATA snapshots, durable dirs, template immutability |
+| 4 | [Make it an agent](modules/04-make-it-an-agent/README.md) | 13 | Gateway pattern, Workload Identity, deny-by-default egress |
+| 5 | [Density and idle](modules/05-density-idle/README.md) | 10 | Oversubscription, parking, building an idle-suspender |
+| 6 | [Observe the fleet](modules/06-observe/README.md) | 12 | Substrate OTel + app metrics, PromQL, dashboards, per-actor logs |
+| 7 | [Wrap-up](modules/07-wrap-up/README.md) | 3 | Real-world patterns, limits, optional labs |
+
+Optional labs afterwards: [H — agent-substrate/env](optional/H-env/README.md) (start here),
+[D](optional/D-observability-deep-dive/README.md), [A](optional/A-tags-clone-revert/README.md),
+[E](optional/E-agent-swarm/README.md), [B](optional/B-microvm/README.md), [C](optional/C-credential-injection/README.md),
+[F](optional/F-grpc-client/README.md), [G](optional/G-hpa-workerpool/README.md).
+
+## Prerequisites
+- A GCP project where you are **Owner**, with a GKE **1.37+** cluster (or 1.36 with the
+  `podcertificaterequests` and `clustertrustbundles` beta APIs enabled at creation): Workload Identity, managed
+  OpenTelemetry, Managed Prometheus, no node auto-upgrade, no spot nodes, 2× `c3-standard-4`. `make preflight`
+  checks all of it.
+- Local tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst`, `nc`, `curl`, `git`, `python3`.
+- Comfort with Kubernetes. No prior Substrate knowledge needed.
+
+For comparison, [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) solves a
+similar problem with a Pod per agent session and no Substrate integration — [Module 1](modules/01-architecture/README.md)
+has the full comparison.
+
+## Two ways to take it
+- **Instructor-led:** follow the modules in order. If you fall behind, `make catch-up MODULE=<n>` brings your
+  environment to the start of module `n`, and you keep going.
+- **Self-paced:** same path. After each module, `make verify MODULE=<n>` checks that you got there.
+  `instructor/troubleshooting.md` covers the common failures.
 
 ## Quick start
-    cp workshop.env.example workshop.env   # set PROJECT_ID
-    make preflight
-    make help
+```bash
+cp workshop.env.example workshop.env     # set PROJECT_ID
+make preflight
+make help                                # every target, one line each
+```
+
+## Repo layout
+
+| Path | What |
+|---|---|
+| `modules/NN-*/` | The guide: one README per module, the manifests it uses, and the finished `main.go` |
+| `app/` | Go code: `cmd/agent` (you edit this), `cmd/gateway`, `cmd/egressctl` |
+| `scripts/` | Everything `make` runs; `verify/` checks each module's end state |
+| `observability/` | Dashboard JSON, PodMonitoring, Prometheus UI, canned queries |
+| `optional/` | Post-workshop labs |
+| `instructor/` | Runbook (timings, cut lines, pre-event checks) and troubleshooting |
+
+## Versions
+Substrate moves fast. The workshop pins it with `SUBSTRATE_REF` in `workshop.env`. It uses published images when
+`SUBSTRATE_IMAGE_REPO`/`SUBSTRATE_IMAGE_TAG` are set, and builds from source otherwise. The runbook says which ref
+was validated for the next event.
+
+## Clean up
+`make teardown` deletes the workshop's atespace, namespace, dashboard, and snapshots, and keeps your cluster,
+bucket, and Artifact Registry — it asks you to confirm unless you set `YES=1`. `YES=1 scripts/teardown.sh --all`
+also removes the bucket, the Artifact Registry repo, and the project IAM bindings `make gcp` created, but never
+the GKE cluster; see [Module 7](modules/07-wrap-up/README.md#clean-up).
