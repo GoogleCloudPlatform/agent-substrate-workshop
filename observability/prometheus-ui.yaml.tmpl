@@ -1,0 +1,45 @@
+# The GMP frontend: a Prometheus UI and API that queries Cloud Monitoring (Monarch) with
+# the prometheus-ui KSA's Workload Identity (roles/monitoring.viewer, granted in Module 0).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus-ui
+  namespace: ${NAMESPACE}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-ui
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: prometheus-ui}
+  template:
+    metadata:
+      labels: {app: prometheus-ui}
+    spec:
+      serviceAccountName: prometheus-ui
+      nodeSelector: {kubernetes.io/os: linux, kubernetes.io/arch: amd64}
+      containers:
+      - name: frontend
+        image: ${PROM_FRONTEND_IMAGE}
+        args:
+        - --web.listen-address=:9090
+        - --query.project-id=${PROJECT_ID}
+        ports:
+        - {name: web, containerPort: 9090}
+        readinessProbe:
+          httpGet: {path: /-/ready, port: web}
+        livenessProbe:
+          httpGet: {path: /-/healthy, port: web}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-ui
+  namespace: ${NAMESPACE}
+spec:
+  selector: {app: prometheus-ui}
+  ports:
+  - {name: web, port: 9090, targetPort: web}

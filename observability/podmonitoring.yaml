@@ -1,0 +1,13 @@
+# Google Managed Prometheus scrapes the gateway's /metrics every 15s.
+apiVersion: monitoring.googleapis.com/v1
+kind: PodMonitoring
+metadata:
+  name: gateway
+  namespace: workshop
+spec:
+  selector:
+    matchLabels: {app: gateway}
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s
