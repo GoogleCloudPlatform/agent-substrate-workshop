@@ -21,6 +21,10 @@ type Result struct {
 	Reply        string
 	InputTokens  int
 	OutputTokens int
+	// Backend names who actually answered when that isn't the Backend's own Name(), i.e. a
+	// per-request fallback. UpstreamErr is the error that caused the fallback.
+	Backend     string
+	UpstreamErr error
 }
 
 // Backend generates a reply to a conversation whose last message is from the user.
@@ -29,7 +33,8 @@ type Backend interface {
 	Generate(ctx context.Context, msgs []chatapi.Message) (Result, error)
 }
 
-// Mock answers without any model. Fallback marks a mock chosen because Vertex failed to init.
+// Mock answers without any model. Fallback marks a mock answering because Vertex failed,
+// either at startup or on this request.
 type Mock struct{ Fallback bool }
 
 func (m Mock) Name() string {
@@ -50,8 +55,9 @@ func (Mock) Generate(_ context.Context, msgs []chatapi.Message) (Result, error) 
 	return Result{Reply: fmt.Sprintf("mock model (turn %d): you said %q", turn, last), InputTokens: len(last) / 4, OutputTokens: 8}, nil
 }
 
-// Select picks the backend: the mock when asked, otherwise Vertex, falling back to the mock
-// if Vertex cannot be initialized so the workshop keeps moving.
+// Select picks the backend: the mock when asked, otherwise Vertex. It falls back to the mock
+// if Vertex can't be initialized, and per request if a Vertex call fails, so the workshop
+// keeps moving and the reply's backend says "mock-fallback" instead of looking like an egress 502.
 func Select(mock bool, newVertex func() (Backend, error)) Backend {
 	if mock {
 		return Mock{}
@@ -61,7 +67,29 @@ func Select(mock bool, newVertex func() (Backend, error)) Backend {
 		log.Printf("vertex unavailable (%v); using mock-fallback", err)
 		return Mock{Fallback: true}
 	}
-	return b
+	return WithFallback(b)
+}
+
+// WithFallback answers a request from Mock{Fallback: true} when b fails it, and logs b's error.
+func WithFallback(b Backend) Backend { return fallback{b} }
+
+type fallback struct{ primary Backend }
+
+func (f fallback) Name() string { return f.primary.Name() }
+
+func (f fallback) Generate(ctx context.Context, msgs []chatapi.Message) (Result, error) {
+	res, err := f.primary.Generate(ctx, msgs)
+	if err == nil {
+		return res, nil
+	}
+	mock := Mock{Fallback: true}
+	log.Printf("model %s failed (%v); answering this request from %s", f.primary.Name(), err, mock.Name())
+	res, mockErr := mock.Generate(ctx, msgs)
+	if mockErr != nil {
+		return Result{}, err
+	}
+	res.Backend, res.UpstreamErr = mock.Name(), err
+	return res, nil
 }
 
 // Handler serves POST /v1/model.
@@ -87,9 +115,19 @@ func Handler(b Backend, m *metrics.Metrics) http.Handler {
 			writeJSON(w, http.StatusBadGateway, chatapi.Error{Error: fmt.Sprintf("%s: %v", b.Name(), err)})
 			return
 		}
-		m.ObserveModel(b.Name(), "ok", time.Since(start), res.InputTokens, res.OutputTokens)
+		name, upstream := b.Name(), ""
+		if res.UpstreamErr != nil {
+			// The primary failed and a fallback answered: count the failure against the primary too.
+			m.ObserveModel(b.Name(), "error", time.Since(start), 0, 0)
+			upstream = fmt.Sprintf("%s: %v", b.Name(), res.UpstreamErr)
+		}
+		if res.Backend != "" {
+			name = res.Backend
+		}
+		m.ObserveModel(name, "ok", time.Since(start), res.InputTokens, res.OutputTokens)
 		writeJSON(w, http.StatusOK, chatapi.ModelResponse{
-			Reply: res.Reply, Backend: b.Name(), InputTokens: res.InputTokens, OutputTokens: res.OutputTokens,
+			Reply: res.Reply, Backend: name, InputTokens: res.InputTokens, OutputTokens: res.OutputTokens,
+			UpstreamError: upstream,
 		})
 	})
 }

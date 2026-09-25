@@ -30,7 +30,10 @@ flowchart LR
    make forward-gateway            # port-forwards the gateway to http://localhost:8081
    curl -s localhost:8081/v1/model -d '{"messages":[{"role":"user","content":"Say hi in five words"}]}' | jq
    ```
-   `backend` shows which model answered.
+   `backend` shows which model answered. If a Vertex call fails (say, a 403 while the Workload Identity
+   binding propagates), the gateway answers that request from a mock instead: `backend` is `mock-fallback`
+   and `upstreamError` says what Vertex returned. So a `502` from the agent in step 3 is about
+   egress, not Vertex.
 2. **Free a worker, then teach the agent to call the model.** Suspend `memo` so the new template's golden
    actor has a worker. In `app/cmd/agent/main.go`, find `WORKSHOP(module-4)` and set `ModelURL: os.Getenv("MODEL_URL")`.
    ```bash

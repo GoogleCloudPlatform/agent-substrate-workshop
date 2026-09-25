@@ -30,6 +30,8 @@ type ModelResponse struct {
 	Backend      string `json:"backend"`
 	InputTokens  int    `json:"inputTokens"`
 	OutputTokens int    `json:"outputTokens"`
+	// UpstreamError says why Vertex didn't answer, when Backend is "mock-fallback".
+	UpstreamError string `json:"upstreamError,omitempty"`
 }
 
 // Error is the body of every non-2xx JSON response.

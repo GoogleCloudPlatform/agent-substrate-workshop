@@ -86,6 +86,44 @@ func TestHandlerBackendErrorIs502(t *testing.T) {
 	}
 }
 
+type answering struct{}
+
+func (answering) Name() string { return "vertex" }
+func (answering) Generate(context.Context, []chatapi.Message) (Result, error) {
+	return Result{Reply: "from gemini", InputTokens: 3, OutputTokens: 4}, nil
+}
+
+func TestVertexErrorFallsBackToMockPerRequest(t *testing.T) {
+	m := metrics.New()
+	b := Select(false, func() (Backend, error) { return failing{}, nil })
+	code, out := post(t, Handler(b, m), `{"messages":[{"role":"user","content":"hi"}]}`)
+	if code != http.StatusOK || out["backend"] != "mock-fallback" || !strings.Contains(out["reply"].(string), `"hi"`) {
+		t.Fatalf("handler = %d %v", code, out)
+	}
+	if up, _ := out["upstreamError"].(string); !strings.Contains(up, "vertex: permission denied") {
+		t.Errorf("upstreamError = %q", up)
+	}
+	// One (vertex,error) and one (mock-fallback,ok) duration series.
+	if n := promtest.CollectAndCount(m.ModelDuration); n != 2 {
+		t.Errorf("duration series = %d, want 2", n)
+	}
+}
+
+func TestVertexSuccessStaysOnVertex(t *testing.T) {
+	m := metrics.New()
+	b := Select(false, func() (Backend, error) { return answering{}, nil })
+	code, out := post(t, Handler(b, m), `{"messages":[{"role":"user","content":"hi"}]}`)
+	if code != http.StatusOK || out["backend"] != "vertex" || out["reply"] != "from gemini" {
+		t.Fatalf("handler = %d %v", code, out)
+	}
+	if _, ok := out["upstreamError"]; ok {
+		t.Errorf("upstreamError set on success: %v", out)
+	}
+	if n := promtest.CollectAndCount(m.ModelDuration); n != 1 {
+		t.Errorf("duration series = %d, want 1", n)
+	}
+}
+
 func TestToContentsMapsRoles(t *testing.T) {
 	got := toContents([]chatapi.Message{{Role: "user", Content: "q"}, {Role: "assistant", Content: "a"}})
 	if len(got) != 2 || got[0].Role != genai.RoleUser || got[1].Role != genai.RoleModel || got[1].Parts[0].Text != "a" {

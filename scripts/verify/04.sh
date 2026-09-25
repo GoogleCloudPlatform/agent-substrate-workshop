@@ -11,4 +11,8 @@ code="${out##*$'\n'}"; body="${out%$'\n'*}"
 check "chat with buddy returns 200 (got $code)" test "$code" = 200
 backend_ok() { jq -e '.backend | IN("vertex", "mock", "mock-fallback")' <<<"$body"; }
 check "reply came from a model backend" backend_ok
+# mock-fallback still passes (the agent -> egress -> gateway path works), but Vertex refused the call.
+if [[ "$(jq -r '.backend // ""' <<<"$body" 2>/dev/null)" == mock-fallback ]]; then
+  warn "the gateway answered from mock-fallback: Vertex refused the request. Check: kubectl -n $NAMESPACE logs deploy/gateway, and instructor/troubleshooting.md"
+fi
 finish 4
