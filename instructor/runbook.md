@@ -10,7 +10,8 @@
      `install-substrate.sh` runs `ate-setup deploy ate-system --image-repo … --image-tag …` instead of building.
    - `make e2e` drives every module through `catch-up` + `verify` (`scripts/catch-up.sh $n && scripts/verify/$((n-1)).sh`
      for n = 1..7). Run it start to finish in **each** mode; a pass in one mode does not imply a pass in the other,
-     since the worker image (`ateom-gvisor`) comes from a different path in each.
+     since the worker image (`ateom-gvisor`) comes from a different path in each. Run it with `bin/` on your
+     PATH (`export PATH="$PWD/bin:$PATH"`, as attendees do in Module 0), or `verify/00` fails its PATH check.
    - Put the validated ref in `workshop.env.example`'s `SUBSTRATE_REF` and in `app/go.mod`
      (`cd app && go get github.com/agent-substrate/substrate@<ref> && go mod tidy`), since `ateapipb` (used by the
      gateway, `egressctl`, and the idle-suspender) must speak the same protocol as the control plane you install.
