@@ -81,7 +81,9 @@ keep its live `MOCK_LLM` (workshop.env only sets the first deploy); `MOCK_LLM=fa
 ## What just happened
 - The actor holds **no secrets**. The gateway's KSA is bound to `roles/aiplatform.user` through Workload Identity.
 - **Egress is per actor and deny-by-default.** An actor without a policy can't open outbound connections at all.
-  A hostname rule scoped to the gateway is the least privilege that works.
+  A hostname rule scoped to the gateway is the least privilege that works. It means "only the gateway", not
+  "only `/v1/model`": the same host also serves `/chat/{actor}`, `/actors/…` and `/metrics`, so an actor that can
+  reach the model can also reach those. A real deployment would serve `/v1/model` on its own Service and allow only that hostname.
 - The egress gateway re-checks every request's Host against the actor's current `EgressPolicy`, refetching it
   from `ateapi` every few seconds. A policy change reaches a *running* actor's next outbound call — there's no
   suspend/resume step in the loop, and no restart required.

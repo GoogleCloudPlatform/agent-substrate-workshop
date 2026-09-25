@@ -37,9 +37,9 @@ the one thing Substrate deliberately doesn't do for you: **decide when an actor 
    kubectl -n workshop set env deploy/gateway IDLE_AFTER=20s
    kubectl -n workshop rollout status deploy/gateway
    make forward-gateway
-   watch -n2 kubectl ate get actors -a workshop   # swarm-01/02 fall asleep ~20–25s later; Ctrl-C
+   while true; do clear; kubectl ate get actors -a workshop; sleep 2; done   # swarm-01/02 fall asleep ~20–25s later; Ctrl-C
    ```
-   The code is in `app/internal/idle/idle.go`: a tracker fed by the front door, and a loop (about 180 lines
+   The code is in `app/internal/idle/idle.go`: a tracker fed by the front door, and a loop (about 200 lines
    total) that calls `SuspendActor` over gRPC with the gateway's own identity.
 6. **Oversubscribe on purpose.** Four actors, two workers, all at once:
    ```bash
