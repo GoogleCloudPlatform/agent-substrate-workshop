@@ -30,7 +30,7 @@ and start the Substrate install in the background. It runs while you take the ar
    ```
 4. **Start the install in the background.** It clones substrate at `SUBSTRATE_REF`, builds `kubectl ate`,
    deploys `ate-system`, pins a worker image that matches the control plane, labels your nodes, and
-   raises the router's parked-request budget.
+   raises the router's parked-request budget (and its shutdown grace period to match).
    ```bash
    make install-bg
    make install-status     # run any time; the install takes about 5–10 minutes

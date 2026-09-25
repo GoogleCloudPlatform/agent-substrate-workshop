@@ -15,13 +15,12 @@ Compare that with Module 4's gateway-only-egress pattern.
 >   `ko`-resolved. You still push everything into your own `KO_DOCKER_REPO` — `hack/deploy.sh` reuses that
 >   env var as the target registry for the Docker build too — but you need `docker` with `buildx` installed
 >   as well as `ko`.
-> - **Don't skip `--patch-router`.** This workshop's `install-substrate.sh` only raises
->   `--parked-request-budget` to 60s; it never touches `terminationGracePeriodSeconds`, which stays at
->   substrate's own default of 60s. agent-swarm's `hack/deploy.sh` requires **both**: once the parked-request
->   budget is ≥60s, it also requires `terminationGracePeriodSeconds ≥120` on `atenet-router`, and refuses to
->   deploy otherwise. Since our router only has the first half fixed, `hack/deploy.sh up` **will** fail with
->   a "needs these changes" error unless you pass `--patch-router` (which patches the grace period too, and
->   says so: "not restored on delete").
+> - **Keep `--patch-router`.** agent-swarm's `hack/deploy.sh` requires **both** router changes: once the
+>   parked-request budget is ≥60s, it also requires `terminationGracePeriodSeconds ≥120` on `atenet-router`,
+>   and refuses to deploy otherwise. This workshop's `install-substrate.sh` now sets both (60s budget, 120s
+>   grace), but a cluster installed before that change still has substrate's default 60s grace, and
+>   `hack/deploy.sh up` then fails with a "needs these changes" error. `--patch-router` covers that case
+>   (it patches the grace period too, and says so: "not restored on delete").
 
 ## Before you start
 

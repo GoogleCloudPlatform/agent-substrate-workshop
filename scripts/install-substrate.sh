@@ -45,16 +45,24 @@ state_put worker-image "$worker"
 ok "worker image $worker"
 
 step "Label nodes"
-for node in $(kubectl get nodes -l '!ate.dev/substrate-version' -o name); do
-  kubectl label "$node" "ate.dev/substrate-version=$version"
-done
+# Every node, with --overwrite: after a SUBSTRATE_REF change the old version label must be replaced.
+kubectl label nodes --all "ate.dev/substrate-version=$version" --overwrite >/dev/null
 ok "nodes labeled"
 
-step "Router: raise parked-request budget to 60s (default 5s is too short for model turns)"
+step "Router: raise parked-request budget to 60s (default 5s is too short for model turns), grace to 120s"
 args="$(kubectl -n ate-system get deploy atenet-router -o jsonpath='{.spec.template.spec.containers[0].args}')"
 if [[ "$args" != *"--parked-request-budget="* ]]; then
   kubectl -n ate-system patch deploy atenet-router --type=json \
     -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--parked-request-budget=60s"}]'
+fi
+# The router's shutdown runs --drain-delay (13s) + the Envoy drain window (~15s) + the derived
+# --drain-timeout (park budget + 10s route budget + 5s margin = 75s at 60s), about 103s plus slack for
+# the force stop and telemetry flush. Substrate's default grace of 60s is sized for the 5s budget;
+# 120s keeps a router rollout from SIGKILLing parked requests mid-drain.
+grace="$(kubectl -n ate-system get deploy atenet-router -o jsonpath='{.spec.template.spec.terminationGracePeriodSeconds}')"
+if [[ "${grace:-0}" -lt 120 ]]; then
+  kubectl -n ate-system patch deploy atenet-router --type=merge \
+    -p '{"spec":{"template":{"spec":{"terminationGracePeriodSeconds":120}}}}'
 fi
 kubectl -n ate-system rollout status deploy/atenet-router --timeout=5m
 ok "router patched"
