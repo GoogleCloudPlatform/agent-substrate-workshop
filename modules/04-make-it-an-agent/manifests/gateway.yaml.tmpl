@@ -1,0 +1,71 @@
+# The always-on gateway. Rendered by scripts/gateway.sh.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gateway
+  namespace: ${NAMESPACE}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: ${NAMESPACE}
+  labels: {app: gateway}
+spec:
+  replicas: 1   # one replica: the idle tracker is in memory
+  selector:
+    matchLabels: {app: gateway}
+  template:
+    metadata:
+      labels: {app: gateway}
+    spec:
+      serviceAccountName: gateway
+      containers:
+      - name: gateway
+        image: ${GATEWAY_IMAGE}
+        ports:
+        - {name: http, containerPort: 8080}
+        env:
+        - {name: ATESPACE, value: "${ATESPACE}"}
+        - {name: MOCK_LLM, value: "${MOCK_LLM}"}
+        - {name: GEMINI_MODEL, value: "${GEMINI_MODEL}"}
+        - {name: GOOGLE_CLOUD_PROJECT, value: "${PROJECT_ID}"}
+        - {name: VERTEX_LOCATION, value: "${VERTEX_LOCATION}"}
+        - {name: IDLE_AFTER, value: "${IDLE_AFTER}"}
+        readinessProbe:
+          httpGet: {path: /readyz, port: http}
+        resources:
+          requests: {cpu: 100m, memory: 128Mi}
+          limits: {memory: 256Mi}
+        volumeMounts:
+        - {name: ate-token, mountPath: /var/run/ate/token, readOnly: true}
+        - {name: ate-trust, mountPath: /var/run/ate/trust, readOnly: true}
+      volumes:
+      # A token ateapi accepts: audience api.ate-system.svc, rotated by the kubelet.
+      - name: ate-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              audience: api.ate-system.svc
+              expirationSeconds: 3600
+              path: token
+      # The CA that signs ateapi's serving certificate, published as a ClusterTrustBundle.
+      - name: ate-trust
+        projected:
+          sources:
+          - clusterTrustBundle:
+              signerName: servicedns.podcert.ate.dev/identity
+              labelSelector:
+                matchLabels: {podcert.ate.dev/canarying: live}
+              path: trust-bundle.pem
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: ${NAMESPACE}
+  labels: {app: gateway}
+spec:
+  selector: {app: gateway}
+  ports:
+  - {name: http, port: 80, targetPort: http}
