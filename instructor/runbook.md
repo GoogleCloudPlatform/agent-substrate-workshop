@@ -74,5 +74,9 @@ which is exactly what `catch-up.sh <current>` produces.
 Ask attendees to run `make teardown` (keeps their cluster, bucket, and Artifact Registry — only the in-cluster
 workshop state goes away), or `YES=1 scripts/teardown.sh --all` if the whole project is being torn down too
 (also deletes the bucket, the Artifact Registry repo, and the project IAM bindings `make gcp` created). Neither
-one touches the GKE cluster or the Substrate install itself — that's a separate, explicit cluster teardown if
-the project isn't being deleted outright.
+one touches the GKE cluster, and neither deletes Substrate's own `ate-system` Deployments/DaemonSets — but
+**`--all` leaves the already-running Substrate unable to actually work**: in source install mode its
+control-plane and worker images lived in the Artifact Registry repo that was just deleted, and the IAM grants
+that let `atelet`/`ateapi` write snapshots are gone too. If the project is being kept around rather than
+deleted outright, `--all` needs a full `make install` (or `make catch-up`) afterward before Substrate is usable
+again.
