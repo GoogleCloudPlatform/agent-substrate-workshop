@@ -146,6 +146,42 @@ t_count_actors_in_state() {
   [[ "$n" == 1 && "$m" == 1 ]]
 }
 
+# A stub kubectl for reset_template: $KDIR/actors/<name> holds the actor's template name,
+# $KDIR/tmpl-<name> marks a template that exists. Deleting a template still in use fails,
+# like ateapi's FailedPrecondition.
+make_template_stub() {
+  local d="$1"; mkdir -p "$d/bin" "$d/actors"
+  cat >"$d/bin/kubectl" <<'STUB'
+#!/usr/bin/env bash
+echo "$*" >>"$KLOG"
+case "$*" in
+  "ate get actors -a ws -o json")
+    out=""; for f in "$KDIR"/actors/*; do [[ -f "$f" ]] || continue
+      out+="${out:+,}{\"metadata\":{\"name\":\"${f##*/}\"},\"actorTemplate\":{\"atespace\":\"ws\",\"name\":\"$(cat "$f")\"},\"status\":{\"state\":\"ACTOR_STATE_CRASHED\"}}"
+    done; echo "{\"actors\":[$out]}" ;;
+  "ate delete actor "*" -a ws --any-state") rm -f "$KDIR/actors/$4" ;;
+  "ate get actor-template "*" -a ws") [[ -f "$KDIR/tmpl-$4" ]] ;;
+  "ate delete actor-template "*" -a ws")
+    grep -qx "$4" "$KDIR"/actors/* 2>/dev/null && exit 1
+    rm -f "$KDIR/tmpl-$4" ;;
+  *) exit 1 ;;
+esac
+STUB
+  chmod +x "$d/bin/kubectl"
+}
+t_reset_template_deletes_its_actors_then_template() {
+  local d; d="$(mktemp -d "$TMP/t.XXXXXX")"; make_template_stub "$d"
+  echo t >"$d/actors/a1"; echo t >"$d/actors/a2"; echo other >"$d/actors/b1"; touch "$d/tmpl-t" "$d/tmpl-other"
+  ( export PATH="$d/bin:$PATH" KLOG="$d/log" KDIR="$d"; reset_template ws t && reset_template ws t ) &&
+    [[ ! -e "$d/actors/a1" && ! -e "$d/actors/a2" && -e "$d/actors/b1" ]] &&
+    [[ ! -e "$d/tmpl-t" && -e "$d/tmpl-other" ]] &&
+    grep -q 'delete actor a1 -a ws --any-state' "$d/log" && ! grep -q 'delete actor b1' "$d/log"
+}
+t_catch_up_reset_needs_module_3() {
+  local out; out="$(RESET=1 bash "$HERE/../catch-up.sh" 2 2>&1)" && return 1
+  [[ "$out" == *"RESET=1 needs MODULE=3"* ]]
+}
+
 load_env
 check "load_env expands references" t_load_env_expands
 check "load_env requires PROJECT_ID" t_load_env_requires_project
@@ -164,4 +200,6 @@ check "ensure_actor creates once" t_ensure_actor_idempotent
 check "suspend_actor suspends a running actor" t_suspend_actor_suspends_running
 check "suspend_actor is a no-op when suspended" t_suspend_actor_noop_when_suspended
 check "count_actors_in_state filters by state and prefix" t_count_actors_in_state
+check "catch-up RESET=1 refuses MODULE<3" t_catch_up_reset_needs_module_3
+check "reset_template deletes its actors, then the template (idempotent)" t_reset_template_deletes_its_actors_then_template
 exit "$fails"

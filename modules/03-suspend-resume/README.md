@@ -88,6 +88,6 @@ template version. Existing actors keep their template, so `hello` still runs `ag
 ```bash
 make verify MODULE=3
 ```
-**Stuck?** Run `make catch-up MODULE=4`.
+**Stuck?** Run `make catch-up MODULE=4`. If `agent-v2` or its actors exist but are broken, run `make catch-up MODULE=4 RESET=1`, which deletes and recreates them from the solution.
 
 Next: [Module 4 — Make it an agent](../04-make-it-an-agent/README.md)

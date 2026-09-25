@@ -1,12 +1,24 @@
 #!/usr/bin/env bash
 # catch-up.sh N — bring your environment to the start of module N (the end of module N-1).
 # Safe to re-run: every step skips work that is already done. Your main.go is backed up before it is replaced.
+# RESET=1 also deletes the newest template catch-up N stages (N=3: agent-v1, N=4: agent-v2, N>=5: agent-v3)
+# and every actor made from it, in any state, then rebuilds and recreates them from the solution.
+# Use it when a template exists but is broken (a golden snapshot is immutable, so it can't be fixed in place).
 # Note: past Module 5 the gateway's IDLE_AFTER is live. Re-running catch-up at a lower N doesn't
 # turn it off, so actors can still get idle-suspended while you work back through earlier modules.
 source "$(dirname "$0")/lib.sh"
 load_env
 N="${1:-}"
-[[ "$N" =~ ^[1-7]$ ]] || die "usage: make catch-up MODULE=<1-7>"
+[[ "$N" =~ ^[1-7]$ ]] || die "usage: make catch-up MODULE=<1-7> [RESET=1]"
+RESET_TEMPLATE=""
+if [[ "${RESET:-}" == 1 ]]; then
+  case "$N" in
+    1|2) die "RESET=1 needs MODULE=3 or later: modules 0 and 1 create no template" ;;
+    3)   RESET_TEMPLATE=agent-v1 ;;
+    4)   RESET_TEMPLATE=agent-v2 ;;
+    *)   RESET_TEMPLATE=agent-v3 ;;
+  esac
+fi
 S="$REPO_ROOT/scripts" M="$REPO_ROOT/modules" MAIN="$REPO_ROOT/app/cmd/agent/main.go"
 POLICY="$M/04-make-it-an-agent/manifests/egress-gateway.yaml"
 BACKED_UP=false
@@ -38,8 +50,14 @@ use_solution() {
   ok "app/cmd/agent/main.go ← modules/$1/solution/main.go"
 }
 # stage_template <module-dir> <template>: build that module's agent and create its template, once.
+# With RESET=1, the template being reset (and its actors) is deleted first, so it is always rebuilt.
 stage_template() {
   use_solution "$1"
+  if [[ "$2" == "$RESET_TEMPLATE" ]]; then
+    step "RESET=1: deleting template $2 and all its actors (any state), to recreate them from the solution"
+    reset_template "$ATESPACE" "$2"
+    ok "template $2 and its actors deleted"
+  fi
   if ! kubectl ate get actor-template "$2" -a "$ATESPACE" >/dev/null 2>&1; then
     "$S/build.sh" agent
     "$S/render.sh" "$M/$1/manifests/template.yaml.tmpl" >"$STATE_DIR/$2.yaml"

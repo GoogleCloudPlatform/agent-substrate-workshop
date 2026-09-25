@@ -82,6 +82,6 @@ sequenceDiagram
 ```bash
 make verify MODULE=2
 ```
-**Stuck?** Run `make catch-up MODULE=3`.
+**Stuck?** Run `make catch-up MODULE=3`. If `agent-v1` or its actors exist but are broken, run `make catch-up MODULE=3 RESET=1`, which deletes and recreates them from the solution.
 
 Next: [Module 3 — Suspend and resume](../03-suspend-resume/README.md)

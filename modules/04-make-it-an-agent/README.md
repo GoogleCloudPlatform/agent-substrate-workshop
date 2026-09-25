@@ -91,6 +91,6 @@ flowchart LR
 ```bash
 make verify MODULE=4
 ```
-**Stuck?** Run `make catch-up MODULE=5`.
+**Stuck?** Run `make catch-up MODULE=5`. If `agent-v3` or its actors exist but are broken, run `make catch-up MODULE=5 RESET=1`, which deletes and recreates them from the solution.
 
 Next: [Module 5 — Density and idle](../05-density-idle/README.md)

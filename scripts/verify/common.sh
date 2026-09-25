@@ -11,6 +11,9 @@ check() {
 }
 
 finish() {
-  (( VFAILS == 0 )) || die "module $1: $VFAILS check(s) failed — see instructor/troubleshooting.md, or run: make catch-up MODULE=$(( $1 + 1 ))"
+  local next=$(( $1 + 1 )) reset=""
+  # Modules 2-6 create templates/actors; catch-up only creates missing ones unless RESET=1.
+  (( next >= 3 )) && reset=" — if a template or actor you created is broken, add RESET=1 to delete and recreate it and its actors"
+  (( VFAILS == 0 )) || die "module $1: $VFAILS check(s) failed — see instructor/troubleshooting.md, or run: make catch-up MODULE=$next$reset"
   ok "module $1 complete"
 }

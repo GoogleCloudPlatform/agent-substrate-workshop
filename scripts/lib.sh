@@ -141,6 +141,28 @@ _actors_list() {
   kubectl ate get actors -a "$1" -o json | jq -c 'if type == "array" then . else (.actors // .items // []) end'
 }
 actor_names() { _actors_list "$1" | jq -r '.[].metadata.name'; }
+# template_actors <atespace> <template>: names of the actors (any state) created from that template.
+template_actors() {
+  _actors_list "$1" | jq -r --arg t "$2" '.[] | select((.actorTemplate.name // "") == $t) | .metadata.name'
+}
+_no_template_actors() { [[ -z "$(template_actors "$1" "$2")" ]]; }
+_template_gone() { ! kubectl ate get actor-template "$2" -a "$1" >/dev/null 2>&1; }
+# _delete_template succeeds once the template is gone; ateapi refuses the delete while actors still use it.
+_delete_template() {
+  _template_gone "$1" "$2" || kubectl ate delete actor-template "$2" -a "$1" >/dev/null 2>&1 || true
+  _template_gone "$1" "$2"
+}
+
+# reset_template <atespace> <template>: delete the template and every actor made from it, in any
+# state, so it can be recreated. A golden snapshot is immutable, so this is the only way to fix one.
+reset_template() {
+  local as="$1" t="$2" a
+  for a in $(template_actors "$as" "$t"); do
+    kubectl ate delete actor "$a" -a "$as" --any-state >/dev/null || warn "could not delete actor $as/$a"
+  done
+  wait_for 180 "actors of template $as/$t to finish deleting" _no_template_actors "$as" "$t"
+  wait_for 120 "template $as/$t to be deleted" _delete_template "$as" "$t"
+}
 
 # count_actors_in_state <atespace> <STATE> [name-prefix]
 count_actors_in_state() {

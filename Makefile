@@ -2,6 +2,7 @@
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 MODULE ?=
+RESET ?=
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -39,8 +40,8 @@ forward-router: ## Port-forward the atenet-router to http://localhost:8080
 	@source scripts/lib.sh && load_env && port_forward router ate-system svc/atenet-router 8080 80 && echo "open http://localhost:8080"
 forward-gateway: ## Port-forward the gateway to http://localhost:8081
 	@source scripts/lib.sh && load_env && port_forward gateway $$NAMESPACE svc/gateway 8081 80 && echo "open http://localhost:8081"
-catch-up: ## Bring your environment to the start of MODULE=N
-	@scripts/catch-up.sh "$(MODULE)"
+catch-up: ## Bring your environment to the start of MODULE=N (RESET=1 rebuilds that module's template)
+	@RESET="$(RESET)" scripts/catch-up.sh "$(MODULE)"
 verify: ## Check the end state of MODULE=N
 	@scripts/verify/$$(printf '%02d' "$(MODULE)").sh
 e2e: ## Run every module via catch-up + verify

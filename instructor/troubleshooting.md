@@ -1,7 +1,10 @@
 # Troubleshooting
 
 Each entry has a **symptom**, its **cause**, and a **fix**. Attendees who are far behind can run
-`make catch-up MODULE=N`, which reproduces the verified end state of module `N-1`.
+`make catch-up MODULE=N`, which reproduces the verified end state of module `N-1`. It only creates what's
+missing. If a template or actor the attendee made is broken, add `RESET=1`: it deletes the newest template
+that catch-up stages (`agent-v1` for N=3, `agent-v2` for N=4, `agent-v3` for N≥5) and every actor made from
+it, in any state, then rebuilds and recreates them from the solution.
 
 ## Install
 
@@ -22,7 +25,7 @@ Each entry has a **symptom**, its **cause**, and a **fix**. Attendees who are fa
 | `curl` through the router returns `503` after about 60s | All workers are busy and nothing freed one within the parked-request budget (`atenet-router --parked-request-budget=60s`, raised from the substrate default of 5s by `make install`) | Expected in Module 5 step 4 — that's the demo. Otherwise, suspend an actor, or turn on the gateway's idle-suspender (`kubectl -n workshop set env deploy/gateway IDLE_AFTER=20s`). |
 | `curl` returns `503` immediately, or times out at 5s | The router's `--parked-request-budget` patch never landed, so it's still substrate's 5s default | `make verify MODULE=1` checks for the patched flag and fails if it's missing. Rerun `make install`. |
 | Actor state `CRASHED` | The agent process exited, or failed `readyz` after a restore | `kubectl ate logs actor NAME -a workshop` to see why. Substrate won't resume a `CRASHED` actor on its own. Try `kubectl ate revert actor NAME -a workshop` first — a crashed (or running/paused) actor can be reverted straight to `SUSPENDED` with its last snapshot kept, so a later resume restores from it, no recreate needed. If that doesn't help, fall back to `kubectl ate delete actor NAME -a workshop` (`SUSPENDED`/`CRASHED` actors delete without `--any-state` — that flag is only needed for other states) and recreate it. |
-| `disk=-1` in Module 3 | `DataDir` isn't set in `main.go`, or the image wasn't rebuilt before creating `agent-v2` | Fix `main.go`, `make build-agent`, then create a new template version (e.g. `agent-v2b` — a template's golden snapshot is immutable, so you can't edit `agent-v2` in place). Or just `make catch-up MODULE=4`, which redoes both from the workshop's own known-good solution. |
+| `disk=-1` in Module 3 | `DataDir` isn't set in `main.go`, or the image wasn't rebuilt before creating `agent-v2` | Fix `main.go`, `make build-agent`, then create a new template version (e.g. `agent-v2b` — a template's golden snapshot is immutable, so you can't edit `agent-v2` in place). Or run `make catch-up MODULE=4 RESET=1`: it deletes `agent-v2` and its actors (`memo`, in any state), then rebuilds the image and recreates both from the workshop's own known-good solution. Without `RESET=1`, catch-up only creates what's missing and leaves a broken `agent-v2` alone. |
 
 ## Gateway and egress
 
