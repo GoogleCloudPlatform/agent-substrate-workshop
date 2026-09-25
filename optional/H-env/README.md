@@ -77,7 +77,7 @@ build, no cluster access needed to run it, just an address to the API service.
 ## 2. Use an environment
 
 ```bash
-kubectl -n ate-env port-forward svc/ate-env-api 7777:7777 &
+port_forward ate-env-api ate-env svc/ate-env-api 7777 7777   # from scripts/lib.sh, sourced in step 1
 ate-env create dev1
 ate-env dev1 shell 'uname -a; echo hello > /note.txt; ls -la /note.txt'
 echo "print('hi from the sandbox')" | ate-env dev1 write /hi.py
@@ -113,9 +113,10 @@ know before you start" above.
 
 ## 4. Drive it over MCP
 
-The API exposes a built-in MCP server at `POST /v1alpha/envs/{id}/mcp` with tools `shell`, `read_file`,
-`write_file`, `edit_file`, `glob`, and `grep`. It uses the MCP **Streamable HTTP** transport, which requires
-an `Accept` header naming both response formats it can produce, even for a plain JSON reply:
+The API exposes a built-in MCP server at `POST /v1alpha/envs/{id}/mcp` with tools `read_file`, `write_file`,
+and `shell` (`internal/mcp/tools.go` at `ENV_REF`; env's top-level README also lists `edit_file`, `glob`,
+and `grep`, but those aren't registered at this commit). It uses the MCP **Streamable HTTP** transport,
+which requires an `Accept` header naming both response formats it can produce, even for a plain JSON reply:
 
 ```bash
 curl -s -X POST localhost:7777/v1alpha/envs/dev1/mcp \
@@ -195,7 +196,7 @@ atespace, the same way you used the Prometheus UI in Module 6.
 ```bash
 for e in dev1 $(seq -f 'env%g' 1 10); do ate-env delete "$e"; done
 ate-env manifest --api-image x --worker-image x | kubectl delete -f - --ignore-not-found
-kill %1 2>/dev/null   # the port-forward from step 2, if you didn't already stop it
+stop_port_forwards   # from scripts/lib.sh; stops step 2's ate-env-api forward (and any others this shell started)
 ```
 
 ## Next
