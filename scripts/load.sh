@@ -25,7 +25,7 @@ while (( SECONDS < deadline )); do
   done
   # Wait only on this burst's own PIDs. A bare `wait` would also block on the
   # port_forward's kubectl process, which stays running for the whole script.
-  wait "${pids[@]}"
+  (( ${#pids[@]} )) && wait "${pids[@]}"
   i=$((i + CONCURRENCY))
   sleep $(( RANDOM % 4 ))
 done
