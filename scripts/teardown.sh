@@ -14,7 +14,7 @@ case "${1:-}" in
   *)      die "usage: teardown.sh [--all]" ;;
 esac
 if [[ "${YES:-}" != 1 ]]; then
-  echo "This deletes atespace $ATESPACE (all actors and templates), namespace $NAMESPACE, the workshop dashboard,"
+  echo "This deletes atespace $ATESPACE (all actors and templates), namespace $NAMESPACE, the workshop and substrate dashboards,"
   echo "and gs://$BUCKET_NAME/$ATESPACE/.$($ALL && echo " ALSO the bucket gs://$BUCKET_NAME, repo $AR_REPO, and the workshop's IAM bindings.")"
   read -r -p "Type 'yes' to continue: " answer || answer=""
   [[ "$answer" == yes ]] || die "aborted"
@@ -47,11 +47,27 @@ step "namespace $NAMESPACE (WorkerPool, gateway, Prometheus UI)"
 kubectl -n "$NAMESPACE" delete workerpool agents --ignore-not-found --wait=true || warn "workerpool agents (the WorkerPool CRD may be gone)"
 kubectl delete ns "$NAMESPACE" --ignore-not-found || warn "namespace $NAMESPACE"
 
-step "workshop dashboard"
-for d in $(gcloud monitoring dashboards list --project "$PROJECT_ID" \
-    --filter='displayName="Agent Substrate Workshop"' --format='value(name)'); do
-  gcloud monitoring dashboards delete "$d" --project "$PROJECT_ID" --quiet || warn "dashboard $d"
-done
+step "dashboards (the workshop's and substrate's three, as created by make dashboards)"
+# Titles come from the same files scripts/dashboards.sh uploads; the fallback list is substrate's
+# tools/setup-gcp/dashboards at the pinned ref, for when the checkout is already gone.
+dashboard_titles() {
+  local f found=false
+  echo "Agent Substrate Workshop"
+  for f in "$STATE_DIR"/substrate/tools/setup-gcp/dashboards/*.json; do
+    [[ -f "$f" ]] || continue
+    jq -r .displayName "$f" 2>/dev/null && found=true
+  done
+  $found || printf '%s\n' "Substrate Routing & E2E Latency" "Substrate gRPC Server — latency / QPS / errors" "Substrate Snapshot Size & QPS"
+}
+while IFS= read -r title; do
+  [[ -n "$title" ]] || continue
+  names="$(gcloud monitoring dashboards list --project "$PROJECT_ID" \
+    --filter="displayName=\"$title\"" --format='value(name)' 2>/dev/null)" || { warn "could not list dashboard: $title"; continue; }
+  for d in $names; do
+    gcloud monitoring dashboards delete "$d" --project "$PROJECT_ID" --quiet >/dev/null || warn "dashboard $title ($d)"
+  done
+done < <(dashboard_titles)
+ok "dashboards removed"
 
 step "snapshots"
 gcloud storage rm -r "gs://$BUCKET_NAME/$ATESPACE/**" --quiet 2>/dev/null || true

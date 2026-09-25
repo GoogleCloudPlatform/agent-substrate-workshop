@@ -74,7 +74,7 @@ Substrate moves fast. The workshop pins it with `SUBSTRATE_REF` in `workshop.env
 was validated for the next event.
 
 ## Clean up
-`make teardown` deletes the workshop's atespace, namespace, dashboard, and snapshots, and keeps your cluster,
+`make teardown` deletes the workshop's atespace, namespace, dashboards (the workshop's and substrate's three), and snapshots, and keeps your cluster,
 bucket, and Artifact Registry — it asks you to confirm unless you set `YES=1`. `YES=1 scripts/teardown.sh --all`
 also removes the bucket and the Artifact Registry repo (with the grants `make gcp` put on them) and the
 project IAM bindings `make gcp` created for the workshop namespace, but never

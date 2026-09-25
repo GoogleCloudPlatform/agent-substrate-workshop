@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Lints observability/dashboard.json and proves dashboards.sh is idempotent (create once, then update
-# with the live etag) using a stub gcloud. No cloud access needed.
+# Lints observability/dashboard.json, proves dashboards.sh is idempotent (create once, then update
+# with the live etag), and checks what teardown.sh deletes, all with stub gcloud/kubectl. No cloud access needed.
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 DASH="$ROOT/observability/dashboard.json"
@@ -38,4 +38,40 @@ echo "PROJECT_ID=p" >"$WORKSHOP_ENV_FILE"
 check "first run creates" "[[ \$(grep -c 'dashboards create' '$TMP/log') == 1 ]]"
 check "second run updates the same dashboard" "grep -q 'dashboards update projects/p/dashboards/123' '$TMP/log'"
 check "update carries the live etag" "[[ \$(jq -r .etag '$TMP/body') == etag-1 ]]"
+
+# Teardown deletes all four dashboards by title, and a failed delete doesn't stop it.
+mkdir -p "$TMP/td/bin"
+cat >"$TMP/td/bin/gcloud" <<'STUB'
+#!/usr/bin/env bash
+echo "$*" >>"$STUB_LOG"
+case "$*" in
+  *"dashboards list"*) echo "projects/p/dashboards/$(printf '%s' "$*" | cksum | cut -d' ' -f1)" ;;
+  *"dashboards delete"*) [[ "$*" != *"$FAIL_ID"* ]] ;;
+  *"projects describe"*) echo 123 ;;
+esac
+STUB
+cat >"$TMP/td/bin/kubectl" <<'STUB'
+#!/usr/bin/env bash
+[[ "$1" == ate ]] && exit 1; exit 0
+STUB
+chmod +x "$TMP/td/bin/gcloud" "$TMP/td/bin/kubectl"
+fail_id="$(printf '%s' "monitoring dashboards list --project p --filter=displayName=\"Substrate Snapshot Size & QPS\" --format=value(name)" | cksum | cut -d' ' -f1)"
+: >"$TMP/td/log"
+printf 'PROJECT_ID=p\nBUCKET_NAME=p-ate\nREGION=r\nAR_REPO=workshop\n' >"$TMP/td/env"
+PATH="$TMP/td/bin:$PATH" STUB_LOG="$TMP/td/log" FAIL_ID="$fail_id" YES=1 WORKSHOP_ENV_FILE="$TMP/td/env" \
+  bash "$ROOT/scripts/teardown.sh" >/dev/null 2>&1
+td_rc=$?
+check "teardown survives a failed dashboard delete" "[[ $td_rc == 0 ]] && grep -q 'dashboards delete projects/p/dashboards/$fail_id' '$TMP/td/log'"
+for t in "Agent Substrate Workshop" "Substrate Routing & E2E Latency" "Substrate gRPC Server — latency / QPS / errors" "Substrate Snapshot Size & QPS"; do
+  check "teardown looks up dashboard: $t" "grep -qF 'displayName=\"$t\"' '$TMP/td/log'"
+done
+check "teardown deletes each dashboard it finds" "[[ \$(grep -c 'dashboards delete' '$TMP/td/log') == 4 ]]"
+
+# teardown --all must not touch project-level Artifact Registry grants (they're repo-level; the repo delete drops them).
+: >"$TMP/td/log"
+PATH="$TMP/td/bin:$PATH" STUB_LOG="$TMP/td/log" FAIL_ID=none YES=1 WORKSHOP_ENV_FILE="$TMP/td/env" \
+  bash "$ROOT/scripts/teardown.sh" --all >/dev/null 2>&1
+check "teardown --all deletes the repo and unbinds the workshop's project roles" \
+  "grep -q 'artifacts repositories delete' '$TMP/td/log' && grep -q 'remove-iam-policy-binding.*aiplatform.user' '$TMP/td/log'"
+check "teardown --all leaves project-level artifactregistry.reader alone" "! grep -q 'artifactregistry' '$TMP/td/log'"
 exit "$fails"
