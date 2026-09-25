@@ -116,14 +116,30 @@ func (g GRPC) Suspend(ctx context.Context, atespace, name string) error {
 	return err
 }
 
+// DefaultSuspendTimeout bounds one SuspendActor call, so a hung call can't stall every later suspend.
+const DefaultSuspendTimeout = 60 * time.Second
+
 // Suspender suspends RUNNING actors idle for at least IdleAfter. IdleAfter <= 0 disables
-// suspending but still updates the fleet gauges.
+// suspending but still updates the fleet gauges. SuspendTimeout (default DefaultSuspendTimeout)
+// bounds each Suspend call.
 type Suspender struct {
-	API       API
-	Atespace  string
-	IdleAfter time.Duration
-	Tracker   *Tracker
-	Metrics   *metrics.Metrics
+	API            API
+	Atespace       string
+	IdleAfter      time.Duration
+	SuspendTimeout time.Duration
+	Tracker        *Tracker
+	Metrics        *metrics.Metrics
+}
+
+// suspend makes one Suspend call under its own timeout.
+func (s *Suspender) suspend(ctx context.Context, name string) error {
+	timeout := s.SuspendTimeout
+	if timeout <= 0 {
+		timeout = DefaultSuspendTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return s.API.Suspend(ctx, s.Atespace, name)
 }
 
 // Tick runs one check.
@@ -142,11 +158,15 @@ func (s *Suspender) Tick(ctx context.Context) error {
 		if s.IdleAfter <= 0 {
 			continue
 		}
+		// Checked per actor, right before its Suspend, not once for the whole list: earlier
+		// Suspend calls in this Tick can take seconds, and a request may arrive meanwhile.
+		// A request that lands after this check still races the RPC; it parks in the router,
+		// and the actor resumes to serve it.
 		idle, busy := s.Tracker.idleFor(a.Name)
 		if busy || idle < s.IdleAfter {
 			continue
 		}
-		if err := s.API.Suspend(ctx, s.Atespace, a.Name); err != nil {
+		if err := s.suspend(ctx, a.Name); err != nil {
 			s.Metrics.IdleSuspends.WithLabelValues("error").Inc()
 			log.Printf("idle-suspend %s/%s: %v", s.Atespace, a.Name, err)
 			continue

@@ -29,10 +29,16 @@ type fakeAPI struct {
 	actors    []ActorInfo
 	suspended []string
 	err       error
+	onSuspend func(ctx context.Context, name string) error // optional; runs before recording
 }
 
 func (f *fakeAPI) ListActors(context.Context, string) ([]ActorInfo, error) { return f.actors, nil }
-func (f *fakeAPI) Suspend(_ context.Context, _, name string) error {
+func (f *fakeAPI) Suspend(ctx context.Context, _, name string) error {
+	if f.onSuspend != nil {
+		if err := f.onSuspend(ctx, name); err != nil {
+			return err
+		}
+	}
 	if f.err != nil {
 		return f.err
 	}
@@ -128,6 +134,68 @@ func TestSuspendErrorIsCountedAndRetried(t *testing.T) {
 	_ = s.Tick(context.Background())
 	if promtest.ToFloat64(m.IdleSuspends.WithLabelValues("error")) != 1 || len(api.suspended) != 1 {
 		t.Fatalf("errors=%v suspended=%v", promtest.ToFloat64(m.IdleSuspends.WithLabelValues("error")), api.suspended)
+	}
+}
+
+func TestSuspendHasATimeout(t *testing.T) {
+	c := &clock{t: time.Unix(1000, 0)}
+	var deadlines []time.Duration
+	api := &fakeAPI{actors: []ActorInfo{{"hung", true}, {"next", true}}}
+	api.onSuspend = func(ctx context.Context, name string) error {
+		d, ok := ctx.Deadline()
+		if !ok {
+			return errors.New("no deadline")
+		}
+		deadlines = append(deadlines, time.Until(d))
+		if name == "hung" {
+			<-ctx.Done() // a SuspendActor that never answers
+			return ctx.Err()
+		}
+		return nil
+	}
+	s, m := newSuspender(api, c, time.Second)
+	s.SuspendTimeout = 50 * time.Millisecond
+	_ = s.Tick(context.Background()) // first sighting
+	c.advance(2 * time.Second)
+	start := time.Now()
+	_ = s.Tick(context.Background())
+	if time.Since(start) > 5*time.Second {
+		t.Fatalf("Tick blocked %v on a hung Suspend", time.Since(start))
+	}
+	if len(api.suspended) != 1 || api.suspended[0] != "next" {
+		t.Fatalf("suspended %v, want [next] after the hung call timed out", api.suspended)
+	}
+	if promtest.ToFloat64(m.IdleSuspends.WithLabelValues("error")) != 1 {
+		t.Fatal("timed-out suspend not counted as an error")
+	}
+
+	// The default is DefaultSuspendTimeout.
+	deadlines = nil
+	s2, _ := newSuspender(&fakeAPI{actors: []ActorInfo{{"a", true}}, onSuspend: api.onSuspend}, c, time.Second)
+	_ = s2.Tick(context.Background())
+	c.advance(2 * time.Second)
+	_ = s2.Tick(context.Background())
+	if len(deadlines) != 1 || deadlines[0] > DefaultSuspendTimeout || deadlines[0] < DefaultSuspendTimeout-5*time.Second {
+		t.Fatalf("default suspend deadline = %v, want ~%v", deadlines, DefaultSuspendTimeout)
+	}
+}
+
+func TestRequestDuringEarlierSuspendSparesLaterActor(t *testing.T) {
+	c := &clock{t: time.Unix(1000, 0)}
+	api := &fakeAPI{actors: []ActorInfo{{"a", true}, {"b", true}}}
+	s, _ := newSuspender(api, c, 20*time.Second)
+	_ = s.Tick(context.Background()) // first sighting of both
+	c.advance(30 * time.Second)
+	// While a's (slow, synchronous) Suspend runs, a chat request for b starts.
+	api.onSuspend = func(_ context.Context, name string) error {
+		if name == "a" {
+			s.Tracker.Begin("b")
+		}
+		return nil
+	}
+	_ = s.Tick(context.Background())
+	if len(api.suspended) != 1 || api.suspended[0] != "a" {
+		t.Fatalf("suspended %v, want [a]: b's idle state must be re-checked right before its Suspend", api.suspended)
 	}
 }
 
