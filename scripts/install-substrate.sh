@@ -18,6 +18,7 @@ step "kubectl-ate"
 mkdir -p "$REPO_ROOT/bin"
 (cd "$SRC" && go build -ldflags "$(make -s ldflags | tr '\n' ' ')" -o "$REPO_ROOT/bin/kubectl-ate" ./cmd/kubectl-ate)
 ok "bin/kubectl-ate (kubectl ate …)"
+user_has_ate || path_hint
 
 step "Substrate version label"
 if [[ -n "${SUBSTRATE_IMAGE_TAG:-}" ]]; then

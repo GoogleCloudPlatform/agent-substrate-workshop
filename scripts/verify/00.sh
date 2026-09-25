@@ -9,4 +9,7 @@ check "Substrate install started (.workshop/install.log or ate-system)" \
 check "workshop dashboard exists" bash -c \
   "gcloud monitoring dashboards list --project '$PROJECT_ID' --filter='displayName=\"Agent Substrate Workshop\"' --format='value(name)' | grep -q ."
 check "bin/egressctl built" test -x "$REPO_ROOT/bin/egressctl"
+# Scripts get bin/ on PATH from lib.sh; your shell doesn't. Module 2 onwards you type `kubectl ate …`.
+check "kubectl ate on your shell's PATH (bin/)" user_has_ate
+user_has_ate || path_hint
 finish 0

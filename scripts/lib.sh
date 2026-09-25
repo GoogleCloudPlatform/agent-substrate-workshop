@@ -4,6 +4,9 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE_DIR="${WORKSHOP_STATE_DIR:-$REPO_ROOT/.workshop}"
+# Your shell's PATH before we prepend bin/, so checks can tell whether *you* can type `kubectl ate`.
+# Exported once, so a script run by another script still sees the original.
+: "${WORKSHOP_USER_PATH:=$PATH}"; export WORKSHOP_USER_PATH
 export PATH="$REPO_ROOT/bin:$PATH"
 
 if [[ -t 1 ]]; then C_B=$'\e[1m'; C_G=$'\e[32m'; C_Y=$'\e[33m'; C_R=$'\e[31m'; C_0=$'\e[0m'; else C_B=; C_G=; C_Y=; C_R=; C_0=; fi
@@ -22,6 +25,17 @@ load_env() {
   : "${NAMESPACE:=workshop}" "${ATESPACE:=workshop}" "${MOCK_LLM:=false}"
   export NAMESPACE ATESPACE MOCK_LLM
   mkdir -p "$STATE_DIR"
+}
+
+# user_has_ate: true if your shell (not just our scripts) finds kubectl-ate, or already has bin/ on PATH.
+user_has_ate() {
+  local p IFS=:
+  for p in $WORKSHOP_USER_PATH; do [[ "${p%/}" == "$REPO_ROOT/bin" ]] && return 0; done
+  env PATH="$WORKSHOP_USER_PATH" sh -c 'command -v kubectl-ate' >/dev/null 2>&1
+}
+path_hint() {
+  warn "kubectl ate is not on your shell's PATH. Run this (and add it to ~/.zshrc, ~/.bashrc or .envrc):"
+  echo "    export PATH=\"$REPO_ROOT/bin:\$PATH\"" >&2
 }
 
 state_put() { mkdir -p "$STATE_DIR"; printf '%s\n' "$2" >"$STATE_DIR/$1"; }

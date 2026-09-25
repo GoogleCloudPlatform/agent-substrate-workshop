@@ -34,12 +34,21 @@ and start the Substrate install in the background. It runs while you take the ar
    make install-bg
    make install-status     # run any time; the install takes about 5–10 minutes
    ```
-5. **Dashboards.** This creates the workshop dashboard and substrate's three dashboards in Cloud Monitoring.
+5. **Put `bin/` on your PATH.** The install builds the `kubectl ate` plugin into `bin/kubectl-ate`. The
+   `make` targets find it on their own, but from Module 2 on you type `kubectl ate …` yourself, so your
+   shell needs it too. Run this from the repo root:
+   ```bash
+   export PATH="$PWD/bin:$PATH"
+   ```
+   It only lasts for this terminal. Add the same line, with the absolute repo path instead of `$PWD`, to
+   `~/.zshrc` or `~/.bashrc`. If you use direnv, put `PATH_add bin` in an `.envrc` at the repo root.
+   Once the install finishes, `kubectl ate --help` works. `make verify MODULE=0` checks that `bin/` is on your PATH.
+6. **Dashboards.** This creates the workshop dashboard and substrate's three dashboards in Cloud Monitoring.
    They stay empty until Module 6. Setting them up now means data is already flowing by then.
    ```bash
    make dashboards
    ```
-6. **Local tools.** This builds `bin/egressctl`, which you'll use in Module 4.
+7. **Local tools.** This builds `bin/egressctl`, which you'll use in Module 4.
    ```bash
    make tools
    ```

@@ -136,3 +136,4 @@ fi
 moddir=""
 for d in "$M"/0"$N"-*/; do moddir="${d%/}"; moddir="${moddir##*/}"; break; done
 ok "ready for module $N — open modules/$moddir/README.md"
+user_has_ate || path_hint

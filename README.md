@@ -45,12 +45,15 @@ has the full comparison.
 - **Instructor-led:** follow the modules in order. If you fall behind, `make catch-up MODULE=<n>` brings your
   environment to the start of module `n`, and you keep going.
 - **Self-paced:** same path. After each module, `make verify MODULE=<n>` checks that you got there.
-  `instructor/troubleshooting.md` covers the common failures.
+  `instructor/troubleshooting.md` covers the common failures. Put `bin/` on your PATH
+  (`export PATH="$PWD/bin:$PATH"` from the repo root, Module 0 step 5) before you type any `kubectl ate …`
+  yourself. `make catch-up` doesn't do that for your shell.
 
 ## Quick start
 ```bash
 cp workshop.env.example workshop.env     # set PROJECT_ID
 make preflight
+export PATH="$PWD/bin:$PATH"             # `kubectl ate` lands in bin/ during the install (Module 0 step 5)
 make help                                # every target, one line each
 ```
 

@@ -22,6 +22,12 @@ t_load_env_requires_project() {
   local f="$TMP/bad.env"; echo "PROJECT_ID=" >"$f"
   ! (WORKSHOP_ENV_FILE="$f" load_env 2>/dev/null)
 }
+t_user_has_ate() {
+  # Checks the caller's PATH (captured before lib.sh prepends bin/), not the script's own.
+  ! (WORKSHOP_USER_PATH="/usr/bin:/bin" user_has_ate) &&
+    (WORKSHOP_USER_PATH="/usr/bin:$REPO_ROOT/bin/" user_has_ate) &&
+    [[ "$(WORKSHOP_USER_PATH=/usr/bin path_hint 2>&1)" == *"export PATH=\"$REPO_ROOT/bin:"* ]]
+}
 t_state_roundtrip() { state_put agent-image "r/agent@sha256:abc" && [[ "$(state_get agent-image)" == "r/agent@sha256:abc" ]]; }
 t_require_state_names_target() {
   local out; out="$( (require_state gateway-image "make gateway") 2>&1 )"
@@ -143,6 +149,7 @@ t_count_actors_in_state() {
 load_env
 check "load_env expands references" t_load_env_expands
 check "load_env requires PROJECT_ID" t_load_env_requires_project
+check "user_has_ate checks the caller's PATH" t_user_has_ate
 check "state roundtrip" t_state_roundtrip
 check "require_state names the make target" t_require_state_names_target
 check "render substitutes only listed vars" t_render_only_listed_vars
