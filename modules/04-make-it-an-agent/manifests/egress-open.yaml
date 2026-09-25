@@ -1,0 +1,3 @@
+# DO NOT USE for real agents. This opens ALL egress. It's here only to compare with egress-gateway.yaml.
+rules:
+- all: {}

@@ -133,3 +133,11 @@ count_actors_in_state() {
   _actors_list "$1" | jq --arg s "$2" --arg p "${3:-}" \
     '[.[] | select(.status.state == $s and (.metadata.name | startswith($p)))] | length'
 }
+
+# gateway_chat <actor> <message>: one chat turn through the gateway's front door.
+# Prints the JSON body, then the HTTP status code on its own last line.
+gateway_chat() {
+  port_forward gateway "$NAMESPACE" svc/gateway 8081 80
+  curl -sS --max-time 150 -H 'Content-Type: application/json' -w '\n%{http_code}\n' \
+    -d "$(jq -cn --arg m "$2" '{message: $m}')" "http://localhost:8081/chat/$1"
+}

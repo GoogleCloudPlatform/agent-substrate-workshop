@@ -2,6 +2,8 @@ package egress
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -119,5 +121,22 @@ func TestDeleteIsIdempotent(t *testing.T) {
 	c := dial(t, &testutil.FakeControl{})
 	if err := Delete(context.Background(), c, &ateapipb.ObjectRef{Atespace: "workshop", Name: "nobody"}); err != nil {
 		t.Fatalf("delete missing: %v", err)
+	}
+}
+
+// The policy files attendees apply in Module 4 must parse.
+func TestWorkshopPolicyFilesParse(t *testing.T) {
+	files, err := filepath.Glob("../../../modules/04-make-it-an-agent/manifests/egress-*.yaml")
+	if err != nil || len(files) != 2 {
+		t.Fatalf("glob = %v, %v; want 2 files", files, err)
+	}
+	for _, f := range files {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ParsePolicy(b); err != nil {
+			t.Errorf("%s: %v", f, err)
+		}
 	}
 }

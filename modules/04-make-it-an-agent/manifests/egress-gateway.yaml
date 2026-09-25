@@ -1,0 +1,11 @@
+# EgressPolicy for the workshop agent: the gateway is the only destination.
+# Everything else (the internet, the metadata server, other Services) stays denied.
+#
+# This file is applied literally, not rendered by scripts/render.sh (egressctl reads it
+# straight off disk). The hostname below assumes the workshop default NAMESPACE=workshop,
+# matching workshop.env.example and the agent-v3 template's MODEL_URL
+# (http://gateway.${NAMESPACE}.svc.cluster.local/v1/model). If you changed NAMESPACE, edit
+# this pattern to match before applying it.
+rules:
+- hostnames:
+    patterns: ["gateway.workshop.svc.cluster.local"]

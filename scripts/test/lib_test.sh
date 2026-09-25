@@ -54,6 +54,38 @@ t_port_forward_reuses_live() {
   kill "$pid"
   [[ $rc -eq 0 ]]
 }
+t_gateway_chat_prints_body_then_status() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/bin"
+  # A tiny HTTP server standing in for the gateway: any POST gets a fixed JSON reply.
+  cat >"$d/srv.py" <<'PY'
+import http.server, sys
+class H(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get('Content-Length', '0')))
+        body = b'{"reply":"stub reply","turn":1,"backend":"mock"}'
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+    def log_message(self, *a): pass
+http.server.HTTPServer(('127.0.0.1', int(sys.argv[1])), H).serve_forever()
+PY
+  # A stub kubectl: `port-forward RES LPORT:RPORT` starts the fake server on LPORT instead
+  # of actually forwarding, so gateway_chat's curl reaches something real.
+  cat >"$d/bin/kubectl" <<EOS
+#!/usr/bin/env bash
+lport=""
+for a in "\$@"; do case "\$a" in *:*) lport="\${a%%:*}" ;; esac; done
+exec python3 "$d/srv.py" "\$lport"
+EOS
+  chmod +x "$d/bin/kubectl"
+  local out rc
+  out="$(PATH="$d/bin:$PATH" NAMESPACE=ws gateway_chat buddy "hi" 2>&1)"; rc=$?
+  kill "$(cat "$STATE_DIR/pf-gateway.pid" 2>/dev/null)" 2>/dev/null || true
+  rm -f "$STATE_DIR/pf-gateway.pid"
+  [[ $rc -eq 0 && "${out##*$'\n'}" == "200" && "${out%$'\n'*}" == *'"reply":"stub reply"'* ]]
+}
 t_actor_state_strips_prefix() {
   local bindir="$TMP/bin"; mkdir -p "$bindir"
   cat >"$bindir/kubectl" <<'EOS'
@@ -119,6 +151,7 @@ check "wait_for succeeds" t_wait_for_succeeds
 check "wait_for times out" t_wait_for_times_out
 check "port_forward detects foreign listener" t_port_forward_detects_foreign_listener
 check "port_forward reuses live forward" t_port_forward_reuses_live
+check "gateway_chat prints body then status code" t_gateway_chat_prints_body_then_status
 check "actor_state strips ACTOR_STATE_ prefix" t_actor_state_strips_prefix
 check "ensure_actor creates once" t_ensure_actor_idempotent
 check "suspend_actor suspends a running actor" t_suspend_actor_suspends_running
