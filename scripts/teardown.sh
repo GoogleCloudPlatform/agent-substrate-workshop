@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # teardown.sh [--all] — delete everything the workshop created. Never deletes the GKE cluster,
 # and never touches the ate-system Deployments/DaemonSets Substrate itself runs as.
-# --all also deletes the snapshot bucket, the Artifact Registry repo, and the project IAM bindings
-# `make gcp` created — which (in source install mode) leaves the already-running Substrate without
-# the images or IAM grants it needs, so it needs a full reinstall before the project is used again.
+# --all also deletes the snapshot bucket and the Artifact Registry repo (and with them the bucket/repo IAM
+# grants), plus the workshop namespace's project IAM bindings `make gcp` created. In source install mode
+# that leaves the already-running Substrate without the images or IAM grants it needs, so it needs a full
+# reinstall before the project is used again.
 # Set YES=1 to skip the confirmation prompt.
 source "$(dirname "$0")/lib.sh"
 load_env
@@ -14,7 +15,7 @@ case "${1:-}" in
 esac
 if [[ "${YES:-}" != 1 ]]; then
   echo "This deletes atespace $ATESPACE (all actors and templates), namespace $NAMESPACE, the workshop dashboard,"
-  echo "and gs://$BUCKET_NAME/$ATESPACE/.$($ALL && echo " ALSO the bucket gs://$BUCKET_NAME, repo $AR_REPO, and their project IAM bindings.")"
+  echo "and gs://$BUCKET_NAME/$ATESPACE/.$($ALL && echo " ALSO the bucket gs://$BUCKET_NAME, repo $AR_REPO, and the workshop's IAM bindings.")"
   read -r -p "Type 'yes' to continue: " answer || answer=""
   [[ "$answer" == yes ]] || die "aborted"
 fi
@@ -56,26 +57,17 @@ step "snapshots"
 gcloud storage rm -r "gs://$BUCKET_NAME/$ATESPACE/**" --quiet 2>/dev/null || true
 
 if $ALL; then
-  step "bucket, Artifact Registry repo, and their project IAM bindings (undoing 'make gcp')"
+  step "bucket, Artifact Registry repo, and the workshop's IAM bindings (undoing 'make gcp')"
   gcloud storage rm -r "gs://$BUCKET_NAME" --quiet || true
   gcloud artifacts repositories delete "$AR_REPO" --location "$REGION" --project "$PROJECT_ID" --quiet || true
-  # Deleting the bucket also drops its bucket-level IAM policy. The project-level bindings
-  # `scripts/gcp-resources.sh` created (Workload Identity -> Artifact Registry/Vertex/Monitoring)
-  # outlive both the bucket and the repo, so they need to be removed explicitly.
+  # Deleting the bucket and the repo also drops their IAM policies, including the Artifact Registry
+  # reader grants (repo-level, never project-level, so nothing outside the workshop loses access).
+  # The project-level bindings `scripts/gcp-resources.sh` created (the workshop namespace's Workload
+  # Identity -> Vertex/Monitoring) outlive both, so they need to be removed explicitly.
   PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')" || true
   if [[ -n "${PROJECT_NUMBER:-}" ]]; then
     WI="principal://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${PROJECT_ID}.svc.id.goog/subject"
-    COMPUTE_SA="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
     unbind_project() { gcloud projects remove-iam-policy-binding "$PROJECT_ID" --member="$1" --role="$2" --condition=None --quiet >/dev/null 2>&1 || true; }
-    for sa in atelet ate-api-server; do
-      unbind_project "${WI}/ns/ate-system/sa/${sa}" roles/artifactregistry.reader
-    done
-    # NOTE: the compute default SA can carry roles/artifactregistry.reader for reasons that
-    # have nothing to do with this workshop (it's a project-wide default SA other things may
-    # also grant to). This removes exactly the binding `scripts/gcp-resources.sh` added, but if
-    # something else in the project also depends on this SA having that role, removing it here
-    # will affect that too.
-    unbind_project "$COMPUTE_SA" roles/artifactregistry.reader
     unbind_project "${WI}/ns/${NAMESPACE}/sa/gateway" roles/aiplatform.user
     unbind_project "${WI}/ns/${NAMESPACE}/sa/prometheus-ui" roles/monitoring.viewer
     ok "project IAM bindings removed"

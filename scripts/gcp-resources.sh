@@ -28,15 +28,19 @@ ok "registry ready: ${KO_DOCKER_REPO}"
 
 bind_bucket()  { gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" --member="$1" --role="$2" --condition=None >/dev/null; }
 bind_project() { gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="$1" --role="$2" --condition=None >/dev/null; }
+# Artifact Registry read access is granted on the workshop repo only, not the project: least privilege,
+# and deleting the repo (teardown --all) removes the binding with it, so nobody else's grant is touched.
+# (If you point KO_DOCKER_REPO at a different repo, grant the same readers on that one.)
+bind_repo()    { gcloud artifacts repositories add-iam-policy-binding "$AR_REPO" --location "$REGION" --project "$PROJECT_ID" --member="$1" --role="$2" >/dev/null; }
 
 step "IAM for Substrate (Workload Identity principals in ate-system)"
 for sa in atelet ate-api-server; do
   bind_bucket  "${WI}/ns/ate-system/sa/${sa}" roles/storage.objectAdmin
   bind_bucket  "${WI}/ns/ate-system/sa/${sa}" roles/storage.bucketViewer
-  bind_project "${WI}/ns/ate-system/sa/${sa}" roles/artifactregistry.reader
+  bind_repo    "${WI}/ns/ate-system/sa/${sa}" roles/artifactregistry.reader
 done
 bind_bucket  "$COMPUTE_SA" roles/storage.objectViewer
-bind_project "$COMPUTE_SA" roles/artifactregistry.reader
+bind_repo    "$COMPUTE_SA" roles/artifactregistry.reader
 ok "substrate IAM bound"
 
 step "IAM for the workshop (gateway -> Vertex, prometheus-ui -> Monitoring)"

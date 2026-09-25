@@ -23,7 +23,8 @@ and start the Substrate install in the background. It runs while you take the ar
    make preflight
    ```
 3. **Cloud resources.** This creates a GCS bucket (snapshots live here), an Artifact Registry repo (your images live here),
-   and IAM bindings for Substrate's components, your gateway, and the Prometheus UI.
+   and IAM bindings for Substrate's components, your gateway, and the Prometheus UI. Image pull access
+   (`roles/artifactregistry.reader`) is granted on that one repo, not the whole project.
    ```bash
    make gcp
    ```
