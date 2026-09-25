@@ -5,8 +5,9 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE_DIR="${WORKSHOP_STATE_DIR:-$REPO_ROOT/.workshop}"
 # Your shell's PATH before we prepend bin/, so checks can tell whether *you* can type `kubectl ate`.
-# Exported once, so a script run by another script still sees the original.
-: "${WORKSHOP_USER_PATH:=$PATH}"; export WORKSHOP_USER_PATH
+# Exported once, so a script run by another script still sees the original. Not when you source this file
+# in your own interactive shell (the optional labs do): that would pin a stale value into later make runs.
+if [[ $- == *i* ]]; then WORKSHOP_USER_PATH="$PATH"; else : "${WORKSHOP_USER_PATH:=$PATH}"; export WORKSHOP_USER_PATH; fi
 export PATH="$REPO_ROOT/bin:$PATH"
 
 if [[ -t 1 ]]; then C_B=$'\e[1m'; C_G=$'\e[32m'; C_Y=$'\e[33m'; C_R=$'\e[31m'; C_0=$'\e[0m'; else C_B=; C_G=; C_Y=; C_R=; C_0=; fi
@@ -21,7 +22,9 @@ load_env() {
   [[ -f "$f" ]] || die "missing $f — run: cp workshop.env.example workshop.env and set PROJECT_ID"
   # A MOCK_LLM you pass on the command line (MOCK_LLM=true make …) beats workshop.env. Captured once and
   # exported, so a script run by another script still sees what you typed, not workshop.env's value.
-  : "${WORKSHOP_MOCK_LLM_OVERRIDE=${MOCK_LLM:-}}"; export WORKSHOP_MOCK_LLM_OVERRIDE
+  # Interactive shells skip the capture for the same reason as WORKSHOP_USER_PATH above.
+  if [[ $- == *i* ]]; then local WORKSHOP_MOCK_LLM_OVERRIDE="${MOCK_LLM:-}"
+  else : "${WORKSHOP_MOCK_LLM_OVERRIDE=${MOCK_LLM:-}}"; export WORKSHOP_MOCK_LLM_OVERRIDE; fi
   set -a; # shellcheck disable=SC1090
   source "$f"; set +a
   if [[ -n "$WORKSHOP_MOCK_LLM_OVERRIDE" ]]; then MOCK_LLM="$WORKSHOP_MOCK_LLM_OVERRIDE"; fi
