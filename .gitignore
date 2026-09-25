@@ -17,3 +17,4 @@ dist/
 
 # Local agent scratch
 .superpowers/
+.worktrees/
