@@ -31,6 +31,10 @@ load_env() {
   [[ -n "${PROJECT_ID:-}" ]] || die "PROJECT_ID is empty in $f"
   : "${NAMESPACE:=workshop}" "${ATESPACE:=workshop}" "${MOCK_LLM:=false}"
   export NAMESPACE ATESPACE MOCK_LLM
+  # Substrate's ate-setup reads CLUSTER_NAME / CLUSTER_LOCATION (and fails without them when PROJECT_ID is
+  # set). Older workshop.env files used CLUSTER / ZONE_OR_REGION; accept those too.
+  : "${CLUSTER_NAME:=${CLUSTER:-ate-cluster}}" "${CLUSTER_LOCATION:=${ZONE_OR_REGION:-${REGION:-us-central1}}}"
+  export CLUSTER_NAME CLUSTER_LOCATION
   mkdir -p "$STATE_DIR"
 }
 
@@ -187,7 +191,8 @@ count_actors_in_state() {
 # gateway_chat <actor> <message>: one chat turn through the gateway's front door.
 # Prints the JSON body, then the HTTP status code on its own last line.
 gateway_chat() {
-  port_forward gateway "$NAMESPACE" svc/gateway 8081 80
+  local port="${GATEWAY_LOCAL_PORT:-8081}"
+  port_forward gateway "$NAMESPACE" svc/gateway "$port" 80
   curl -sS --max-time 150 -H 'Content-Type: application/json' -w '\n%{http_code}\n' \
-    -d "$(jq -cn --arg m "$2" '{message: $m}')" "http://localhost:8081/chat/$1"
+    -d "$(jq -cn --arg m "$2" '{message: $m}')" "http://localhost:$port/chat/$1"
 }

@@ -21,9 +21,9 @@ need bash -c 'gcloud auth print-access-token >/dev/null 2>&1'
 CHECK="project ${PROJECT_ID} reachable" HINT="check PROJECT_ID and your Owner role"
 need bash -c "gcloud projects describe '$PROJECT_ID' --format='value(projectNumber)' >/dev/null"
 
-step "Cluster ${CLUSTER} (${ZONE_OR_REGION})"
-desc="$(gcloud container clusters describe "$CLUSTER" --location "$ZONE_OR_REGION" --project "$PROJECT_ID" --format=json 2>/dev/null || true)"
-[[ -n "$desc" ]] || die "cluster $CLUSTER not found in $ZONE_OR_REGION — set CLUSTER / ZONE_OR_REGION in workshop.env"
+step "Cluster ${CLUSTER_NAME} (${CLUSTER_LOCATION})"
+desc="$(gcloud container clusters describe "$CLUSTER_NAME" --location "$CLUSTER_LOCATION" --project "$PROJECT_ID" --format=json 2>/dev/null || true)"
+[[ -n "$desc" ]] || die "cluster $CLUSTER_NAME not found in $CLUSTER_LOCATION — set CLUSTER_NAME / CLUSTER_LOCATION in workshop.env"
 # The checks below read the JSON from the environment, never spliced into a quoted string: labels or a
 # description containing a quote would otherwise break them.
 export DESC="$desc"
@@ -36,11 +36,11 @@ if [[ "$(printf '%s\n' 1.37 "$VER" | sort -V | head -1)" != 1.37 ]]; then
   CHECK="1.36 beta APIs enabled" HINT="1.36 needs --enable-kubernetes-unstable-apis for podcertificaterequests and clustertrustbundles at creation"
   need bash -c 'jq -e ".enableK8sBetaApis.enabledApis // [] | map(select(test(\"clustertrustbundles|podcertificaterequests\"))) | length == 2" <<<"$DESC" >/dev/null 2>&1'
 fi
-CHECK="Workload Identity enabled" HINT="gcloud container clusters update $CLUSTER --workload-pool=${PROJECT_ID}.svc.id.goog"
+CHECK="Workload Identity enabled" HINT="gcloud container clusters update $CLUSTER_NAME --workload-pool=${PROJECT_ID}.svc.id.goog"
 need bash -c 'jq -e --arg p "${PROJECT_ID}.svc.id.goog" ".workloadIdentityConfig.workloadPool == \$p" <<<"$DESC" >/dev/null 2>&1'
-CHECK="managed OpenTelemetry collection enabled" HINT="gcloud container clusters update $CLUSTER --managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS"
+CHECK="managed OpenTelemetry collection enabled" HINT="gcloud beta container clusters update $CLUSTER_NAME --managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS"
 need bash -c 'jq -e ".managedOpentelemetryConfig.scope == \"COLLECTION_AND_INSTRUMENTATION_COMPONENTS\"" <<<"$DESC" >/dev/null 2>&1'
-CHECK="Managed Prometheus enabled" HINT="gcloud container clusters update $CLUSTER --enable-managed-prometheus"
+CHECK="Managed Prometheus enabled" HINT="gcloud container clusters update $CLUSTER_NAME --enable-managed-prometheus"
 need bash -c 'jq -e ".monitoringConfig.managedPrometheusConfig.enabled == true" <<<"$DESC" >/dev/null 2>&1'
 CHECK="no node auto-upgrade" HINT="gcloud container node-pools update <pool> --no-enable-autoupgrade"
 need bash -c 'jq -e "[.nodePools[].management.autoUpgrade // false] | all(. == false)" <<<"$DESC" >/dev/null 2>&1'
@@ -48,8 +48,8 @@ CHECK="no spot/preemptible nodes" HINT="use a standard node pool"
 need bash -c 'jq -e "[.nodePools[].config | (.spot // false) or (.preemptible // false)] | all(. == false)" <<<"$DESC" >/dev/null 2>&1'
 
 step "kubectl context"
-gcloud container clusters get-credentials "$CLUSTER" --location "$ZONE_OR_REGION" --project "$PROJECT_ID" >/dev/null 2>&1 || true
-CHECK="kubectl reaches the cluster" HINT="gcloud container clusters get-credentials $CLUSTER --location $ZONE_OR_REGION"
+gcloud container clusters get-credentials "$CLUSTER_NAME" --location "$CLUSTER_LOCATION" --project "$PROJECT_ID" >/dev/null 2>&1 || true
+CHECK="kubectl reaches the cluster" HINT="gcloud container clusters get-credentials $CLUSTER_NAME --location $CLUSTER_LOCATION"
 need bash -c "kubectl get nodes >/dev/null"
 CHECK="ClusterTrustBundle API served" HINT="needs GKE 1.37+ or the 1.36 beta API"
 need bash -c 'kubectl api-resources --api-group=certificates.k8s.io -o name | grep -q clustertrustbundles'

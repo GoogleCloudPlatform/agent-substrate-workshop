@@ -24,7 +24,7 @@ STUB
 printf '#!/usr/bin/env bash\necho go1.27.1\n' >"$TMP/bin/go"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$TMP/bin/ko"
 chmod +x "$TMP/bin/"*
-printf 'PROJECT_ID=demo-proj\nCLUSTER=c\nZONE_OR_REGION=r\n' >"$TMP/env"
+printf 'PROJECT_ID=demo-proj\nCLUSTER_NAME=c\nCLUSTER_LOCATION=r\n' >"$TMP/env"
 
 # A cluster that passes every check, with a quote in a label and in the description.
 cat >"$TMP/good.json" <<'JSON'

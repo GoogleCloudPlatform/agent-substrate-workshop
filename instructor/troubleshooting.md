@@ -44,7 +44,7 @@ it, in any state, then rebuilds and recreates them from the solution.
 | Symptom | Cause | Fix |
 |---|---|---|
 | Queries return nothing | Metrics lag 1–3 minutes behind the traffic that produced them | Wait, and keep `make load` running in a second terminal so there's always fresh traffic. |
-| Substrate's platform metrics are empty, but the gateway's own metrics show data | Managed OpenTelemetry collection isn't enabled on the cluster | `make preflight` flags this. Fix: `gcloud container clusters update $CLUSTER --managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS` (the same command `make preflight` prints). |
+| Substrate's platform metrics are empty, but the gateway's own metrics show data | Managed OpenTelemetry collection isn't enabled on the cluster | `make preflight` flags this. Fix: `gcloud beta container clusters update $CLUSTER_NAME --managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS` (the same command `make preflight` prints). |
 | Prometheus UI shows `403` / `permission denied` | The `prometheus-ui` KSA lacks `roles/monitoring.viewer` (Workload Identity) | Rerun `make gcp` to (re-)bind the role, then `kubectl -n workshop rollout restart deploy/prometheus-ui`. |
 | PromQL parse error on a metric or label name | Substrate's OTel names are dotted (e.g. `ate.workerpool.workers`) and need quoting in PromQL | Quote it: `{"ate.workerpool.workers"}`, `sum by ("ate.worker.state") (...)`. See [observability/queries.md](../observability/queries.md) for the canned versions. |
 | Cloud Console dashboard is empty even though the Prometheus UI shows data | The workshop dashboard wasn't created, or was created against a different project | `make dashboards` is idempotent (matches by `displayName`) — just rerun it. |
