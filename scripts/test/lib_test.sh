@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Unit tests for scripts/lib.sh. No cluster needed. Run: make test-scripts
-# shellcheck disable=SC2329 # t_* functions are invoked indirectly via check()
+# shellcheck disable=SC2329,SC2030,SC2031 # t_* run via check(); per-test PATH/KLOG exports are subshell-local on purpose
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT

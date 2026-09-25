@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # render.sh fills ${VARS} from workshop.env and .workshop/ state, and names the make target when state is missing.
+# shellcheck disable=SC2034 # $out is read inside check() eval strings
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
