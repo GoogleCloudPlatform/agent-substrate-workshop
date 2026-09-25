@@ -43,7 +43,8 @@ sequenceDiagram
    probe, the snapshot scope for pause and suspend, the GCS location, the gVisor sandbox, and one durable directory.
    ```bash
    scripts/render.sh modules/02-hello-actor/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
-   kubectl ate get actor-template agent-v1 -a workshop -o yaml    # repeat until status shows a goldenTag
+   kubectl ate get actor-template agent-v1 -a workshop            # repeat until GOLDEN TAG is filled in
+   kubectl ate get actor-template agent-v1 -a workshop -o yaml    # the full record; the tag is at status.goldenSnapshotStatus.goldenTag.name
    ```
    Substrate starts your container once on a free worker, waits for `/readyz`, and snapshots it.
    That **golden snapshot** is the starting point for every actor of this template. Creating an actor

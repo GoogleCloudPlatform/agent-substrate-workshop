@@ -39,6 +39,20 @@
      upgrade or a preempted node can silently swap in a worker image `ate.dev/substrate-version` doesn't match,
      and a spot reclaim mid-workshop loses whatever wasn't already snapshotted).
 
+   `--managed-otel-scope` is a **beta** flag: plain `gcloud container clusters create` rejects it
+   (`unrecognized arguments`). Use `gcloud beta` (`gcloud components install beta` first). A zonal
+   cluster matching the list above:
+   ```bash
+   gcloud beta container clusters create "$CLUSTER_NAME" --project "$PROJECT_ID" --location us-central1-a \
+     --release-channel None --no-enable-autoupgrade \
+     --machine-type c3-standard-4 --num-nodes 2 \
+     --workload-pool "$PROJECT_ID.svc.id.goog" --enable-managed-prometheus \
+     --managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS
+   # On 1.36 add: --cluster-version 1.36 --enable-kubernetes-unstable-apis=certificates.k8s.io/v1beta1/clustertrustbundles,certificates.k8s.io/v1beta1/podcertificaterequests
+   ```
+   With a regional `--location`, `--num-nodes` is per zone (2 × 3 zones = 6 nodes). Put the cluster's
+   location in each attendee's `workshop.env` as `CLUSTER_LOCATION`.
+
    Send each attendee their `PROJECT_ID` and confirm they can `gcloud auth login` and reach it before the day.
 
 ## Day of

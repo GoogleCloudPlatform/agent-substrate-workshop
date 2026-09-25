@@ -35,8 +35,8 @@ the one thing Substrate deliberately doesn't do for you: **decide when an actor 
    last did something. With `IDLE_AFTER` set, it suspends RUNNING actors that have had no request in flight for that long.
    ```bash
    kubectl -n workshop set env deploy/gateway IDLE_AFTER=20s
-   kubectl -n workshop rollout status deploy/gateway
-   make forward-gateway
+   kubectl -n workshop rollout status deploy/gateway   # wait for this to finish before the next line
+   make forward-gateway                                # restarts the forward onto the new gateway pod
    while true; do clear; kubectl ate get actors -a workshop; sleep 2; done   # swarm-01/02 fall asleep ~20–25s later; Ctrl-C
    ```
    The code is in `app/internal/idle/idle.go`: a tracker fed by the front door, and a loop (about 200 lines

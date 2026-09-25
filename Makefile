@@ -38,8 +38,8 @@ prometheus-ui: ## Port-forward the Prometheus UI to http://localhost:9090
 	@source scripts/lib.sh && load_env && port_forward prom-ui $$NAMESPACE svc/prometheus-ui 9090 9090 && echo "open http://localhost:9090"
 forward-router: ## Port-forward the atenet-router to http://localhost:8080
 	@source scripts/lib.sh && load_env && port_forward router ate-system svc/atenet-router 8080 80 && echo "open http://localhost:8080"
-forward-gateway: ## Port-forward the gateway to http://localhost:8081
-	@source scripts/lib.sh && load_env && port_forward gateway $$NAMESPACE svc/gateway 8081 80 && echo "open http://localhost:8081"
+forward-gateway: ## (Re)start the gateway port-forward on http://localhost:8081
+	@source scripts/lib.sh && load_env && stop_port_forward gateway && port_forward gateway $$NAMESPACE svc/gateway 8081 80 && echo "open http://localhost:8081"
 catch-up: ## Bring your environment to the start of MODULE=N (RESET=1 rebuilds that module's template)
 	@RESET="$(RESET)" scripts/catch-up.sh "$(MODULE)"
 verify: ## Check the end state of MODULE=N

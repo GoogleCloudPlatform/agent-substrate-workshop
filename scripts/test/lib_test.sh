@@ -70,6 +70,16 @@ t_load_env_mock_llm_override() {
   [[ "$(unset MOCK_LLM WORKSHOP_MOCK_LLM_OVERRIDE; WORKSHOP_ENV_FILE="$f" load_env
        bash -c 'echo "[${WORKSHOP_MOCK_LLM_OVERRIDE-unset}]"')" == "[]" ]]
 }
+t_load_env_cluster_vars() {
+  local n="$TMP/new.env" o="$TMP/old.env"
+  printf 'PROJECT_ID=p\nCLUSTER_NAME=c1\nCLUSTER_LOCATION=us-east1-b\n' >"$n"
+  printf 'PROJECT_ID=p\nCLUSTER=c2\nZONE_OR_REGION=europe-west1\n' >"$o"
+  # ate-setup is a child process: the names it reads must be exported, and legacy names still work.
+  [[ "$(unset CLUSTER_NAME CLUSTER_LOCATION; WORKSHOP_ENV_FILE="$n" load_env
+       bash -c 'echo "$CLUSTER_NAME/$CLUSTER_LOCATION"')" == "c1/us-east1-b" ]] &&
+  [[ "$(unset CLUSTER_NAME CLUSTER_LOCATION; WORKSHOP_ENV_FILE="$o" load_env
+       bash -c 'echo "$CLUSTER_NAME/$CLUSTER_LOCATION"')" == "c2/europe-west1" ]]
+}
 # gateway.sh against a stub kubectl whose live Deployment has MOCK_LLM=$LIVE_MOCK; prints the applied MOCK_LLM.
 run_gateway_sh() {
   local d; d="$(mktemp -d "$TMP/t.XXXXXX")"; mkdir -p "$d/bin" "$d/state"
@@ -135,7 +145,9 @@ exec python3 "$d/srv.py" "\$lport"
 EOS
   chmod +x "$d/bin/kubectl"
   local out rc
-  out="$(PATH="$d/bin:$PATH" NAMESPACE=ws gateway_chat buddy "hi" 2>&1)"; rc=$?
+  # A free port, so a real gateway forward on 8081 (e.g. a live workshop) doesn't break the test.
+  local port; port="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')"
+  out="$(PATH="$d/bin:$PATH" NAMESPACE=ws GATEWAY_LOCAL_PORT="$port" gateway_chat buddy "hi" 2>&1)"; rc=$?
   kill "$(cat "$STATE_DIR/pf-gateway.pid" 2>/dev/null)" 2>/dev/null || true
   rm -f "$STATE_DIR/pf-gateway.pid"
   [[ $rc -eq 0 && "${out##*$'\n'}" == "200" && "${out%$'\n'*}" == *'"reply":"stub reply"'* ]]
@@ -243,6 +255,7 @@ check "wait_for times out" t_wait_for_times_out
 check "port_forward detects foreign listener" t_port_forward_detects_foreign_listener
 check "port_forward reuses live forward" t_port_forward_reuses_live
 check "load_env: command-line MOCK_LLM beats workshop.env" t_load_env_mock_llm_override
+check "load_env exports CLUSTER_NAME/CLUSTER_LOCATION (legacy names too)" t_load_env_cluster_vars
 check "gateway.sh keeps a live MOCK_LLM unless one is passed" t_gateway_keeps_live_mock_llm
 check "stop_port_forward stops only the named forward" t_stop_port_forward_stops_one
 check "gateway_chat prints body then status code" t_gateway_chat_prints_body_then_status
