@@ -1,0 +1,78 @@
+# Instructor runbook
+
+## One week before
+
+1. **Pick `SUBSTRATE_REF`**: the newest tag or commit that passes `make e2e` in **both** install modes,
+   against a scratch GCP project (not an attendee's).
+   - Source mode: leave `SUBSTRATE_IMAGE_REPO`/`SUBSTRATE_IMAGE_TAG` empty in `workshop.env` — `install-substrate.sh`
+     clones `SUBSTRATE_REF` and ko-builds `ate-setup`, `kubectl-ate`, and `ateom-gvisor` from source.
+   - Published mode: set both `SUBSTRATE_IMAGE_REPO` and `SUBSTRATE_IMAGE_TAG` if images exist for that ref, so
+     `install-substrate.sh` runs `ate-setup deploy ate-system --image-repo … --image-tag …` instead of building.
+   - `make e2e` drives every module through `catch-up` + `verify` (`scripts/catch-up.sh $n && scripts/verify/$((n-1)).sh`
+     for n = 1..7). Run it start to finish in **each** mode; a pass in one mode does not imply a pass in the other,
+     since the worker image (`ateom-gvisor`) comes from a different path in each.
+   - Put the validated ref in `workshop.env.example`'s `SUBSTRATE_REF` and in `app/go.mod`
+     (`cd app && go get github.com/agent-substrate/substrate@<ref> && go mod tidy`), since `ateapipb` (used by the
+     gateway, `egressctl`, and the idle-suspender) must speak the same protocol as the control plane you install.
+2. **Run the mock path too**: `MOCK_LLM=true make e2e`, so you know the whole workshop still works when Vertex is
+   unreachable (quota, a locked-down project, a flaky network) — the fallback attendees are told about in Module 4.
+3. **Check external dependencies that drift independently of substrate:**
+   - `GEMINI_MODEL` (`workshop.env.example`, currently `gemini-2.5-flash`) is still served in `VERTEX_LOCATION`
+     (currently `${REGION}`, i.e. `us-central1`).
+   - `PROM_FRONTEND_IMAGE` (currently `gke.gcr.io/prometheus-engine/frontend:v0.15.3-gke.0`) is a current tag.
+4. **Re-check [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) releases.** If it has
+   gained auto suspend/resume or multi-sandbox-per-Pod, update the comparison table in
+   [Module 1](../modules/01-architecture/README.md) and the wrap-up table in
+   [Module 7](../modules/07-wrap-up/README.md).
+5. **For optional lab H** (`agent-substrate/env`): pick a tag whose `go.mod` substrate version matches
+   `SUBSTRATE_REF`, so the sandboxed-shell lab isn't running against a different substrate build than the core
+   workshop.
+6. **Provision attendee projects and clusters.** Each attendee is Owner on their own GCP project, with a
+   bare GKE cluster that has, at creation:
+   - GKE **1.37+** (or 1.36 with `--enable-kubernetes-unstable-apis=certificates.k8s.io/v1beta1/clustertrustbundles,certificates.k8s.io/v1beta1/podcertificaterequests`
+     — `make preflight` checks for both the version and, on 1.36, the beta APIs).
+   - **Workload Identity** and **managed OpenTelemetry** with `--managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS`.
+   - **Managed Prometheus** enabled (`--enable-managed-prometheus`) — Module 6's Prometheus UI reads through it.
+   - Machine type **`c3-standard-4`**, 2 nodes, **no node auto-upgrade**, **no spot/preemptible nodes** (an
+     upgrade or a preempted node can silently swap in a worker image `ate.dev/substrate-version` doesn't match,
+     and a spot reclaim mid-workshop loses whatever wasn't already snapshotted).
+
+   Send each attendee their `PROJECT_ID` and confirm they can `gcloud auth login` and reach it before the day.
+
+## Day of
+
+- Arrive with your own cluster already caught up: `make catch-up MODULE=7`. Use it to demo any step that fails
+  for the room, and as a known-good reference if an attendee's environment diverges.
+- Keep [`instructor/troubleshooting.md`](troubleshooting.md) open in a tab.
+- Confirm `make forward-router`, `make forward-gateway`, and `make prometheus-ui` all work from the room's
+  network (some corporate VPNs block the long-lived connections they depend on) — this is worth testing from
+  a guest-network laptop, not just your own, before the event.
+
+## Timing (85 min) and talk track
+
+| Module | Min | Say | Cut if behind |
+|---|---|---|---|
+| 0 Setup | 10 | "The install runs in the background while we talk." | — |
+| 1 Architecture | 10 | Agents idle most of the time. Actors vs Pods. CRDs vs records. | Skip "Look around" for everyone but you |
+| 2 Hello actor | 15 | Golden snapshot = every actor's starting point. Create is cheap. | — |
+| 3 Suspend/resume | 12 | FULL vs DATA. The router hides resumes. Templates are immutable. | Part B logs step |
+| 4 Agent | 13 | No secrets in actors. Egress is deny-by-default. Presence vs cognition. | The `egress-open` comparison |
+| 5 Density & idle | 10 | Substrate doesn't know when you're idle; your front door does. | Step 4 (the 60s 503 demo): describe it instead |
+| 6 Observe | 12 | Platform metrics + product metrics. The 1–3 min lag. | Logs Explorer step |
+| 7 Wrap-up | 3 | Point everyone at lab H. | — |
+
+That's 85 minutes with no slack. If a module runs long, take the "cut if behind" for that module rather than
+compressing the next one — Module 6 in particular needs its 1–3 minute Cloud Monitoring lag no matter how fast
+you talk.
+
+If someone falls more than one module behind, have them run `make catch-up MODULE=<current>` and keep going.
+Every module README starts from the previous module's verified end state (`make verify MODULE=<current - 1>`),
+which is exactly what `catch-up.sh <current>` produces.
+
+## After
+
+Ask attendees to run `make teardown` (keeps their cluster, bucket, and Artifact Registry — only the in-cluster
+workshop state goes away), or `YES=1 scripts/teardown.sh --all` if the whole project is being torn down too
+(also deletes the bucket, the Artifact Registry repo, and the project IAM bindings `make gcp` created). Neither
+one touches the GKE cluster or the Substrate install itself — that's a separate, explicit cluster teardown if
+the project isn't being deleted outright.
