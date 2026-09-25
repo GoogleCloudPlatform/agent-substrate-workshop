@@ -41,13 +41,15 @@ type Config struct {
 	Now      func() time.Time
 }
 
-// State is what GET /state reports. DiskCount is -1 when DataDir is unset.
+// State is what GET /state reports. DiskCount is -1 when DataDir is unset, and DiskError
+// says why when the counter file exists but can't be read.
 type State struct {
 	Greeting  string    `json:"greeting"`
 	BootID    string    `json:"bootID"`
 	StartedAt time.Time `json:"startedAt"`
 	MemCount  int       `json:"memCount"`
 	DiskCount int       `json:"diskCount"`
+	DiskError string    `json:"diskError,omitempty"`
 	Turns     int       `json:"turns"`
 	Hostname  string    `json:"hostname"`
 }
@@ -115,15 +117,21 @@ func (s *Server) handleState(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	host, _ := os.Hostname()
-	writeJSON(w, http.StatusOK, State{
+	st := State{
 		Greeting:  s.cfg.Greeting,
 		BootID:    s.bootID,
 		StartedAt: s.started,
 		MemCount:  s.memCount,
-		DiskCount: s.readDiskCount(),
 		Turns:     countTurns(s.history),
 		Hostname:  host,
-	})
+	}
+	n, err := s.readDiskCount()
+	if err != nil {
+		log.Printf("state: %v", err)
+		st.DiskError = err.Error()
+	}
+	st.DiskCount = n
+	writeJSON(w, http.StatusOK, st)
 }
 
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
@@ -187,26 +195,38 @@ func (s *Server) bumpDiskCount() (int, error) {
 	if s.cfg.DataDir == "" {
 		return -1, nil
 	}
-	n := s.readDiskCount() + 1
+	n, err := s.readDiskCount()
+	if err != nil {
+		// Don't overwrite a counter we can't read with 1: that would silently break the lesson.
+		log.Printf("count: %v", err)
+		return 0, err
+	}
+	n++
 	if err := writeFileAtomic(filepath.Join(s.cfg.DataDir, countFile), []byte(strconv.Itoa(n))); err != nil {
 		return 0, fmt.Errorf("persist count: %w", err)
 	}
 	return n, nil
 }
 
-func (s *Server) readDiskCount() int {
+// readDiskCount returns the durable counter: -1 without a DataDir, 0 if the file doesn't
+// exist yet, and an error if it exists but can't be read or parsed.
+func (s *Server) readDiskCount() (int, error) {
 	if s.cfg.DataDir == "" {
-		return -1
+		return -1, nil
 	}
-	b, err := os.ReadFile(filepath.Join(s.cfg.DataDir, countFile))
+	p := filepath.Join(s.cfg.DataDir, countFile)
+	b, err := os.ReadFile(p)
+	if errors.Is(err, fs.ErrNotExist) {
+		return 0, nil
+	}
 	if err != nil {
-		return 0
+		return 0, fmt.Errorf("read %s: %w", p, err)
 	}
 	n, err := strconv.Atoi(strings.TrimSpace(string(b)))
 	if err != nil {
-		return 0
+		return 0, fmt.Errorf("%s is corrupt (%w); delete it to start counting from 0", p, err)
 	}
-	return n
+	return n, nil
 }
 
 // loadHistory reads history from the durableDir. A file it cannot parse (for example one

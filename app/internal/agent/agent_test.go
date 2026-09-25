@@ -95,6 +95,24 @@ func TestDiskCountSurvivesRestartButMemoryDoesNot(t *testing.T) {
 	}
 }
 
+func TestCorruptDiskCountIsReportedNotReset(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, countFile)
+	if err := os.WriteFile(p, []byte("not-a-number"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ts := newTestServer(t, Config{Greeting: "hi", DataDir: dir})
+	if code, body := get(t, ts.URL+"/"); code != http.StatusInternalServerError || !strings.Contains(body, "corrupt") {
+		t.Fatalf("root = %d %q, want 500 naming the corrupt counter", code, body)
+	}
+	if b, _ := os.ReadFile(p); string(b) != "not-a-number" {
+		t.Fatalf("counter overwritten with %q", b)
+	}
+	if st := getState(t, ts.URL); !strings.Contains(st.DiskError, "corrupt") {
+		t.Fatalf("state = %+v, want diskError", st)
+	}
+}
+
 func TestChatEchoMode(t *testing.T) {
 	ts := newTestServer(t, Config{Greeting: "hi"})
 	code, out := chat(t, ts.URL, "ping")
