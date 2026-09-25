@@ -1,0 +1,34 @@
+# Two generic worker Pods. Any actor whose template selects workload=workshop-agent can run on either.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${NAMESPACE}
+---
+apiVersion: ate.dev/v1alpha1
+kind: WorkerPool
+metadata:
+  name: agents
+  namespace: ${NAMESPACE}
+  # atecontroller copies these onto the Worker record it registers with ateapi; the
+  # ActorTemplate's workerSelector (template.yaml.tmpl) matches actors to workers by this label.
+  labels:
+    workload: workshop-agent
+spec:
+  replicas: 2
+  # Must come from the same substrate build as the control plane (recorded by make install).
+  workerImage: ${WORKER_IMAGE}
+  # WorkerPoolPodTemplate is flat: there is no template.spec. Everything here lands on the
+  # generated Deployment and its worker Pods, so `labels` is what makes
+  # `kubectl get pods -l workload=workshop-agent` find them.
+  template:
+    labels:
+      workload: workshop-agent
+    nodeSelector:
+      ate.dev/substrate-version: "${SUBSTRATE_VERSION}"
+    resources:
+      limits:
+        cpu: "1"
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 1Gi

@@ -49,7 +49,7 @@ test: test-go test-scripts ## Run all offline tests
 test-go:
 	@cd app && go vet ./... && go test ./...
 test-scripts:
-	@bash scripts/test/lib_test.sh && bash scripts/test/dashboards_test.sh && bash scripts/test/solutions_test.sh
+	@bash scripts/test/lib_test.sh && bash scripts/test/render_test.sh && bash scripts/test/dashboards_test.sh && bash scripts/test/solutions_test.sh
 stop-forwards: ## Stop background port-forwards
 	@source scripts/lib.sh && stop_port_forwards
 teardown: ## Delete workshop resources (keeps the cluster)

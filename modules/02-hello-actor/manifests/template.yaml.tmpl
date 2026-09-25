@@ -1,0 +1,38 @@
+# ActorTemplate agent-v1 — a Substrate record (not a Kubernetes object), in the protojson
+# shape of ateapipb.ActorTemplate. Applied with `kubectl ate create actor-template -f -`.
+# Immutable once created: there is no update, only delete + recreate (see Module 3's agent-v2).
+metadata:
+  atespace: ${ATESPACE}
+  name: agent-v1
+# Which workers may run this template's actors: matched against the WorkerPool's own labels
+# (workerpool.yaml.tmpl's metadata.labels), not the Kubernetes Pod labels.
+workerSelector:
+  matchLabels:
+    workload: workshop-agent
+containers:
+- name: agent
+  image: ${AGENT_IMAGE}            # must be digest-pinned (@sha256:…); a CEL admission rule enforces this
+  command: ["/ko-app/agent"]
+  readyz:
+    httpGet:
+      path: /readyz
+      port: 80
+  volumeMounts:
+  - name: data
+    mountPath: /data
+resources:
+  limits:
+  - name: cpu
+    quantity: "1"
+  - name: memory
+    quantity: 512Mi
+snapshotsConfig:
+  onPause: SNAPSHOT_CONTENT_SCOPE_FULL     # pause: memory + disk
+  onCommit: SNAPSHOT_CONTENT_SCOPE_FULL    # suspend: memory + disk
+  storageLocation: gs://${BUCKET_NAME}/${ATESPACE}/agent-v1/
+sandboxConfig:
+  sandboxClass: SANDBOX_CLASS_GVISOR
+  configName: gvisor-default
+volumes:
+- name: data
+  durableDir: {}                           # per-actor directory that survives suspend/resume
