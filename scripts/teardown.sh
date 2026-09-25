@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# teardown.sh [--all] — delete everything the workshop created. Keeps the cluster and Substrate itself.
+# teardown.sh [--all] — delete everything the workshop created. Never deletes the GKE cluster,
+# and never touches the ate-system Deployments/DaemonSets Substrate itself runs as.
 # --all also deletes the snapshot bucket, the Artifact Registry repo, and the project IAM bindings
-# `make gcp` created. Set YES=1 to skip the confirmation prompt.
+# `make gcp` created — which (in source install mode) leaves the already-running Substrate without
+# the images or IAM grants it needs, so it needs a full reinstall before the project is used again.
+# Set YES=1 to skip the confirmation prompt.
 source "$(dirname "$0")/lib.sh"
 load_env
 case "${1:-}" in
@@ -20,18 +23,33 @@ stop_port_forwards
 if kubectl ate get atespace "$ATESPACE" >/dev/null 2>&1; then
   step "actors and templates in atespace $ATESPACE"
   for a in $(actor_names "$ATESPACE"); do kubectl ate delete actor "$a" -a "$ATESPACE" --any-state || warn "actor $a"; done
-  for t in agent-v1 agent-v2 agent-v3; do kubectl ate delete actor-template "$t" -a "$ATESPACE" 2>/dev/null || true; done
+  # List templates instead of hardcoding agent-v1/v2/v3, so a template made outside the guided
+  # modules (or a future module) still gets cleaned up. `actor-templates` is a real alias for
+  # `actor-template` (kubectl-ate); with no name given it lists every template in the atespace.
+  # JSON envelope key is "actorTemplates" (protojson on ListActorTemplatesResponse), not "items".
+  for t in $(kubectl ate get actor-templates -a "$ATESPACE" -o json | jq -r '(.actorTemplates // [])[].metadata.name'); do
+    kubectl ate delete actor-template "$t" -a "$ATESPACE" 2>/dev/null || true
+  done
+  # Actor deletion is asynchronous (an actor moves to DELETING before it's actually gone), so
+  # give it a bounded window before deleting the atespace out from under it.
+  no_actors_left() { [[ -z "$(actor_names "$ATESPACE")" ]]; }
+  ( wait_for 60 "actors in $ATESPACE to finish deleting" no_actors_left ) || warn "some actors in $ATESPACE may still be deleting"
   kubectl ate delete atespace "$ATESPACE" || warn "atespace $ATESPACE (delete remaining records and retry)"
+else
+  warn "atespace $ATESPACE not found — skipping actor/template cleanup"
 fi
 
 step "namespace $NAMESPACE (WorkerPool, gateway, Prometheus UI)"
-kubectl -n "$NAMESPACE" delete workerpool agents --ignore-not-found --wait=true
-kubectl delete ns "$NAMESPACE" --ignore-not-found
+# Non-fatal: --ignore-not-found only covers a missing *object*, not a missing WorkerPool CRD
+# (e.g. Substrate itself was already removed), which would otherwise abort the rest of teardown
+# under set -e.
+kubectl -n "$NAMESPACE" delete workerpool agents --ignore-not-found --wait=true || warn "workerpool agents (the WorkerPool CRD may be gone)"
+kubectl delete ns "$NAMESPACE" --ignore-not-found || warn "namespace $NAMESPACE"
 
 step "workshop dashboard"
 for d in $(gcloud monitoring dashboards list --project "$PROJECT_ID" \
     --filter='displayName="Agent Substrate Workshop"' --format='value(name)'); do
-  gcloud monitoring dashboards delete "$d" --project "$PROJECT_ID" --quiet
+  gcloud monitoring dashboards delete "$d" --project "$PROJECT_ID" --quiet || warn "dashboard $d"
 done
 
 step "snapshots"
@@ -52,6 +70,11 @@ if $ALL; then
     for sa in atelet ate-api-server; do
       unbind_project "${WI}/ns/ate-system/sa/${sa}" roles/artifactregistry.reader
     done
+    # NOTE: the compute default SA can carry roles/artifactregistry.reader for reasons that
+    # have nothing to do with this workshop (it's a project-wide default SA other things may
+    # also grant to). This removes exactly the binding `scripts/gcp-resources.sh` added, but if
+    # something else in the project also depends on this SA having that role, removing it here
+    # will affect that too.
     unbind_project "$COMPUTE_SA" roles/artifactregistry.reader
     unbind_project "${WI}/ns/${NAMESPACE}/sa/gateway" roles/aiplatform.user
     unbind_project "${WI}/ns/${NAMESPACE}/sa/prometheus-ui" roles/monitoring.viewer
@@ -59,6 +82,16 @@ if $ALL; then
   else
     warn "could not resolve the project number; leaving project IAM bindings in place"
   fi
+  # Substrate itself is untouched (ate-system isn't ours to delete), but in source mode its
+  # control-plane and worker images lived in the Artifact Registry repo just deleted, and the
+  # IAM grants that let atelet/ateapi write snapshots are gone too. Force a full reinstall
+  # rather than let the next `make install`/catch-up think it's already done.
+  rm -f "$STATE_DIR/worker-image" "$STATE_DIR/install-complete"
+  warn "Substrate needs a reinstall: its images (source mode) and its GCP IAM grants were just removed. Run make install (or make catch-up) before using this project again."
 fi
 rm -f "$STATE_DIR"/{agent-image,gateway-image,ate-token,ate-ca.pem,agent-v*.yaml}
-ok "teardown complete (Substrate and the cluster are untouched)"
+if $ALL; then
+  ok "teardown complete (the cluster is untouched; Substrate itself is still deployed but needs a reinstall — see above)"
+else
+  ok "teardown complete (Substrate and the cluster are untouched)"
+fi

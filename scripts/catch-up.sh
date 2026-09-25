@@ -1,19 +1,41 @@
 #!/usr/bin/env bash
 # catch-up.sh N — bring your environment to the start of module N (the end of module N-1).
 # Safe to re-run: every step skips work that is already done. Your main.go is backed up before it is replaced.
+# Note: past Module 5 the gateway's IDLE_AFTER is live. Re-running catch-up at a lower N doesn't
+# turn it off, so actors can still get idle-suspended while you work back through earlier modules.
 source "$(dirname "$0")/lib.sh"
 load_env
 N="${1:-}"
 [[ "$N" =~ ^[1-7]$ ]] || die "usage: make catch-up MODULE=<1-7>"
 S="$REPO_ROOT/scripts" M="$REPO_ROOT/modules" MAIN="$REPO_ROOT/app/cmd/agent/main.go"
 POLICY="$M/04-make-it-an-agent/manifests/egress-gateway.yaml"
+BACKED_UP=false
 
+# is_known_solution: true if $MAIN already matches one of our own modules/*/solution/main.go
+# files, i.e. it's leftover from a previous catch-up run rather than the attendee's own code.
+is_known_solution() {
+  local f
+  for f in "$M"/*/solution/main.go; do
+    cmp -s "$f" "$MAIN" && return 0
+  done
+  return 1
+}
 use_solution() {
   local sol="$M/$1/solution/main.go"
   cmp -s "$sol" "$MAIN" && return 0
-  cp "$MAIN" "$STATE_DIR/main.go.bak.$(date +%s)"
+  # Back up at most once per run, and only the attendee's own code — not a solution file this
+  # same run already wrote (stage_template can call use_solution up to three times when
+  # catching up several modules at once; a second/third backup would otherwise overwrite the
+  # one backup that matters with a copy of our own solution code).
+  if ! $BACKED_UP && ! is_known_solution; then
+    local bak
+    bak="$STATE_DIR/main.go.bak.$(date +%Y%m%d-%H%M%S).$$"
+    cp "$MAIN" "$bak"
+    BACKED_UP=true
+    ok "backed up your app/cmd/agent/main.go to $bak"
+  fi
   cp "$sol" "$MAIN"
-  ok "app/cmd/agent/main.go ← modules/$1/solution/main.go (yours is backed up in .workshop/)"
+  ok "app/cmd/agent/main.go ← modules/$1/solution/main.go"
 }
 # stage_template <module-dir> <template>: build that module's agent and create its template, once.
 stage_template() {
@@ -25,7 +47,9 @@ stage_template() {
   ensure_template "$ATESPACE" "$2" "$STATE_DIR/$2.yaml"
   ok "template $2 ready"
 }
-_no_bg_install() { ! pgrep -f scripts/install-substrate.sh >/dev/null; }
+# Tightened past a bare `install-substrate.sh` substring match so this doesn't also match,
+# say, an editor buffer or a grep for the same string in someone's shell history.
+_no_bg_install() { ! pgrep -f 'bash .*scripts/install-substrate.sh' >/dev/null; }
 _two_workers() {
   [[ "$(kubectl -n "$NAMESPACE" get pods -l workload=workshop-agent --field-selector=status.phase=Running -o name | wc -l)" -ge 2 ]]
 }
@@ -40,7 +64,12 @@ if ! _no_bg_install; then
   step "a background install is running — waiting for it (tail -f .workshop/install.log)"
   wait_for 1800 "background install to finish" _no_bg_install
 fi
-if [[ ! -s "$STATE_DIR/worker-image" ]] || ! kubectl -n ate-system get deploy atenet-router >/dev/null 2>&1; then
+# install-substrate.sh writes .workshop/install-complete as its very last step (after node
+# labeling and the router patch), so that single marker is what verify/01.sh's checks actually
+# depend on having happened. A missing marker on an otherwise-installed cluster (e.g. .workshop/
+# predates this marker, or was partially cleaned up) just means we re-run it — install-substrate.sh
+# is safe to re-run (its own header says so, and every step in it is create-or-patch-if-missing).
+if [[ ! -s "$STATE_DIR/install-complete" ]]; then
   "$S/install-substrate.sh"
 fi
 "$S/dashboards.sh"
@@ -81,7 +110,9 @@ if (( N >= 5 )); then
     code="${out##*$'\n'}"
     if [[ "$code" != 200 ]]; then
       sleep 10
-      gateway_chat buddy "hello from catch-up" >/dev/null
+      out="$(gateway_chat buddy "hello from catch-up")" || true
+      code="${out##*$'\n'}"
+      [[ "$code" == 200 ]] || die "buddy still can't reach the gateway after the egress policy cache window (last status: $code) — see instructor/troubleshooting.md"
     fi
   fi
 fi

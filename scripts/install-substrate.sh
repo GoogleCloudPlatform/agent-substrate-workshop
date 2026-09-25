@@ -66,3 +66,7 @@ kubectl -n ate-system wait --for=condition=Available deploy --all --timeout=10m
 kubectl -n ate-system rollout status ds --timeout=10m
 ok "Agent Substrate is ready"
 kubectl -n ate-system get pods
+
+# Written last, after node labeling and the router patch, so catch-up.sh can gate a skip on
+# this single marker instead of re-deriving "is the install actually done" from several checks.
+state_put install-complete "$(date -u +%Y-%m-%dT%H:%M:%SZ) SUBSTRATE_REF=$SUBSTRATE_REF"
