@@ -65,6 +65,49 @@ EOS
   [[ "$out" == "RUNNING" ]]
 }
 
+# A stub kubectl that fakes `kubectl ate` for one actor a1 in atespace ws.
+# KSTATE holds the actor's state; an absent file means the actor doesn't exist.
+make_stub_kubectl() {
+  local d="$1"; mkdir -p "$d/bin"
+  cat >"$d/bin/kubectl" <<'STUB'
+#!/usr/bin/env bash
+echo "$*" >>"$KLOG"
+case "$*" in
+  "ate get actor a1 -a ws -o json")
+    [[ -f "$KSTATE" ]] || exit 1
+    printf '{"metadata":{"name":"a1"},"status":{"state":"%s"}}\n' "$(cat "$KSTATE")" ;;
+  "ate get actors -a ws -o json")
+    printf '{"actors":[{"metadata":{"name":"a1"},"status":{"state":"%s"}},{"metadata":{"name":"b1"},"status":{"state":"RUNNING"}}]}\n' "$(cat "$KSTATE")" ;;
+  "ate create actor a1 --template=t -a ws") echo SUSPENDED >"$KSTATE" ;;
+  "ate suspend actor a1 -a ws") echo SUSPENDED >"$KSTATE" ;;
+  *) exit 1 ;;
+esac
+STUB
+  chmod +x "$d/bin/kubectl"
+}
+t_ensure_actor_idempotent() {
+  local d; d="$(mktemp -d)"; make_stub_kubectl "$d"
+  ( export PATH="$d/bin:$PATH" KLOG="$d/log" KSTATE="$d/state"
+    ensure_actor ws a1 t && ensure_actor ws a1 t )
+  [[ "$(grep -c 'create actor' "$d/log")" == 1 ]]
+}
+t_suspend_actor_suspends_running() {
+  local d; d="$(mktemp -d)"; make_stub_kubectl "$d"; echo RUNNING >"$d/state"
+  ( export PATH="$d/bin:$PATH" KLOG="$d/log" KSTATE="$d/state"; suspend_actor ws a1 ) &&
+    [[ "$(cat "$d/state")" == SUSPENDED ]] && grep -q 'suspend actor a1' "$d/log"
+}
+t_suspend_actor_noop_when_suspended() {
+  local d; d="$(mktemp -d)"; make_stub_kubectl "$d"; echo SUSPENDED >"$d/state"
+  ( export PATH="$d/bin:$PATH" KLOG="$d/log" KSTATE="$d/state"; suspend_actor ws a1 ) &&
+    ! grep -q 'suspend actor' "$d/log"
+}
+t_count_actors_in_state() {
+  local d; d="$(mktemp -d)"; make_stub_kubectl "$d"; echo SUSPENDED >"$d/state"
+  local n; n="$(export PATH="$d/bin:$PATH" KLOG="$d/log" KSTATE="$d/state"; count_actors_in_state ws RUNNING)"
+  local m; m="$(export PATH="$d/bin:$PATH" KLOG="$d/log" KSTATE="$d/state"; count_actors_in_state ws SUSPENDED a)"
+  [[ "$n" == 1 && "$m" == 1 ]]
+}
+
 load_env
 check "load_env expands references" t_load_env_expands
 check "load_env requires PROJECT_ID" t_load_env_requires_project
@@ -77,4 +120,8 @@ check "wait_for times out" t_wait_for_times_out
 check "port_forward detects foreign listener" t_port_forward_detects_foreign_listener
 check "port_forward reuses live forward" t_port_forward_reuses_live
 check "actor_state strips ACTOR_STATE_ prefix" t_actor_state_strips_prefix
+check "ensure_actor creates once" t_ensure_actor_idempotent
+check "suspend_actor suspends a running actor" t_suspend_actor_suspends_running
+check "suspend_actor is a no-op when suspended" t_suspend_actor_noop_when_suspended
+check "count_actors_in_state filters by state and prefix" t_count_actors_in_state
 exit "$fails"

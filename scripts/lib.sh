@@ -110,3 +110,26 @@ router_curl() {
   port_forward router ate-system svc/atenet-router 8080 80
   curl -sS --max-time 90 -H "ate-target-actor: ${ATESPACE}/${actor}" "$@"
 }
+
+_actor_in_state() { [[ "$(actor_state "$1" "$2")" == "$3" ]]; }
+
+# suspend_actor <atespace> <name>: checkpoint a running actor and wait until it is SUSPENDED.
+suspend_actor() {
+  local as="$1" name="$2"
+  if [[ "$(actor_state "$as" "$name")" == RUNNING ]]; then
+    kubectl ate suspend actor "$name" -a "$as" >/dev/null
+  fi
+  wait_for 120 "actor $as/$name to be SUSPENDED" _actor_in_state "$as" "$name" SUSPENDED
+}
+
+# _actors_list <atespace>: the actor list as a JSON array, whatever envelope kubectl ate uses.
+_actors_list() {
+  kubectl ate get actors -a "$1" -o json | jq -c 'if type == "array" then . else (.actors // .items // []) end'
+}
+actor_names() { _actors_list "$1" | jq -r '.[].metadata.name'; }
+
+# count_actors_in_state <atespace> <STATE> [name-prefix]
+count_actors_in_state() {
+  _actors_list "$1" | jq --arg s "$2" --arg p "${3:-}" \
+    '[.[] | select(.status.state == $s and (.metadata.name | startswith($p)))] | length'
+}
