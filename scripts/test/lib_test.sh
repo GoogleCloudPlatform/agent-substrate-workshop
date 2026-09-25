@@ -55,7 +55,7 @@ t_port_forward_reuses_live() {
   [[ $rc -eq 0 ]]
 }
 t_gateway_chat_prints_body_then_status() {
-  local d; d="$(mktemp -d)"; mkdir -p "$d/bin"
+  local d; d="$(mktemp -d "$TMP/t.XXXXXX")"; mkdir -p "$d/bin"
   # A tiny HTTP server standing in for the gateway: any POST gets a fixed JSON reply.
   cat >"$d/srv.py" <<'PY'
 import http.server, sys
@@ -118,23 +118,23 @@ STUB
   chmod +x "$d/bin/kubectl"
 }
 t_ensure_actor_idempotent() {
-  local d; d="$(mktemp -d)"; make_stub_kubectl "$d"
+  local d; d="$(mktemp -d "$TMP/t.XXXXXX")"; make_stub_kubectl "$d"
   ( export PATH="$d/bin:$PATH" KLOG="$d/log" KSTATE="$d/state"
     ensure_actor ws a1 t && ensure_actor ws a1 t )
   [[ "$(grep -c 'create actor' "$d/log")" == 1 ]]
 }
 t_suspend_actor_suspends_running() {
-  local d; d="$(mktemp -d)"; make_stub_kubectl "$d"; echo RUNNING >"$d/state"
+  local d; d="$(mktemp -d "$TMP/t.XXXXXX")"; make_stub_kubectl "$d"; echo RUNNING >"$d/state"
   ( export PATH="$d/bin:$PATH" KLOG="$d/log" KSTATE="$d/state"; suspend_actor ws a1 ) &&
     [[ "$(cat "$d/state")" == SUSPENDED ]] && grep -q 'suspend actor a1' "$d/log"
 }
 t_suspend_actor_noop_when_suspended() {
-  local d; d="$(mktemp -d)"; make_stub_kubectl "$d"; echo SUSPENDED >"$d/state"
+  local d; d="$(mktemp -d "$TMP/t.XXXXXX")"; make_stub_kubectl "$d"; echo SUSPENDED >"$d/state"
   ( export PATH="$d/bin:$PATH" KLOG="$d/log" KSTATE="$d/state"; suspend_actor ws a1 ) &&
     ! grep -q 'suspend actor' "$d/log"
 }
 t_count_actors_in_state() {
-  local d; d="$(mktemp -d)"; make_stub_kubectl "$d"; echo SUSPENDED >"$d/state"
+  local d; d="$(mktemp -d "$TMP/t.XXXXXX")"; make_stub_kubectl "$d"; echo SUSPENDED >"$d/state"
   local n; n="$(export PATH="$d/bin:$PATH" KLOG="$d/log" KSTATE="$d/state"; count_actors_in_state ws RUNNING)"
   local m; m="$(export PATH="$d/bin:$PATH" KLOG="$d/log" KSTATE="$d/state"; count_actors_in_state ws SUSPENDED a)"
   [[ "$n" == 1 && "$m" == 1 ]]
