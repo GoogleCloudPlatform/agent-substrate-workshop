@@ -16,6 +16,7 @@
      gateway, `egressctl`, and the idle-suspender) must speak the same protocol as the control plane you install.
 2. **Run the mock path too**: `MOCK_LLM=true make e2e`, so you know the whole workshop still works when Vertex is
    unreachable (quota, a locked-down project, a flaky network) — the fallback attendees are told about in Module 4.
+   The gateway keeps that live `MOCK_LLM=true` afterwards; run `MOCK_LLM=false make gateway` to go back to Vertex.
 3. **Check external dependencies that drift independently of substrate:**
    - `GEMINI_MODEL` (`workshop.env.example`, currently `gemini-2.5-flash`) is still served in `VERTEX_LOCATION`
      (currently `${REGION}`, i.e. `us-central1`).

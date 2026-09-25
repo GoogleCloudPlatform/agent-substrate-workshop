@@ -74,8 +74,9 @@ flowchart LR
    History lives in `/data/history.json` and in memory, and both came back. The `turn` count continues.
 
 ## If Vertex isn't available
-`make gateway` with `MOCK_LLM=true` in `workshop.env`, or live:
-`kubectl -n workshop set env deploy/gateway MOCK_LLM=true`. Everything else in the workshop behaves the same.
+`MOCK_LLM=true make gateway`, or live: `kubectl -n workshop set env deploy/gateway MOCK_LLM=true`.
+Everything else in the workshop behaves the same. Once the gateway is running, `make gateway` and `make catch-up`
+keep its live `MOCK_LLM` (workshop.env only sets the first deploy); `MOCK_LLM=false make gateway` switches back.
 
 ## What just happened
 - The actor holds **no secrets**. The gateway's KSA is bound to `roles/aiplatform.user` through Workload Identity.

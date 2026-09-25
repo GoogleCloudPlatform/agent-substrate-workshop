@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Renders and applies the gateway. Keeps a live IDLE_AFTER (set in Module 5) unless you pass one.
+# Renders and applies the gateway. Keeps a live IDLE_AFTER (set in Module 5) and a live MOCK_LLM
+# (e.g. `kubectl set env … MOCK_LLM=true`) unless you pass one: IDLE_AFTER=… / MOCK_LLM=… make gateway.
 source "$(dirname "$0")/lib.sh"
 load_env
 require_state gateway-image "make gateway"
@@ -11,11 +12,26 @@ if [[ -z "${IDLE_AFTER:-}" ]]; then
     -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="IDLE_AFTER")].value}' 2>/dev/null || true)"
 fi
 export IDLE_AFTER="${IDLE_AFTER:-0s}" GEMINI_MODEL VERTEX_LOCATION
+# load_env already let a command-line MOCK_LLM win over workshop.env; without one, the live value wins.
+if [[ -z "${WORKSHOP_MOCK_LLM_OVERRIDE:-}" ]]; then
+  live_mock="$(kubectl -n "$NAMESPACE" get deploy gateway \
+    -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="MOCK_LLM")].value}' 2>/dev/null || true)"
+  if [[ -n "$live_mock" && "$live_mock" != "$MOCK_LLM" ]]; then
+    warn "keeping the gateway's live MOCK_LLM=$live_mock (workshop.env says $MOCK_LLM); to change it: MOCK_LLM=$MOCK_LLM make gateway"
+    MOCK_LLM="$live_mock"
+  fi
+fi
+export MOCK_LLM
 kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 step "deploying gateway ($GATEWAY_IMAGE, MOCK_LLM=$MOCK_LLM, IDLE_AFTER=$IDLE_AFTER)"
 render "$REPO_ROOT/modules/04-make-it-an-agent/manifests/gateway.yaml.tmpl" \
   NAMESPACE GATEWAY_IMAGE ATESPACE MOCK_LLM GEMINI_MODEL PROJECT_ID VERTEX_LOCATION IDLE_AFTER | kubectl apply -f -
 kubectl -n "$NAMESPACE" rollout status deploy/gateway --timeout=180s
+# A forward to a replaced pod can stay alive but dead; drop it so the next port_forward starts fresh.
+if [[ -f "$STATE_DIR/pf-gateway.pid" ]]; then
+  stop_port_forward gateway
+  ok "stopped the old gateway port-forward (the pods were replaced); run make forward-gateway again if you use it"
+fi
 # The gateway's PodMonitoring (Task 15) may not exist yet; apply it here too so gateway
 # metrics are scraped from the moment the gateway exists, not just from Module 6 onward.
 if [[ -f "$REPO_ROOT/observability/podmonitoring.yaml" ]]; then

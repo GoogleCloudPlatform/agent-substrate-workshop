@@ -19,8 +19,12 @@ die()  { echo "${C_R}  ✗ $*${C_0}" >&2; exit 1; }
 load_env() {
   local f="${WORKSHOP_ENV_FILE:-$REPO_ROOT/workshop.env}"
   [[ -f "$f" ]] || die "missing $f — run: cp workshop.env.example workshop.env and set PROJECT_ID"
+  # A MOCK_LLM you pass on the command line (MOCK_LLM=true make …) beats workshop.env. Captured once and
+  # exported, so a script run by another script still sees what you typed, not workshop.env's value.
+  : "${WORKSHOP_MOCK_LLM_OVERRIDE=${MOCK_LLM:-}}"; export WORKSHOP_MOCK_LLM_OVERRIDE
   set -a; # shellcheck disable=SC1090
   source "$f"; set +a
+  if [[ -n "$WORKSHOP_MOCK_LLM_OVERRIDE" ]]; then MOCK_LLM="$WORKSHOP_MOCK_LLM_OVERRIDE"; fi
   [[ -n "${PROJECT_ID:-}" ]] || die "PROJECT_ID is empty in $f"
   : "${NAMESPACE:=workshop}" "${ATESPACE:=workshop}" "${MOCK_LLM:=false}"
   export NAMESPACE ATESPACE MOCK_LLM
@@ -82,12 +86,19 @@ port_forward() {
   wait_for 20 "port-forward $name on :$lport" _port_listening "$lport"
 }
 
+# stop_port_forward <name>: stop one forward we started (no-op if it isn't running).
+stop_port_forward() {
+  local pidf="$STATE_DIR/pf-$1.pid"
+  [[ -f "$pidf" ]] || return 0
+  kill "$(cat "$pidf")" 2>/dev/null || true
+  rm -f "$pidf"
+}
+
 stop_port_forwards() {
-  local f
+  local f n
   for f in "$STATE_DIR"/pf-*.pid; do
     [[ -f "$f" ]] || continue
-    kill "$(cat "$f")" 2>/dev/null || true
-    rm -f "$f"
+    n="${f##*/pf-}"; stop_port_forward "${n%.pid}"
   done
 }
 

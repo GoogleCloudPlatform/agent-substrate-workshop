@@ -60,6 +60,54 @@ t_port_forward_reuses_live() {
   kill "$pid"
   [[ $rc -eq 0 ]]
 }
+t_load_env_mock_llm_override() {
+  local f="$TMP/mock.env"; printf 'PROJECT_ID=p\nMOCK_LLM=false\n' >"$f"
+  # From workshop.env when nothing is passed; the command-line value wins, also in a nested script.
+  [[ "$(unset MOCK_LLM WORKSHOP_MOCK_LLM_OVERRIDE; WORKSHOP_ENV_FILE="$f" load_env; echo "$MOCK_LLM")" == false ]] &&
+  [[ "$(unset WORKSHOP_MOCK_LLM_OVERRIDE; export MOCK_LLM=true WORKSHOP_ENV_FILE="$f"; load_env
+       bash -c 'source "$1"; load_env; echo "$MOCK_LLM"' _ "$HERE/../lib.sh")" == true ]] &&
+  # A parent script without an override hands its children an empty (not a workshop.env) override.
+  [[ "$(unset MOCK_LLM WORKSHOP_MOCK_LLM_OVERRIDE; WORKSHOP_ENV_FILE="$f" load_env
+       bash -c 'echo "[${WORKSHOP_MOCK_LLM_OVERRIDE-unset}]"')" == "[]" ]]
+}
+# gateway.sh against a stub kubectl whose live Deployment has MOCK_LLM=$LIVE_MOCK; prints the applied MOCK_LLM.
+run_gateway_sh() {
+  local d; d="$(mktemp -d "$TMP/t.XXXXXX")"; mkdir -p "$d/bin" "$d/state"
+  cat >"$d/bin/kubectl" <<'STUB'
+#!/usr/bin/env bash
+case "$*" in
+  *"get deploy gateway"*"IDLE_AFTER"*) echo 20s ;;
+  *"get deploy gateway"*"MOCK_LLM"*) echo "$LIVE_MOCK" ;;
+  *"create namespace"*) echo "kind: Namespace" ;;
+  *"apply -f -"*) cat >>"$APPLIED" ;;
+esac
+exit 0
+STUB
+  chmod +x "$d/bin/kubectl"
+  echo "r/gw@sha256:abc" >"$d/state/gateway-image"
+  printf 'PROJECT_ID=p\nMOCK_LLM=false\n' >"$d/env"
+  env -u MOCK_LLM -u WORKSHOP_MOCK_LLM_OVERRIDE PATH="$d/bin:$PATH" WORKSHOP_ENV_FILE="$d/env" \
+    WORKSHOP_STATE_DIR="$d/state" APPLIED="$d/applied" "$@" bash "$HERE/../gateway.sh" >/dev/null 2>&1 || return 1
+  grep -A1 'name: MOCK_LLM' "$d/applied" | sed -n 's/.*value: "\([a-z]*\)".*/\1/p' | head -n1
+}
+t_gateway_keeps_live_mock_llm() {
+  [[ "$(run_gateway_sh LIVE_MOCK=true)" == true ]] &&     # live beats workshop.env
+    [[ "$(run_gateway_sh LIVE_MOCK=)" == false ]] &&      # no gateway yet: workshop.env
+    [[ "$(run_gateway_sh LIVE_MOCK=true MOCK_LLM=false)" == false ]]   # command line beats live
+}
+t_stop_port_forward_stops_one() {
+  sleep 30 & local a=$!; sleep 30 & local b=$!
+  echo "$a" >"$STATE_DIR/pf-one.pid"; echo "$b" >"$STATE_DIR/pf-two.pid"
+  stop_port_forward one; stop_port_forward missing
+  local ok=true
+  kill -0 "$a" 2>/dev/null && ok=false
+  [[ -f "$STATE_DIR/pf-one.pid" ]] && ok=false
+  kill -0 "$b" 2>/dev/null || ok=false
+  stop_port_forwards
+  kill -0 "$b" 2>/dev/null && ok=false
+  wait "$a" "$b" 2>/dev/null
+  $ok
+}
 t_gateway_chat_prints_body_then_status() {
   local d; d="$(mktemp -d "$TMP/t.XXXXXX")"; mkdir -p "$d/bin"
   # A tiny HTTP server standing in for the gateway: any POST gets a fixed JSON reply.
@@ -194,6 +242,9 @@ check "wait_for succeeds" t_wait_for_succeeds
 check "wait_for times out" t_wait_for_times_out
 check "port_forward detects foreign listener" t_port_forward_detects_foreign_listener
 check "port_forward reuses live forward" t_port_forward_reuses_live
+check "load_env: command-line MOCK_LLM beats workshop.env" t_load_env_mock_llm_override
+check "gateway.sh keeps a live MOCK_LLM unless one is passed" t_gateway_keeps_live_mock_llm
+check "stop_port_forward stops only the named forward" t_stop_port_forward_stops_one
 check "gateway_chat prints body then status code" t_gateway_chat_prints_body_then_status
 check "actor_state strips ACTOR_STATE_ prefix" t_actor_state_strips_prefix
 check "ensure_actor creates once" t_ensure_actor_idempotent
