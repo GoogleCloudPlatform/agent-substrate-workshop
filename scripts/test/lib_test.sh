@@ -255,6 +255,18 @@ t_catch_up_reset_needs_module_3() {
   local out; out="$(RESET=1 bash "$HERE/../catch-up.sh" 2 2>&1)" && return 1
   [[ "$out" == *"RESET=1 needs MODULE=3"* ]]
 }
+# make help lists only targets with a "## " comment, so every .PHONY target needs one.
+t_make_help_lists_every_target() {
+  local t missing=0 help; help="$(make -s -C "$REPO_ROOT" help | sed $'s/\e\\[[0-9;]*m//g')"
+  for t in $(sed -n 's/^\.PHONY://p' "$REPO_ROOT/Makefile"); do
+    [[ "$help" == *" $t "* ]] || { echo "  no help line: $t" >&2; missing=1; }
+  done
+  return "$missing"
+}
+t_make_teardown_all_passes_flag() {
+  [[ "$(make -s -n -C "$REPO_ROOT" teardown ALL=1)" == "scripts/teardown.sh --all" ]] &&
+    [[ "$(make -s -n -C "$REPO_ROOT" teardown)" != *--all* ]]
+}
 
 load_env
 check "load_env expands references" t_load_env_expands
@@ -280,4 +292,6 @@ check "suspend_actor is a no-op when suspended" t_suspend_actor_noop_when_suspen
 check "count_actors_in_state filters by state and prefix" t_count_actors_in_state
 check "catch-up RESET=1 refuses MODULE<3" t_catch_up_reset_needs_module_3
 check "reset_template deletes its actors, then the template (idempotent)" t_reset_template_deletes_its_actors_then_template
+check "make help lists every target" t_make_help_lists_every_target
+check "make teardown ALL=1 passes --all" t_make_teardown_all_passes_flag
 exit "$fails"
