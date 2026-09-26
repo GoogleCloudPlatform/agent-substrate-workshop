@@ -58,6 +58,7 @@ func main() {
 	mux.Handle("POST /v1/model", model.Handler(backend, m))
 	mux.HandleFunc("POST /chat/{actor}", fd.HandleChat)
 	mux.HandleFunc("GET /actors/{actor}/state", fd.HandleState)
+	mux.HandleFunc("GET /actors/{actor}/work", fd.HandleWork)
 	mux.Handle("GET /metrics", m.Handler())
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "ok\n") })
 

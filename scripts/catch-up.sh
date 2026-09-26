@@ -150,7 +150,7 @@ if (( N >= 5 )); then
 fi
 
 if (( N >= 6 )); then
-  step "module 5 end state: 20 swarm actors, atespace-wide policy, idle-suspend on"
+  step "module 5 end state: 20 swarm actors, policy on every current actor, idle-suspend on"
   suspend_actor "$ATESPACE" buddy       # module 5 step 1: clear the decks
   for i in $(seq -w 1 20); do _exists "swarm-$i" || kubectl ate create actor "swarm-$i" --template=agent-v3 -a "$ATESPACE"; done
   "$S/egress.sh" apply "$POLICY" --all

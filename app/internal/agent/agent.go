@@ -112,6 +112,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /{$}", s.handleRoot)
 	mux.HandleFunc("GET /state", s.handleState)
 	mux.HandleFunc("POST /chat", s.handleChat)
+	mux.HandleFunc("GET /work", s.handleWork)
 	return mux
 }
 

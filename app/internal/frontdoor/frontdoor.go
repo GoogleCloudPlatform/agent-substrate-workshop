@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -77,6 +78,16 @@ func (f *FrontDoor) HandleState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f.forward(w, r.Context(), http.MethodGet, actor, "/state", nil)
+}
+
+// HandleWork serves GET /actors/{actor}/work?steps=N: a slow request the idle tracker can see.
+func (f *FrontDoor) HandleWork(w http.ResponseWriter, r *http.Request) {
+	actor := r.PathValue("actor")
+	if !dnsLabel.MatchString(actor) {
+		writeJSON(w, http.StatusBadRequest, chatapi.Error{Error: fmt.Sprintf("invalid actor name %q", actor)})
+		return
+	}
+	f.forward(w, r.Context(), http.MethodGet, actor, "/work?steps="+url.QueryEscape(r.URL.Query().Get("steps")), nil)
 }
 
 // forward proxies one request to the actor through the router and reports whether it got a 2xx.

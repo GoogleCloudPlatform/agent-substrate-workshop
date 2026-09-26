@@ -48,6 +48,7 @@ func setup(t *testing.T, router http.HandlerFunc) (*httptest.Server, *recorder, 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /chat/{actor}", fd.HandleChat)
 	mux.HandleFunc("GET /actors/{actor}/state", fd.HandleState)
+	mux.HandleFunc("GET /actors/{actor}/work", fd.HandleWork)
 	gw := httptest.NewServer(mux)
 	t.Cleanup(gw.Close)
 	return gw, rec, m
@@ -155,5 +156,27 @@ func TestStateForwards(t *testing.T) {
 	resp.Body.Close()
 	if !strings.Contains(string(b), `"memCount":3`) {
 		t.Fatalf("state = %s", b)
+	}
+}
+
+func TestWorkForwardsStepsAndCountsAsActivity(t *testing.T) {
+	gw, rec, _ := setup(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/work" || r.URL.Query().Get("steps") != "150" || r.Header.Get(RouteHeader) != "workshop/swarm-03" {
+			t.Errorf("router saw %s %s", r.URL, r.Header.Get(RouteHeader))
+		}
+		_, _ = io.WriteString(w, `{"steps":150}`)
+	})
+	resp, err := http.Get(gw.URL + "/actors/swarm-03/work?steps=150")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+	rec.mu.Lock()
+	defer rec.mu.Unlock()
+	if len(rec.begun) != 1 || rec.begun[0] != "swarm-03" || len(rec.ended) != 1 {
+		t.Fatalf("activity begun=%v ended=%v", rec.begun, rec.ended)
 	}
 }
