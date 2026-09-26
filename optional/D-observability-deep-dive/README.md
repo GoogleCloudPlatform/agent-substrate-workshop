@@ -26,6 +26,15 @@ done
   it by crashing an actor — the easiest repeatable way without touching an actor's own code is to delete its
   worker pod out from under it while it's RUNNING (`kubectl -n workshop delete pod -l workload=workshop-agent
   --wait=false` while a chat is in flight) and watch `kubectl ate get actors -a workshop` for `CRASHED`.
+  The metric tells you *that* something crashed, not *what*. The alert can't name the actor (that would be
+  a series per actor), so go to Logs Explorer:
+  ```
+  resource.type="k8s_container"
+  jsonPayload."ate.actor.state"="crashed"
+  ```
+  ateapi's `Actor crashed` record names the actor (`ate.actor.name`, `ate.actor.uid`), the operation it
+  was in (`ate.actor.operation.name`), and why: `ate.failure.domain` and `ate.failure.reason` (for the pod
+  delete above, `infrastructure` / `WORKER_POD_GONE`).
 - **`alert-workers-desired-vs-ready.json`** fires when the `agents` WorkerPool's ready workers stay below
   what it asked for, for 5 minutes. It's hard to trigger honestly in the workshop's own 2-replica pool
   without breaking your cluster (over-request node capacity, or drop a quota) — read it as the alert you'd
@@ -53,7 +62,7 @@ identity in the log filter you eyeball, but never promote it to a metric label.
 ```bash
 gcloud logging metrics create actor_usage_events --project "$PROJECT_ID" \
   --description="Actor usage samples, labeled only by template and pool (never actor — cardinality)" \
-  --log-filter='resource.type="k8s_container" AND jsonPayload.message="Actor usage sample"'
+  --log-filter='resource.type="k8s_container" AND jsonPayload.msg="Actor usage sample"'
 ```
 In the metric's settings (Logs Explorer → your new metric → "Convert to a metric" panel, or Metrics Explorer
 → edit), add label extractors for `labels."ate.template.name"` and `labels."ate.workerpool.name"` — **not**
@@ -64,7 +73,7 @@ To drill into one actor's own usage events (a log search, not a metric — no ca
 use Logs Explorer directly:
 ```
 resource.type="k8s_container"
-jsonPayload.message="Actor usage sample"
+jsonPayload.msg="Actor usage sample"
 labels."ate.actor.name"="swarm-01"
 ```
 
@@ -106,9 +115,36 @@ kubectl ate --trace resume actor buddy -a workshop
 `kubectl ate suspend actor buddy -a workshop`.)
 
 Open Cloud Trace → Trace Explorer, paste the printed trace ID into "Find a specific trace", and look at the
-span breakdown across ateapi and atelet for that one resume. Data plane traffic (the router forwarding your
-actual chat request) is sampled at 1%, so this per-command trace ID is the reliable way to find *a specific*
-call rather than hoping a resume shows up in a random sample.
+span breakdown for that one resume: ateapi's steps (`step.AssignWorker`, `step.CallAteletRestore`, …),
+atelet's snapshot download and OCI prep, and an `ateom-gvisor` span. That last one is tagged
+`ate.otlp.relay=relay`: ateom runs inside the sandbox with no network of its own, so atelet relays its
+OTLP out for it. Data plane traffic (the router forwarding your actual chat request) is sampled at 1%, so
+this per-command trace ID is the reliable way to find *a specific* call rather than hoping a resume shows
+up in a random sample.
+
+Spans carry actor identity too. In Trace Explorer, filter on the span attribute `ate.actor.name` = `buddy`
+to list every traced operation on that actor, including failed ones.
+
+**Join the trace to its logs.** Every Substrate log record written while handling that request carries
+the same ID as a top-level `trace_id` field (Cloud Logging doesn't link them for you, since the entry's
+own `trace` field is left empty). In Logs Explorer:
+```
+resource.type="k8s_container"
+jsonPayload.trace_id="<the ID the CLI printed>"
+```
+You get the request across three components: ateapi (`Picked worker`, the lease, `Actor state changed`),
+atelet (`Image cache hit`, `Restore timing breakdown`), and ateom (`Actor restoring`, `Actor restored`).
+Records from untraced requests carry a `trace_id` too, with `trace_flags` `00`: not sampled, so no spans
+exist for it.
+
+**Where did the restore time go?** Open the `Restore timing breakdown` record. Its
+`ate.actor.restore.duration.*` fields split the resume into phases (`total` plus each step), and
+`ate.snapshot.kind` says which snapshot it came from. To compare resumes of one actor:
+```
+resource.type="k8s_container"
+jsonPayload.msg="Restore timing breakdown"
+jsonPayload."ate.actor.name"="buddy"
+```
 
 ## Clean up
 ```bash
