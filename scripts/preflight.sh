@@ -44,7 +44,7 @@ export DESC="$desc"
 ver="$(jq -r '.currentMasterVersion // empty' <<<"$desc" 2>/dev/null)" || true
 [[ -n "$ver" ]] || die "could not read the cluster version from 'gcloud container clusters describe' (is jq installed?)"
 export VER="${ver%%-*}"
-CHECK="GKE version $ver >= 1.37 (or 1.36 with beta APIs)" HINT="recreate the cluster on 1.37+"
+CHECK="GKE version $ver >= 1.37 (or 1.36 with beta APIs)" HINT="recreate the cluster on 1.36+"
 need bash -c '[[ "$(printf "%s\n" 1.36 "$VER" | sort -V | head -1)" == 1.36 ]]'
 if [[ "$(printf '%s\n' 1.37 "$VER" | sort -V | head -1)" != 1.37 ]]; then
   CHECK="1.36 beta APIs enabled" HINT="1.36 needs --enable-kubernetes-unstable-apis for podcertificaterequests and clustertrustbundles at creation"
@@ -56,8 +56,13 @@ CHECK="managed OpenTelemetry collection enabled" HINT="gcloud beta container clu
 need bash -c 'jq -e ".managedOpentelemetryConfig.scope == \"COLLECTION_AND_INSTRUMENTATION_COMPONENTS\"" <<<"$DESC" >/dev/null 2>&1'
 CHECK="Managed Prometheus enabled" HINT="gcloud container clusters update $CLUSTER_NAME --enable-managed-prometheus"
 need bash -c 'jq -e ".monitoringConfig.managedPrometheusConfig.enabled == true" <<<"$DESC" >/dev/null 2>&1'
-CHECK="no node auto-upgrade" HINT="gcloud container node-pools update <pool> --no-enable-autoupgrade"
-need bash -c 'jq -e "[.nodePools[].management.autoUpgrade // false] | all(. == false)" <<<"$DESC" >/dev/null 2>&1'
+# New clusters must join a release channel, and a channel forces node auto-upgrade on, so an active
+# maintenance exclusion that blocks node upgrades counts too.
+CHECK="no node auto-upgrade" HINT="gcloud container node-pools update <pool> --no-enable-autoupgrade, or on a release channel: gcloud container clusters update $CLUSTER_NAME --add-maintenance-exclusion-scope no_minor_or_node_upgrades (plus -name/-start/-end)"
+need bash -c 'jq -e "([.nodePools[].management.autoUpgrade // false] | all(. == false))
+  or ((now | todate) as \$t | [.maintenancePolicy.window.maintenanceExclusions // {} | .[]
+      | select(.maintenanceExclusionOptions.scope == \"NO_MINOR_OR_NODE_UPGRADES\" or .maintenanceExclusionOptions.scope == \"NO_UPGRADES\")
+      | select(.startTime <= \$t and \$t < .endTime)] | length > 0)" <<<"$DESC" >/dev/null 2>&1'
 CHECK="no spot/preemptible nodes" HINT="use a standard node pool"
 need bash -c 'jq -e "[.nodePools[].config | (.spot // false) or (.preemptible // false)] | all(. == false)" <<<"$DESC" >/dev/null 2>&1'
 
@@ -65,8 +70,9 @@ step "kubectl context"
 gcloud container clusters get-credentials "$CLUSTER_NAME" --location "$CLUSTER_LOCATION" --project "$PROJECT_ID" >/dev/null 2>&1 || true
 CHECK="kubectl reaches the cluster" HINT="gcloud container clusters get-credentials $CLUSTER_NAME --location $CLUSTER_LOCATION"
 need bash -c "kubectl get nodes >/dev/null"
-CHECK="ClusterTrustBundle API served" HINT="needs GKE 1.37+ or the 1.36 beta API"
-need bash -c 'kubectl api-resources --api-group=certificates.k8s.io -o name | grep -q clustertrustbundles'
+# Substrate uses the v1beta1 versions. GKE 1.37 serves both at v1 and drops v1beta1 unless it's enabled.
+CHECK="certificates.k8s.io/v1beta1 ClusterTrustBundle + PodCertificateRequest served" HINT="gcloud container clusters update $CLUSTER_NAME --enable-kubernetes-unstable-apis=certificates.k8s.io/v1beta1/clustertrustbundles,certificates.k8s.io/v1beta1/podcertificaterequests"
+need bash -c 'r="$(kubectl get --raw /apis/certificates.k8s.io/v1beta1 2>/dev/null)"; [[ "$r" == *\"clustertrustbundles\"* && "$r" == *\"podcertificaterequests\"* ]]'
 
 (( failures == 0 )) || die "$failures preflight check(s) failed"
 ok "preflight passed"

@@ -32,7 +32,7 @@ exit 0
 STUB
 cat >"$TMP/bin/kubectl" <<'STUB'
 #!/usr/bin/env bash
-case "$*" in *api-resources*) echo clustertrustbundles.certificates.k8s.io ;; esac
+case "$*" in *certificates.k8s.io/v1beta1*) [[ -n "${V1_ONLY:-}" ]] && exit 1; echo '{"resources":[{"name":"clustertrustbundles"},{"name":"podcertificaterequests"}]}' ;; esac
 exit 0
 STUB
 printf '#!/usr/bin/env bash\necho go1.27.1\n' >"$TMP/bin/go"
@@ -49,6 +49,13 @@ cat >"$TMP/good.json" <<'JSON'
  "nodePools": [{"management": {"autoUpgrade": false}, "config": {"spot": false}}]}
 JSON
 printf 'not json\n' >"$TMP/bad.json"
+# Release-channel clusters: auto-upgrade is forced on, so an active node-upgrade exclusion must stand in for it.
+channel() { jq --arg s "$1" --arg e "$2" --arg scope "$3" '.nodePools[0].management.autoUpgrade = true
+  | .maintenancePolicy.window.maintenanceExclusions.freeze = {startTime: $s, endTime: $e, maintenanceExclusionOptions: {scope: $scope}}' \
+  "$TMP/good.json"; }
+channel 2000-01-01T00:00:00Z 2999-01-01T00:00:00Z NO_MINOR_OR_NODE_UPGRADES >"$TMP/excluded.json"
+channel 2000-01-01T00:00:00Z 2000-02-01T00:00:00Z NO_MINOR_OR_NODE_UPGRADES >"$TMP/expired.json"
+channel 2000-01-01T00:00:00Z 2999-01-01T00:00:00Z NO_MINOR_UPGRADES >"$TMP/minor-only.json"
 
 run() { PATH="$TMP/bin:$PATH" WORKSHOP_ENV_FILE="$TMP/env" WORKSHOP_STATE_DIR="$TMP/ws" CLUSTER_JSON="$1" \
   bash "$ROOT/scripts/preflight.sh" 2>&1; }
@@ -57,4 +64,13 @@ check "quotes in the cluster JSON don't break the checks" "[[ $rc == 0 ]]"
 [[ $rc == 0 ]] || echo "$out"
 out="$(run "$TMP/bad.json")"; rc=$?
 check "unreadable describe output fails with one clear line" "[[ $rc != 0 && \"\$out\" == *'could not read the cluster version'* ]]"
+out="$(run "$TMP/excluded.json")"; rc=$?
+check "auto-upgrade under an active node-upgrade exclusion passes" "[[ $rc == 0 ]]"
+[[ $rc == 0 ]] || echo "$out"
+out="$(run "$TMP/expired.json")"; rc=$?
+check "an expired exclusion doesn't count" "[[ $rc != 0 && \"\$out\" == *'no node auto-upgrade —'* ]]"
+out="$(run "$TMP/minor-only.json")"; rc=$?
+check "a minor-only exclusion doesn't count (nodes still upgrade)" "[[ $rc != 0 && \"\$out\" == *'no node auto-upgrade —'* ]]"
+out="$(V1_ONLY=1 run "$TMP/good.json")"; rc=$?
+check "1.37 serving only certificates.k8s.io/v1 fails the v1beta1 check" "[[ $rc != 0 && \"\$out\" == *'PodCertificateRequest served —'* ]]"
 exit "$fails"

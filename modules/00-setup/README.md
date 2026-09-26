@@ -4,7 +4,7 @@
 and start the Substrate install in the background. It runs while you take the architecture tour in Module 1.
 
 ## What you need
-- A GCP project where you are Owner, and a GKE **1.37+** cluster in it. The cluster needs Workload Identity,
+- A GCP project where you are Owner, and a GKE **1.36+** cluster in it. The cluster needs the `v1beta1` certificate APIs, Workload Identity,
   managed OpenTelemetry, no node auto-upgrade, and no spot nodes. Your instructor created it, or you can follow
   [the substrate GCP guide](https://github.com/agent-substrate/substrate/tree/main/tools/setup-gcp).
 - `kubectl` pointed at that cluster: `kubectl config current-context`.

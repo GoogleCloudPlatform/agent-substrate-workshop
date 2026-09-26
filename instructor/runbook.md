@@ -31,8 +31,10 @@
    workshop.
 6. **Provision attendee projects and clusters.** Each attendee is Owner on their own GCP project, with a
    bare GKE cluster that has, at creation:
-   - GKE **1.37+** (or 1.36 with `--enable-kubernetes-unstable-apis=certificates.k8s.io/v1beta1/clustertrustbundles,certificates.k8s.io/v1beta1/podcertificaterequests`
-     — `make preflight` checks for both the version and, on 1.36, the beta APIs).
+   - GKE **1.36+** with `--enable-kubernetes-unstable-apis=certificates.k8s.io/v1beta1/clustertrustbundles,certificates.k8s.io/v1beta1/podcertificaterequests`.
+     Substrate at `SUBSTRATE_REF` still uses the `v1beta1` versions of both. 1.37 serves them at `v1` and
+     doesn't serve `v1beta1` unless you enable it; without it, `make install` hangs waiting for the
+     `primary-bundle` ClusterTrustBundle. `make preflight` asks the API server for `v1beta1` directly.
    - **Workload Identity** and **managed OpenTelemetry** with `--managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS`.
    - **Managed Prometheus** enabled (`--enable-managed-prometheus`) — Module 6's Prometheus UI reads through it.
    - Machine type **`c3-standard-4`**, 2 nodes, **no node auto-upgrade**, **no spot/preemptible nodes** (an
@@ -40,16 +42,33 @@
      and a spot reclaim mid-workshop loses whatever wasn't already snapshotted).
 
    `--managed-otel-scope` is a **beta** flag: plain `gcloud container clusters create` rejects it
-   (`unrecognized arguments`). Use `gcloud beta` (`gcloud components install beta` first). A zonal
+   (`unrecognized arguments`). Use `gcloud beta` (`gcloud components install beta` first).
+
+   GKE no longer lets new customers create clusters with `--release-channel None` (the create fails with
+   `not enrolling clusters in a release channel is now only allowed for existing customers`), and a release
+   channel forces node auto-upgrade on. So pick the channel that serves 1.37 (`gcloud container get-server-config
+   --location us-central1-a --format="yaml(channels)"`; Rapid at the time of writing), then freeze upgrades with a
+   maintenance exclusion. `clusters create` has no exclusion flags, so it is a second command. `make preflight`
+   accepts an active `no_minor_or_node_upgrades` exclusion in place of `--no-enable-autoupgrade`. A zonal
    cluster matching the list above:
    ```bash
    gcloud beta container clusters create "$CLUSTER_NAME" --project "$PROJECT_ID" --location us-central1-a \
-     --release-channel None --no-enable-autoupgrade \
+     --release-channel rapid --cluster-version 1.37 \
      --machine-type c3-standard-4 --num-nodes 2 \
      --workload-pool "$PROJECT_ID.svc.id.goog" --enable-managed-prometheus \
-     --managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS
-   # On 1.36 add: --cluster-version 1.36 --enable-kubernetes-unstable-apis=certificates.k8s.io/v1beta1/clustertrustbundles,certificates.k8s.io/v1beta1/podcertificaterequests
+     --managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS \
+     --enable-kubernetes-unstable-apis=certificates.k8s.io/v1beta1/clustertrustbundles,certificates.k8s.io/v1beta1/podcertificaterequests
+   # Start must be in the past (or now) for preflight to count it; cover the workshop day with the end.
+   gcloud container clusters update "$CLUSTER_NAME" --project "$PROJECT_ID" --location us-central1-a \
+     --add-maintenance-exclusion-name workshop-freeze \
+     --add-maintenance-exclusion-start "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+     --add-maintenance-exclusion-end <YYYY-MM-DD>T00:00:00Z \
+     --add-maintenance-exclusion-scope no_minor_or_node_upgrades
    ```
+   Projects that still may create unenrolled clusters can use `--release-channel None --no-enable-autoupgrade`
+   instead and skip the exclusion. Adding the unstable APIs to an existing cluster with
+   `clusters update` works too, but takes 10+ minutes and needs `kubectl -n podcertificate-controller-system rollout restart deploy/podcertificate-controller`
+   afterwards if substrate is already installed.
    With a regional `--location`, `--num-nodes` is per zone (2 × 3 zones = 6 nodes). Put the cluster's
    location in each attendee's `workshop.env` as `CLUSTER_LOCATION`.
 
