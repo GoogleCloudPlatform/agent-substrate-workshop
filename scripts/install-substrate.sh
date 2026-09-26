@@ -19,6 +19,8 @@ source "$(dirname "$0")/lib.sh"
 load_env
 SRC="$STATE_DIR/substrate"
 export KO_DOCKER_REPO
+# The checkout sits under the repo's go.work, which only lists ./app; without this every go build in $SRC fails.
+export GOWORK=off
 
 step "Substrate checkout @ ${SUBSTRATE_REF}"
 if [[ ! -d "$SRC/.git" ]]; then
