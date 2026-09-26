@@ -161,7 +161,7 @@ Paste into the Prometheus UI (or Cloud Console → Monitoring → Metrics Explor
 
 | Question | PromQL |
 |---|---|
-| Fleet: worker state on env's pool | `sum by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="default-template-workerpool"})` |
+| Fleet: worker state on env's pool | `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="default-template-workerpool"})` |
 | Multiplexing: did ~10 envs ever need more than 2 workers? | `{"ate.workerpool.desired_workers", "ate.workerpool.name"="default-template-workerpool"}` vs `{"ate.workerpool.ready_workers", "ate.workerpool.name"="default-template-workerpool"}` |
 | Suspend/resume latency for envN | `histogram_quantile(0.95, sum by (le, "ate.actor.operation.name") (rate({"ate.actor.lifecycle.operation.duration_bucket"}[5m])))` |
 | Did `ate-env envN shell` trigger a resume or join a warm one? | `sum by ("ate.router.resume") (rate({"atenet.router.route.duration_count", top_level_controller_name="atenet-router"}[5m]))` |

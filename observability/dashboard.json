@@ -9,7 +9,7 @@
           "title": "Workers by state (WorkerPool agents)",
           "xyChart": {
             "dataSets": [{
-              "timeSeriesQuery": {"prometheusQuery": "sum by (\"ate.worker.state\") ({\"ate.workerpool.workers\", \"ate.workerpool.name\"=\"agents\"})"},
+              "timeSeriesQuery": {"prometheusQuery": "max by (\"ate.worker.state\") ({\"ate.workerpool.workers\", \"ate.workerpool.name\"=\"agents\"})"},
               "plotType": "STACKED_AREA", "legendTemplate": "${metric.labels.ate.worker.state}"
             }],
             "yAxis": {"label": "workers", "scale": "LINEAR"}
@@ -229,7 +229,7 @@
         "widget": {
           "title": "Actor state changes (logs, workshop atespace)",
           "logsPanel": {
-            "filter": "resource.type=\"k8s_container\"\nresource.labels.namespace_name=\"ate-system\"\n\"Actor state changed\"\nlabels.\"ate.atespace\"=\"workshop\""
+            "filter": "resource.type=\"k8s_container\"\njsonPayload.msg=\"Actor state changed\"\njsonPayload.\"ate.atespace\"=\"workshop\""
           }
         }
       }
