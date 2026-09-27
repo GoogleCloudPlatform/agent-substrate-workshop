@@ -44,8 +44,8 @@ done
   one: set `IDLE_AFTER=0s` (`kubectl -n workshop set env deploy/gateway IDLE_AFTER=0s`) — this *disables* the
   idle-suspender (`internal/idle/idle.go`: `IdleAfter <= 0` is a no-op), so nothing frees a worker once it's
   used, and `CONCURRENCY=4 make load` saturates both workers. Parked requests hit the router's 60s budget,
-  error turns climb, and the alert fires in about 5–7 min. Restore `IDLE_AFTER=20s` afterwards
-  (`kubectl -n workshop set env deploy/gateway IDLE_AFTER=20s`).
+  error turns climb, and the alert fires in about 5–7 min. Restore `IDLE_AFTER=3s` afterwards
+  (`kubectl -n workshop set env deploy/gateway IDLE_AFTER=3s`).
 
 ## 2. An SLO on chat success
 In Cloud Console → Monitoring → SLOs, create a request-based SLO on the gateway:

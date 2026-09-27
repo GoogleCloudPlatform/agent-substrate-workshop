@@ -75,7 +75,7 @@ func loadConfig(getenv func(string) string) (config, error) {
 			Insecure:  boolean("ATE_API_INSECURE"),
 		},
 		IdleAfter:      duration("IDLE_AFTER", "0s"),
-		IdleCheckEvery: duration("IDLE_CHECK_EVERY", "5s"),
+		IdleCheckEvery: duration("IDLE_CHECK_EVERY", "1s"),
 	}
 	if c.Atespace == "" {
 		errs = append(errs, errors.New("ATESPACE is required"))

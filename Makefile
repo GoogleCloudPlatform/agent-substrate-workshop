@@ -27,7 +27,7 @@ build-agent: ## ko build the agent -> .workshop/agent-image
 build-gateway: ## ko build the gateway -> .workshop/gateway-image
 	@scripts/build.sh gateway
 build: build-agent build-gateway ## Build the agent and gateway images
-gateway: ## Build and deploy the gateway [IDLE_AFTER=20s (default: keep live value) MOCK_LLM=true|false]
+gateway: ## Build and deploy the gateway [IDLE_AFTER=3s (default: keep live value) MOCK_LLM=true|false]
 	@scripts/build.sh gateway && scripts/gateway.sh
 egress: ## Apply an EgressPolicy [POLICY=file, then ACTOR=name or ALL=1]
 	@scripts/egress.sh apply "$(POLICY)" "$(if $(ALL),--all,--actor=$(ACTOR))"

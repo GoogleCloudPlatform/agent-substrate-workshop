@@ -34,13 +34,14 @@ the one thing Substrate deliberately doesn't do for you: **decide when an actor 
 5. **Teach the gateway to suspend idle actors.** The gateway sees every chat turn, so it knows when each actor
    last did something. With `IDLE_AFTER` set, it suspends RUNNING actors that have had no request in flight for that long.
    ```bash
-   kubectl -n workshop set env deploy/gateway IDLE_AFTER=20s
+   kubectl -n workshop set env deploy/gateway IDLE_AFTER=3s
    kubectl -n workshop rollout status deploy/gateway   # wait for this to finish before the next line
    make forward-gateway                                # restarts the forward onto the new gateway pod
-   while true; do clear; kubectl ate get actors -a workshop; sleep 2; done   # swarm-01/02 fall asleep ~20–25s later; Ctrl-C
+   while true; do clear; kubectl ate get actors -a workshop; sleep 1; done   # swarm-01/02 fall asleep within ~5s; Ctrl-C
    ```
    The code is in `app/internal/idle/idle.go`: a tracker fed by the front door, and a loop (about 200 lines
-   total) that calls `SuspendActor` over gRPC with the gateway's own identity.
+   total) that checks every second (`IDLE_CHECK_EVERY`) and calls `SuspendActor` over gRPC with the gateway's
+   own identity.
 6. **Oversubscribe on purpose.** Four actors, two workers, all at once:
    ```bash
    for a in swarm-03 swarm-04 swarm-05 swarm-06; do
@@ -48,23 +49,27 @@ the one thing Substrate deliberately doesn't do for you: **decide when an actor 
    done; wait
    ```
    All four return `200`. Two answered right away. The other two parked until the idle-suspender freed their workers,
-   so they took about 20–30s longer.
+   so they took about 5s: 3s of idle, up to 1s until the next check, then a suspend and a restore.
 7. **What the gateway can't see** (skippable). Every actor has a `/work?steps=N` endpoint that burns CPU for about
-   0.3s per step inside the request. Ask swarm-03 for about 45s of work, but go straight to the router instead of
+   0.3s per step inside the request. Ask swarm-03 for about 18s of work, but go straight to the router instead of
    through the gateway:
    ```bash
    make forward-router    # if the Module 2 forward died
-   curl -s -w '\nHTTP %{http_code} in %{time_total}s\n' -H 'ate-target-actor: workshop/swarm-03' 'localhost:8080/work?steps=150'
+   curl -s -w '\nHTTP %{http_code} in %{time_total}s\n' -H 'ate-target-actor: workshop/swarm-03' 'localhost:8080/work?steps=60'
    ```
-   It fails with a `502` after 20–25s. The gateway never saw this request, so as far as its tracker knew, swarm-03
+   It fails with a `502` after 3–5s. The gateway never saw this request, so as far as its tracker knew, swarm-03
    was idle, and the gateway suspended it mid-job. Substrate froze the whole sandbox, loop and all. The work isn't
    lost: the next time anything wakes swarm-03, the loop picks up at the step where it froze and finishes, for a
    caller who has already gone. Send the same request through the gateway
-   (`curl -s 'localhost:8081/actors/swarm-03/work?steps=150'`) and it returns `200`: the in-flight request keeps
-   the idle clock stopped. It takes closer to 60s than 45s, because waking swarm-03 also restarts the frozen job,
-   and the two share one CPU. `kubectl ate logs actor swarm-03 -a workshop | grep 'work done'` shows both
-   finishing (within 20s, before swarm-03 is suspended again; logs only come from a running actor). Work that outlives its request (a background job, a queue consumer)
-   needs the actor to tell whoever decides "idle" that it's busy. The tracker has a `Touch` method for that.
+   (`curl -s 'localhost:8081/actors/swarm-03/work?steps=60'`) and it returns `200`: the in-flight request keeps
+   the idle clock stopped. It takes about 30s rather than 18s, because waking swarm-03 also restarts the frozen job,
+   and the two share one CPU. To see both finish, wake swarm-03 and read its logs in one go (logs only come from
+   a running actor, and it's back asleep 3s later):
+   ```bash
+   curl -s -o /dev/null localhost:8081/actors/swarm-03/state; kubectl ate logs actor swarm-03 -a workshop | grep 'work done'
+   ```
+   Work that outlives its request (a background job, a queue consumer) needs the actor to tell whoever decides
+   "idle" that it's busy. The tracker has a `Touch` method for that.
 
 > **Callout: clones share a past.** Every swarm actor was restored from the same golden snapshot, so
 > anything computed *before* the snapshot is identical in all of them:
@@ -85,9 +90,9 @@ the one thing Substrate deliberately doesn't do for you: **decide when an actor 
   is a natural place for it. Real systems also scale the WorkerPool itself (optional lab G).
 - **Suspend early.** Measured on this cluster: a snapshot is about 1 MB (P95 about 4 MB). Suspend takes about 0.4s
   and restore about 0.25s. The five GCS writes per snapshot cost about $0.000025, while a c3-standard-4 worker
-  costs about $0.00006 a second. So an actor idle for more than a second or two is cheaper asleep. `IDLE_AFTER=20s`
-  is slow enough to watch; in production, the limit is how long you're willing to make the next request wait
-  for a restore.
+  costs about $0.00006 a second. So an actor idle for more than a second or two is cheaper asleep. That's why
+  `IDLE_AFTER` is only 3s here. The real limit is how often you're willing to make the next request wait for a
+  restore.
 - **Idle means "nothing I know of is running."** A suspend freezes everything in the sandbox, including work the
   gateway never saw (step 7).
 

@@ -28,7 +28,7 @@ func TestLoadConfigDefaults(t *testing.T) {
 	}
 	if c.ListenAddr != ":8080" || c.RouterURL != "http://atenet-router.ate-system.svc.cluster.local" ||
 		c.ATE.Addr != "api.ate-system.svc.cluster.local:443" || c.ATE.TokenFile != "/var/run/ate/token/token" ||
-		c.ATE.CAFile != "/var/run/ate/trust/trust-bundle.pem" || c.IdleAfter != 0 || c.IdleCheckEvery != 5*time.Second ||
+		c.ATE.CAFile != "/var/run/ate/trust/trust-bundle.pem" || c.IdleAfter != 0 || c.IdleCheckEvery != time.Second ||
 		c.MockLLM || c.GeminiModel != "gemini-2.5-flash" {
 		t.Fatalf("defaults = %+v", c)
 	}

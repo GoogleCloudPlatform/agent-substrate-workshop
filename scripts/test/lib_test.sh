@@ -100,7 +100,7 @@ run_gateway_sh() {
   cat >"$d/bin/kubectl" <<'STUB'
 #!/usr/bin/env bash
 case "$*" in
-  *"get deploy gateway"*"IDLE_AFTER"*) echo 20s ;;
+  *"get deploy gateway"*"IDLE_AFTER"*) echo 3s ;;
   *"get deploy gateway"*"MOCK_LLM"*) echo "$LIVE_MOCK" ;;
   *"create namespace"*) echo "kind: Namespace" ;;
   *"apply -f -"*) cat >>"$APPLIED" ;;

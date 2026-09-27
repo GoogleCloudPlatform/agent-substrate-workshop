@@ -154,7 +154,7 @@ if (( N >= 6 )); then
   suspend_actor "$ATESPACE" buddy       # module 5 step 1: clear the decks
   for i in $(seq -w 1 20); do _exists "swarm-$i" || kubectl ate create actor "swarm-$i" --template=agent-v3 -a "$ATESPACE"; done
   "$S/egress.sh" apply "$POLICY" --all
-  IDLE_AFTER=20s "$S/gateway.sh"
+  IDLE_AFTER=3s "$S/gateway.sh"
   gateway_chat swarm-01 "hello from catch-up" >/dev/null
 fi
 

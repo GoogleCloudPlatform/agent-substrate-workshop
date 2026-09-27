@@ -62,6 +62,8 @@ Both end up in Cloud Monitoring, so you can query them with PromQL from one plac
    kubectl ate resume actor hello -a workshop
    kubectl ate --trace resume actor buddy -a workshop     # prints: Tracing enabled. Trace ID: <id>
    ```
+   Paste all three lines at once. The gateway suspends `hello` about 3s after it wakes, and once it's gone,
+   `buddy` can land back on the same worker.
    The stream prints `Actor is currently running on pod …` twice with two different pods, and keeps going.
    The `Actor restoring` / `Actor restored` lines carry a `trace_id`: after the `--trace` resume it's the
    ID the CLI printed.
