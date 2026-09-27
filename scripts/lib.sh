@@ -90,6 +90,12 @@ render() {
 }
 
 _port_listening() { nc -z localhost "$1" >/dev/null 2>&1; }
+# _port_holder <port>: "pid N: command" of whatever listens on the port, if lsof can tell.
+_port_holder() {
+  local pid
+  pid="$(lsof -t -iTCP:"$1" -sTCP:LISTEN 2>/dev/null | head -1)" || true
+  [[ -n "$pid" ]] && echo "pid $pid: $(ps -o command= -p "$pid" 2>/dev/null)"
+}
 
 # port_forward <name> <namespace> <resource> <local-port> <remote-port>
 # Reuses a live forward we started, restarts a dead one, refuses a port owned by someone else.
@@ -101,7 +107,10 @@ port_forward() {
     kill "$(cat "$pidf")" 2>/dev/null || true
   fi
   rm -f "$pidf"
-  _port_listening "$lport" && die "port $lport is in use by another process; stop it or free the port"
+  if _port_listening "$lport"; then
+    local holder; holder="$(_port_holder "$lport")" || true
+    die "port $lport is in use by another process${holder:+ ($holder)}; stop it or free the port. A port-forward from another workshop checkout points at that checkout's cluster: run \`make stop-forwards\` there"
+  fi
   kubectl -n "$ns" port-forward "$res" "$lport:$rport" >"$STATE_DIR/pf-$name.log" 2>&1 &
   echo $! >"$pidf"
   wait_for 20 "port-forward $name on :$lport" _port_listening "$lport"

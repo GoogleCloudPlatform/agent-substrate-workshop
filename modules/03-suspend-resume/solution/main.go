@@ -32,8 +32,11 @@ func main() {
 		// module-2: custom greeting.
 		Greeting: "hello from my first actor",
 		// module-3: state on the durableDir.
-		DataDir:  "/data",
+		DataDir: "/data",
+		// WORKSHOP(module-4): set ModelURL to os.Getenv("MODEL_URL") so the agent asks the gateway's model.
 		ModelURL: "",
+		// WORKSHOP(lab-i): set Heartbeat to true so background jobs tell the gateway they're busy.
+		Heartbeat: false,
 	}
 
 	srv, err := agent.New(cfg)

@@ -27,7 +27,7 @@ Everything you deploy, you build: the agent, the gateway, and (in source mode) S
 Optional labs afterwards: [H — agent-substrate/env](optional/H-env/README.md) (start here),
 [D](optional/D-observability-deep-dive/README.md), [A](optional/A-tags-clone-revert/README.md),
 [E](optional/E-agent-swarm/README.md), [B](optional/B-microvm/README.md), [C](optional/C-credential-injection/README.md),
-[F](optional/F-grpc-client/README.md), [G](optional/G-hpa-workerpool/README.md).
+[F](optional/F-grpc-client/README.md), [G](optional/G-hpa-workerpool/README.md), [I](optional/I-what-counts-as-idle/README.md).
 
 ## Prerequisites
 - A GCP project where you are **Owner**, with a GKE **1.37+** cluster (or 1.36 with the

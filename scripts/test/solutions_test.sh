@@ -25,6 +25,17 @@ for lab in "$ROOT"/optional/*/solution; do
   id="$(basename "$(dirname "$lab")")"; id="lab-$(tr '[:upper:]' '[:lower:]' <<<"${id%%-*}")"
   if grep -q "// WORKSHOP($id):" "$ROOT/app/cmd/agent/main.go"; then echo "ok   starter has a $id marker"; else echo "FAIL starter has no WORKSHOP($id) marker"; fails=$((fails+1)); fi
 done
+# catch-up copies a module's solution over main.go, so the solution must keep the starter's marker for
+# every later module and every lab, word for word, or the next README's "find WORKSHOP(...)" finds nothing.
+for sol in "$ROOT"/modules/*/solution/main.go; do
+  mod="$(basename "$(dirname "$(dirname "$sol")")")"; n=$((10#${mod%%-*}))
+  while IFS= read -r line; do
+    id="$(sed -E 's|.*// WORKSHOP\(([^)]*)\):.*|\1|' <<<"$line")"
+    [[ "$id" == module-* ]] && (( ${id#module-} <= n )) && continue
+    if grep -qxF -- "$line" "$sol"; then echo "ok   ${sol#"$ROOT"/} keeps WORKSHOP($id)"
+    else echo "FAIL ${sol#"$ROOT"/} lost the WORKSHOP($id) marker"; fails=$((fails+1)); fi
+  done < <(grep '// WORKSHOP(' "$ROOT/app/cmd/agent/main.go")
+done
 for sol in "$ROOT"/modules/*/solution/main.go "$ROOT"/optional/*/solution/main.go; do
   rm -rf "$TMP/app" && cp -R "$ROOT/app" "$TMP/app"
   cp "$sol" "$TMP/app/cmd/agent/main.go"
