@@ -39,16 +39,21 @@ const RouteHeader = "ate-target-actor"
 var dnsLabel = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$`)
 
 // Activity is told when a request to an actor starts; the returned func marks it finished.
+// Touch counts as activity without a request, for a background job's heartbeat.
 type Activity interface {
 	Begin(actor string) (done func())
+	Touch(actor string)
 }
 
 type FrontDoor struct {
 	RouterURL string
 	Atespace  string
-	Client    *http.Client
-	Activity  Activity
-	Metrics   *metrics.Metrics
+	// SelfURL is the gateway's address as actors reach it (in-cluster), used to build the
+	// Busy-URL for background jobs. Empty: jobs get no Busy-URL.
+	SelfURL  string
+	Client   *http.Client
+	Activity Activity
+	Metrics  *metrics.Metrics
 }
 
 // HandleChat serves POST /chat/{actor}.
@@ -90,14 +95,51 @@ func (f *FrontDoor) HandleWork(w http.ResponseWriter, r *http.Request) {
 	f.forward(w, r.Context(), http.MethodGet, actor, "/work?steps="+url.QueryEscape(r.URL.Query().Get("steps")), nil)
 }
 
+// HandleJob serves POST /actors/{actor}/jobs?steps=N: a background job. The actor answers 202
+// right away, so no request stays in flight. Busy-URL tells it where to report that it's still
+// busy; an actor can't know its own name, so the gateway hands it one (optional lab I).
+func (f *FrontDoor) HandleJob(w http.ResponseWriter, r *http.Request) {
+	actor := r.PathValue("actor")
+	if !dnsLabel.MatchString(actor) {
+		writeJSON(w, http.StatusBadRequest, chatapi.Error{Error: fmt.Sprintf("invalid actor name %q", actor)})
+		return
+	}
+	var hdr http.Header
+	if f.SelfURL != "" {
+		hdr = http.Header{chatapi.BusyURLHeader: {strings.TrimSuffix(f.SelfURL, "/") + "/actors/" + actor + "/busy"}}
+	}
+	f.forward(w, r.Context(), http.MethodPost, actor, "/jobs?steps="+url.QueryEscape(r.URL.Query().Get("steps")), nil, hdr)
+}
+
+// HandleBusy serves POST /actors/{actor}/busy: a heartbeat from a background job. It restarts
+// the actor's idle clock, the same as a finished request would.
+func (f *FrontDoor) HandleBusy(w http.ResponseWriter, r *http.Request) {
+	actor := r.PathValue("actor")
+	if !dnsLabel.MatchString(actor) {
+		writeJSON(w, http.StatusBadRequest, chatapi.Error{Error: fmt.Sprintf("invalid actor name %q", actor)})
+		return
+	}
+	f.Activity.Touch(actor)
+	f.Metrics.BusyBeats.Inc()
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // forward proxies one request to the actor through the router and reports whether it got a 2xx.
-func (f *FrontDoor) forward(w http.ResponseWriter, ctx context.Context, method, actor, path string, body []byte) bool {
+// hdr adds request headers on top of the routing header.
+func (f *FrontDoor) forward(w http.ResponseWriter, ctx context.Context, method, actor, path string, body []byte, hdr ...http.Header) bool {
 	done := f.Activity.Begin(actor)
 	defer done()
 	req, err := http.NewRequestWithContext(ctx, method, strings.TrimSuffix(f.RouterURL, "/")+path, bytes.NewReader(body))
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, chatapi.Error{Error: err.Error()})
 		return false
+	}
+	for _, h := range hdr {
+		for k, vs := range h {
+			for _, v := range vs {
+				req.Header.Add(k, v)
+			}
+		}
 	}
 	req.Header.Set(RouteHeader, f.Atespace+"/"+actor)
 	if body != nil {

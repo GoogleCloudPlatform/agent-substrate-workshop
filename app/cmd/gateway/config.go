@@ -27,6 +27,7 @@ type config struct {
 	ListenAddr     string
 	Atespace       string
 	RouterURL      string
+	SelfURL        string
 	MockLLM        bool
 	GeminiModel    string
 	Project        string
@@ -64,6 +65,7 @@ func loadConfig(getenv func(string) string) (config, error) {
 		ListenAddr:     or("LISTEN_ADDR", ":8080"),
 		Atespace:       getenv("ATESPACE"),
 		RouterURL:      or("ROUTER_URL", "http://atenet-router.ate-system.svc.cluster.local"),
+		SelfURL:        getenv("SELF_URL"),
 		MockLLM:        boolean("MOCK_LLM"),
 		GeminiModel:    or("GEMINI_MODEL", "gemini-2.5-flash"),
 		Project:        getenv("GOOGLE_CLOUD_PROJECT"),

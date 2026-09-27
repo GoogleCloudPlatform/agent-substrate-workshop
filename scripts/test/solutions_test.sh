@@ -21,7 +21,11 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 fails=0
 markers="$(grep -c '// WORKSHOP(module-[234]):' "$ROOT/app/cmd/agent/main.go" || true)"
 if [[ "$markers" == 3 ]]; then echo "ok   starter has 3 markers"; else echo "FAIL starter has $markers markers, want 3"; fails=$((fails+1)); fi
-for sol in "$ROOT"/modules/*/solution/main.go; do
+for lab in "$ROOT"/optional/*/solution; do
+  id="$(basename "$(dirname "$lab")")"; id="lab-$(tr '[:upper:]' '[:lower:]' <<<"${id%%-*}")"
+  if grep -q "// WORKSHOP($id):" "$ROOT/app/cmd/agent/main.go"; then echo "ok   starter has a $id marker"; else echo "FAIL starter has no WORKSHOP($id) marker"; fails=$((fails+1)); fi
+done
+for sol in "$ROOT"/modules/*/solution/main.go "$ROOT"/optional/*/solution/main.go; do
   rm -rf "$TMP/app" && cp -R "$ROOT/app" "$TMP/app"
   cp "$sol" "$TMP/app/cmd/agent/main.go"
   if (cd "$TMP/app" && go build -o /dev/null ./cmd/agent); then echo "ok   ${sol#"$ROOT"/}"; else echo "FAIL ${sol#"$ROOT"/}"; fails=$((fails+1)); fi

@@ -33,6 +33,7 @@ func buildComponents(cfg config, ate ateapipb.ControlClient, m *metrics.Metrics)
 	fd := &frontdoor.FrontDoor{
 		RouterURL: cfg.RouterURL,
 		Atespace:  cfg.Atespace,
+		SelfURL:   cfg.SelfURL,
 		// No fixed timeout: atenet-router already bounds each call with its own
 		// parked-request budget (60s) and route-timeout (5m default). A shorter client
 		// timeout here would cut off a legitimate resume-and-answer turn that the router

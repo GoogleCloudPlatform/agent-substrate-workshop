@@ -41,6 +41,7 @@ just useful (Module 1 has the full table).
 | [C — Egress credential injection](../../optional/C-credential-injection/README.md) | `ate-secret://`: let egress add credentials so actors never hold them |
 | [F — Your own gRPC client](../../optional/F-grpc-client/README.md) | Drive ateapi directly from Go |
 | [G — Autoscale the WorkerPool](../../optional/G-hpa-workerpool/README.md) | HPA on worker demand |
+| [I — What counts as idle?](../../optional/I-what-counts-as-idle/README.md) | Background work vs idle-suspend: a heartbeat that keeps a busy actor awake |
 
 ## Clean up
 ```bash

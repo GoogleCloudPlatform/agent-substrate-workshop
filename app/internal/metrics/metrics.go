@@ -31,6 +31,7 @@ type Metrics struct {
 	ModelDuration *prometheus.HistogramVec
 	ModelTokens   *prometheus.CounterVec
 	IdleSuspends  *prometheus.CounterVec
+	BusyBeats     prometheus.Counter
 	ActorsTracked prometheus.Gauge
 	ActorsAwake   prometheus.Gauge
 }
@@ -55,6 +56,10 @@ func New() *Metrics {
 			Name: "workshop_idle_suspends_total",
 			Help: "Suspend calls made by the idle-suspender, by outcome (ok, error).",
 		}, []string{"outcome"}),
+		BusyBeats: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "workshop_busy_heartbeats_total",
+			Help: "Busy heartbeats from actors' background jobs, each restarting that actor's idle clock.",
+		}),
 		ActorsTracked: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "workshop_actors_tracked",
 			Help: "Actors in the workshop atespace at the last idle check.",
@@ -65,7 +70,7 @@ func New() *Metrics {
 		}),
 	}
 	m.Registry.MustRegister(
-		m.ChatTurns, m.ModelDuration, m.ModelTokens, m.IdleSuspends, m.ActorsTracked, m.ActorsAwake,
+		m.ChatTurns, m.ModelDuration, m.ModelTokens, m.IdleSuspends, m.BusyBeats, m.ActorsTracked, m.ActorsAwake,
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	)

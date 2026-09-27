@@ -23,13 +23,20 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/agent-substrate/workshop/app/internal/chatapi"
 	"github.com/agent-substrate/workshop/app/internal/metrics"
 	promtest "github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 type recorder struct {
-	mu           sync.Mutex
-	begun, ended []string
+	mu                    sync.Mutex
+	begun, ended, touched []string
+}
+
+func (r *recorder) Touch(actor string) {
+	r.mu.Lock()
+	r.touched = append(r.touched, actor)
+	r.mu.Unlock()
 }
 
 func (r *recorder) Begin(actor string) func() {
@@ -44,11 +51,13 @@ func setup(t *testing.T, router http.HandlerFunc) (*httptest.Server, *recorder, 
 	up := httptest.NewServer(router)
 	t.Cleanup(up.Close)
 	rec, m := &recorder{}, metrics.New()
-	fd := &FrontDoor{RouterURL: up.URL, Atespace: "workshop", Client: up.Client(), Activity: rec, Metrics: m}
+	fd := &FrontDoor{RouterURL: up.URL, Atespace: "workshop", SelfURL: "http://gw.test/", Client: up.Client(), Activity: rec, Metrics: m}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /chat/{actor}", fd.HandleChat)
 	mux.HandleFunc("GET /actors/{actor}/state", fd.HandleState)
 	mux.HandleFunc("GET /actors/{actor}/work", fd.HandleWork)
+	mux.HandleFunc("POST /actors/{actor}/jobs", fd.HandleJob)
+	mux.HandleFunc("POST /actors/{actor}/busy", fd.HandleBusy)
 	gw := httptest.NewServer(mux)
 	t.Cleanup(gw.Close)
 	return gw, rec, m
@@ -178,5 +187,49 @@ func TestWorkForwardsStepsAndCountsAsActivity(t *testing.T) {
 	defer rec.mu.Unlock()
 	if len(rec.begun) != 1 || rec.begun[0] != "swarm-03" || len(rec.ended) != 1 {
 		t.Fatalf("activity begun=%v ended=%v", rec.begun, rec.ended)
+	}
+}
+
+func TestJobForwardsBusyURL(t *testing.T) {
+	gw, _, _ := setup(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/jobs" || r.URL.Query().Get("steps") != "60" ||
+			r.Header.Get(RouteHeader) != "workshop/cruncher" {
+			t.Errorf("router saw %s %s %s", r.Method, r.URL, r.Header.Get(RouteHeader))
+		}
+		if got, want := r.Header.Get(chatapi.BusyURLHeader), "http://gw.test/actors/cruncher/busy"; got != want {
+			t.Errorf("Busy-URL = %q, want %q", got, want)
+		}
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = io.WriteString(w, `{"steps":60,"heartbeat":true}`)
+	})
+	resp, err := http.Post(gw.URL+"/actors/cruncher/jobs?steps=60", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("status %d, want 202", resp.StatusCode)
+	}
+}
+
+func TestBusyTouchesAndCounts(t *testing.T) {
+	gw, rec, m := setup(t, func(w http.ResponseWriter, r *http.Request) { t.Error("busy must not reach the router") })
+	for _, actor := range []string{"cruncher", "cruncher", "Bad_Name"} {
+		resp, err := http.Post(gw.URL+"/actors/"+actor+"/busy", "", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if want := map[bool]int{true: 204, false: 400}[actor == "cruncher"]; resp.StatusCode != want {
+			t.Errorf("%s: status %d, want %d", actor, resp.StatusCode, want)
+		}
+	}
+	rec.mu.Lock()
+	defer rec.mu.Unlock()
+	if len(rec.touched) != 2 || len(rec.begun) != 0 {
+		t.Fatalf("touched=%v begun=%v, want 2 touches and no requests", rec.touched, rec.begun)
+	}
+	if got := promtest.ToFloat64(m.BusyBeats); got != 2 {
+		t.Fatalf("busy heartbeats = %v, want 2", got)
 	}
 }

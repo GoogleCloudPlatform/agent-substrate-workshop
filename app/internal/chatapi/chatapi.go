@@ -15,6 +15,11 @@
 // Package chatapi holds the JSON shapes shared by the agent, the gateway, and the load tool.
 package chatapi
 
+// BusyURLHeader carries the URL an actor's background job reports "still busy" to. The gateway
+// sets it, because an actor can't know its own name: every clone has the hostname "actor" and
+// the same memory at boot.
+const BusyURLHeader = "Busy-URL"
+
 // Message is one turn in a conversation. Role is "user" or "assistant".
 type Message struct {
 	Role    string `json:"role"`

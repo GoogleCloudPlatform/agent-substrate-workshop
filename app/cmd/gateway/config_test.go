@@ -36,12 +36,12 @@ func TestLoadConfigDefaults(t *testing.T) {
 
 func TestLoadConfigOverrides(t *testing.T) {
 	c, err := loadConfig(env(map[string]string{
-		"ATESPACE": "a", "MOCK_LLM": "true", "IDLE_AFTER": "20s", "IDLE_CHECK_EVERY": "2s", "ATE_API_INSECURE": "true",
+		"ATESPACE": "a", "MOCK_LLM": "true", "IDLE_AFTER": "20s", "IDLE_CHECK_EVERY": "2s", "SELF_URL": "http://gw", "ATE_API_INSECURE": "true",
 	}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !c.MockLLM || c.IdleAfter != 20*time.Second || c.IdleCheckEvery != 2*time.Second || !c.ATE.Insecure {
+	if !c.MockLLM || c.IdleAfter != 20*time.Second || c.IdleCheckEvery != 2*time.Second || c.SelfURL != "http://gw" || !c.ATE.Insecure {
 		t.Fatalf("overrides = %+v", c)
 	}
 }

@@ -41,7 +41,7 @@ BACKED_UP=false
 # files, i.e. it's leftover from a previous catch-up run rather than the attendee's own code.
 is_known_solution() {
   local f
-  for f in "$M"/*/solution/main.go; do
+  for f in "$M"/*/solution/main.go "$REPO_ROOT"/optional/*/solution/main.go; do
     cmp -s "$f" "$MAIN" && return 0
   done
   return 1

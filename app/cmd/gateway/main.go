@@ -59,6 +59,8 @@ func main() {
 	mux.HandleFunc("POST /chat/{actor}", fd.HandleChat)
 	mux.HandleFunc("GET /actors/{actor}/state", fd.HandleState)
 	mux.HandleFunc("GET /actors/{actor}/work", fd.HandleWork)
+	mux.HandleFunc("POST /actors/{actor}/jobs", fd.HandleJob)
+	mux.HandleFunc("POST /actors/{actor}/busy", fd.HandleBusy)
 	mux.Handle("GET /metrics", m.Handler())
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "ok\n") })
 

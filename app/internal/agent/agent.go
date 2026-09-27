@@ -51,8 +51,11 @@ type Config struct {
 	Greeting string
 	DataDir  string
 	ModelURL string
-	Client   *http.Client
-	Now      func() time.Time
+	// Heartbeat makes background jobs (POST /jobs) report "still busy" to the URL the gateway
+	// sends in the Busy-URL header, so the idle suspender leaves the actor alone (optional lab I).
+	Heartbeat bool
+	Client    *http.Client
+	Now       func() time.Time
 }
 
 // State is what GET /state reports. DiskCount is -1 when DataDir is unset, and DiskError
@@ -113,6 +116,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /state", s.handleState)
 	mux.HandleFunc("POST /chat", s.handleChat)
 	mux.HandleFunc("GET /work", s.handleWork)
+	mux.HandleFunc("POST /jobs", s.handleJob)
 	return mux
 }
 

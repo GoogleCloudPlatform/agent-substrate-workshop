@@ -1,0 +1,36 @@
+# ActorTemplate agent-v4 (optional lab I): agent-v3 plus Heartbeat, so background jobs tell the
+# gateway they are busy. Same env as agent-v3: the Busy-URL comes with each job, not from here.
+# Template env is literal and is baked into every snapshot: never put credentials here.
+# The gateway holds the only credential (Workload Identity to Vertex); the actor only
+# gets the gateway's in-cluster address.
+metadata:
+  atespace: ${ATESPACE}
+  name: agent-v4
+workerSelector:
+  matchLabels:
+    workload: workshop-agent
+containers:
+- name: agent
+  image: ${AGENT_IMAGE}
+  command: ["/ko-app/agent"]
+  env:
+  - name: MODEL_URL
+    value: http://gateway.${NAMESPACE}.svc.cluster.local/v1/model
+  readyz:
+    httpGet: {path: /readyz, port: 80}
+  volumeMounts:
+  - {name: data, mountPath: /data}
+resources:
+  limits:
+  - {name: cpu, quantity: "1"}
+  - {name: memory, quantity: 512Mi}
+snapshotsConfig:
+  onPause: SNAPSHOT_CONTENT_SCOPE_FULL
+  onCommit: SNAPSHOT_CONTENT_SCOPE_FULL
+  storageLocation: gs://${BUCKET_NAME}/${ATESPACE}/agent-v4/
+sandboxConfig:
+  sandboxClass: SANDBOX_CLASS_GVISOR
+  configName: gvisor-default
+volumes:
+- name: data
+  durableDir: {}
