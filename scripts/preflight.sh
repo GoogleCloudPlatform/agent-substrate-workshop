@@ -44,12 +44,8 @@ export DESC="$desc"
 ver="$(jq -r '.currentMasterVersion // empty' <<<"$desc" 2>/dev/null)" || true
 [[ -n "$ver" ]] || die "could not read the cluster version from 'gcloud container clusters describe' (is jq installed?)"
 export VER="${ver%%-*}"
-CHECK="GKE version $ver >= 1.37 (or 1.36 with beta APIs)" HINT="recreate the cluster on 1.36+"
-need bash -c '[[ "$(printf "%s\n" 1.36 "$VER" | sort -V | head -1)" == 1.36 ]]'
-if [[ "$(printf '%s\n' 1.37 "$VER" | sort -V | head -1)" != 1.37 ]]; then
-  CHECK="1.36 beta APIs enabled" HINT="1.36 needs --enable-kubernetes-unstable-apis for podcertificaterequests and clustertrustbundles at creation"
-  need bash -c 'jq -e ".enableK8sBetaApis.enabledApis // [] | map(select(test(\"clustertrustbundles|podcertificaterequests\"))) | length == 2" <<<"$DESC" >/dev/null 2>&1'
-fi
+CHECK="GKE version $ver >= 1.37" HINT="recreate the cluster on 1.37+ (the workshop is validated on 1.37)"
+need bash -c '[[ "$(printf "%s\n" 1.37 "$VER" | sort -V | head -1)" == 1.37 ]]'
 CHECK="Workload Identity enabled" HINT="gcloud container clusters update $CLUSTER_NAME --workload-pool=${PROJECT_ID}.svc.id.goog"
 need bash -c 'jq -e --arg p "${PROJECT_ID}.svc.id.goog" ".workloadIdentityConfig.workloadPool == \$p" <<<"$DESC" >/dev/null 2>&1'
 CHECK="managed OpenTelemetry collection enabled" HINT="gcloud beta container clusters update $CLUSTER_NAME --managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS"
@@ -70,7 +66,8 @@ step "kubectl context"
 gcloud container clusters get-credentials "$CLUSTER_NAME" --location "$CLUSTER_LOCATION" --project "$PROJECT_ID" >/dev/null 2>&1 || true
 CHECK="kubectl reaches the cluster" HINT="gcloud container clusters get-credentials $CLUSTER_NAME --location $CLUSTER_LOCATION"
 need bash -c "kubectl get nodes >/dev/null"
-# Substrate uses the v1beta1 versions. GKE 1.37 serves both at v1 and drops v1beta1 unless it's enabled.
+# Substrate's ClusterTrustBundle code is v1beta1-only (PodCertificateRequest takes v1 or v1beta1, but its own
+# GCP setup enables both, so we do too). GKE 1.37 serves both at v1 and drops v1beta1 unless it's enabled.
 CHECK="certificates.k8s.io/v1beta1 ClusterTrustBundle + PodCertificateRequest served" HINT="gcloud container clusters update $CLUSTER_NAME --enable-kubernetes-unstable-apis=certificates.k8s.io/v1beta1/clustertrustbundles,certificates.k8s.io/v1beta1/podcertificaterequests"
 need bash -c 'r="$(kubectl get --raw /apis/certificates.k8s.io/v1beta1 2>/dev/null)"; [[ "$r" == *\"clustertrustbundles\"* && "$r" == *\"podcertificaterequests\"* ]]'
 

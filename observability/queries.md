@@ -10,7 +10,7 @@ Never `kubectl port-forward` by hand for this — `make prometheus-ui`, `make fo
 
 | Question | PromQL |
 |---|---|
-| How many workers, in which state (idle/assigned)? Every ateapi replica reports the whole pool, so take `max`, not `sum` | `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="agents"})` |
+| How many workers, in which state (`idle`, `partial`, `at_capacity`, `unschedulable`)? Every ateapi replica reports the whole pool, so take `max`, not `sum`. A worker running one of our actors is `partial` (actor slots, not CPU) | `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="agents"})` |
 | Desired vs ready workers | `{"ate.workerpool.desired_workers", "ate.workerpool.name"="agents"}` and `{"ate.workerpool.ready_workers", "ate.workerpool.name"="agents"}` |
 | Lifecycle operations per second | `sum by ("ate.actor.operation.name") (rate({"ate.actor.lifecycle.operation.duration_count"}[2m]))` |
 | Did the scheduler find a free worker? (`no_free_worker` = capacity starvation) | `sum by ("ate.scheduler.outcome") (rate({"ate.scheduler.assignment.duration_count"}[2m]))` |

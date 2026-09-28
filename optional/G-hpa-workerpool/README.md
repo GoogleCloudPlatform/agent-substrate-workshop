@@ -13,7 +13,7 @@ together instead of a fixed `replicas: 2`.
    ```bash
    kubectl get crd workerpools.ate.dev -o yaml | grep -A3 subresources   # confirms it on your cluster too
    ```
-2. Pick a signal: parked requests or router `no_free_worker`/timeout outcomes (substrate's
+2. Pick a signal: parked requests or router `no_capacity`/`timeout` outcomes (substrate's
    `atenet.router.route.duration_count` by `ate.router.outcome`, from `observability/queries.md`), or
    `workshop_actors_awake` against `{"ate.workerpool.desired_workers"}` (gateway + substrate, the same ratio
    this lab's dashboard tile in [optional lab D](../D-observability-deep-dive/README.md) charts).
@@ -33,7 +33,8 @@ together instead of a fixed `replicas: 2`.
    ```
    (or a KEDA `ScaledObject` with the same `scaleTargetRef`). Run `CONCURRENCY=4 make load`.
 5. Watch workers grow on the dashboard (`ate.workerpool.workers` by state), and shrink back after load
-   stops. Discuss: node-pool capacity has to keep up with `maxReplicas` (Module 5's oversubscription lesson
+   stops. A busy worker shows as `partial`, not `at_capacity`: the state counts actor slots (1 of the
+   ateom's default 1000), not CPU, so don't scale on `at_capacity` with this sizing. Discuss: node-pool capacity has to keep up with `maxReplicas` (Module 5's oversubscription lesson
    applies to nodes too), and every new worker still starts from the template's golden snapshot, so scaling
    out doesn't change the golden-snapshot warm-start story from Module 2.
 

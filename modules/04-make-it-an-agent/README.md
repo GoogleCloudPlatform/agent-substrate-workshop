@@ -60,8 +60,10 @@ flowchart LR
    `atenet-egress` (the router's egress side) caches each actor's policy for a few seconds, so the very
    next call may still see the old "no policy" answer — retry once if so. You don't need to suspend or
    resume `buddy` for the new policy to take effect; it isn't tied to the actor's lifecycle at all.
-   EgressPolicy is a Substrate record managed only through the gRPC API; there is no `kubectl ate` verb yet.
-   `make egress` runs `bin/egressctl`, a 100-line Go client in `app/cmd/egressctl`.
+   EgressPolicy is a Substrate record: see it with `kubectl ate get egress-policy buddy -a workshop -o yaml`.
+   `make egress` runs `bin/egressctl`, a 100-line Go client in `app/cmd/egressctl`, rather than
+   `kubectl ate create egress-policy`, because `create` fails when a policy already exists and `update`
+   needs the record's current metadata.
    For comparison, `egress-open.yaml` allows everything. Don't use it.
 5. **A conversation that survives sleep.**
    ```bash

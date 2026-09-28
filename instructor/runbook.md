@@ -1,5 +1,11 @@
 # Instructor runbook
 
+**Last validated:** 2026-09-27, `SUBSTRATE_REF=v0.2.0`, GKE `1.37.0-gke.3503000` (Rapid, zonal, 2× `c3-standard-4`),
+source install mode. `make e2e` passed with real Vertex (14.5 min on a fresh cluster, install included) and with
+`MOCK_LLM=true` (7 min, install already done). Optional lab I passed by hand. Not run: published-image mode
+(the v0.2.0 release notes name no image repo), and labs A–H. Lab H's `ENV_REF` patch and lab E's pin were checked at the
+compile/unit-test level only.
+
 ## One week before
 
 1. **Pick `SUBSTRATE_REF`**: the newest tag or commit that passes `make e2e` in **both** install modes,
@@ -31,8 +37,9 @@
    workshop.
 6. **Provision attendee projects and clusters.** Each attendee is Owner on their own GCP project, with a
    bare GKE cluster that has, at creation:
-   - GKE **1.36+** with `--enable-kubernetes-unstable-apis=certificates.k8s.io/v1beta1/clustertrustbundles,certificates.k8s.io/v1beta1/podcertificaterequests`.
-     Substrate at `SUBSTRATE_REF` still uses the `v1beta1` versions of both. 1.37 serves them at `v1` and
+   - GKE **1.37+** (the minimum the workshop is validated on; `make preflight` rejects older) with `--enable-kubernetes-unstable-apis=certificates.k8s.io/v1beta1/clustertrustbundles,certificates.k8s.io/v1beta1/podcertificaterequests`.
+     Substrate at `SUBSTRATE_REF` still reads ClusterTrustBundles only at `v1beta1` (PodCertificateRequest works at
+     either version since v0.2.0, but substrate's own GCP setup still enables both, so we do too). 1.37 serves them at `v1` and
      doesn't serve `v1beta1` unless you enable it; without it, `make install` hangs waiting for the
      `primary-bundle` ClusterTrustBundle. `make preflight` asks the API server for `v1beta1` directly.
    - **Workload Identity** and **managed OpenTelemetry** with `--managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS`.

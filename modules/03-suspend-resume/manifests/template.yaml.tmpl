@@ -10,7 +10,7 @@ containers:
 - name: agent
   image: ${AGENT_IMAGE}
   command: ["/ko-app/agent"]
-  readyz:
+  wakeupProbe:
     httpGet: {path: /readyz, port: 80}
   volumeMounts:
   - {name: data, mountPath: /data}
@@ -18,7 +18,7 @@ resources:
   limits:
   - {name: cpu, quantity: "1"}
   - {name: memory, quantity: 512Mi}
-snapshotsConfig:
+snapshotConfig:
   onPause: SNAPSHOT_CONTENT_SCOPE_FULL
   # Suspend keeps only the durableDir: memory is thrown away, and resume cold-boots the process.
   onCommit: SNAPSHOT_CONTENT_SCOPE_DATA

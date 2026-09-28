@@ -73,4 +73,8 @@ out="$(run "$TMP/minor-only.json")"; rc=$?
 check "a minor-only exclusion doesn't count (nodes still upgrade)" "[[ $rc != 0 && \"\$out\" == *'no node auto-upgrade —'* ]]"
 out="$(V1_ONLY=1 run "$TMP/good.json")"; rc=$?
 check "1.37 serving only certificates.k8s.io/v1 fails the v1beta1 check" "[[ $rc != 0 && \"\$out\" == *'PodCertificateRequest served —'* ]]"
+jq '.currentMasterVersion = "1.36.4-gke.200" | .enableK8sBetaApis.enabledApis = ["certificates.k8s.io/v1beta1/clustertrustbundles", "certificates.k8s.io/v1beta1/podcertificaterequests"]' \
+  "$TMP/good.json" >"$TMP/old.json"
+out="$(run "$TMP/old.json")"; rc=$?
+check "1.36 fails the version check, even with the beta APIs" "[[ $rc != 0 && \"\$out\" == *'>= 1.37 —'* ]]"
 exit "$fails"

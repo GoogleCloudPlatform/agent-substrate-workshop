@@ -25,16 +25,23 @@ Compare that with Module 4's gateway-only-egress pattern.
 ## Before you start
 
 agent-swarm refuses to deploy unless your cluster runs the substrate commit pinned in its `go.mod`. At the
-commit above, that pin is already `github.com/agent-substrate/substrate v0.0.0-20260918213005-c7a1be177d0f`
-— the same build this workshop installs as `SUBSTRATE_REF=c7a1be17`. Re-check before each event, since
-agent-swarm's `main` moves:
+commit above (and still at agent-swarm's `main` on 2026-09-27), that pin is
+`github.com/agent-substrate/substrate v0.0.0-20260918213005-c7a1be177d0f`. This workshop installs `v0.2.0`, so
+**they differ**. Re-check before each event, since agent-swarm's `main` moves:
 ```bash
 git clone https://github.com/agent-substrate/agent-swarm .workshop/agent-swarm
 git -C .workshop/agent-swarm checkout 1bdbdb6
 grep 'agent-substrate/substrate ' .workshop/agent-swarm/go.mod     # compare with SUBSTRATE_REF in workshop.env
 ```
-If they differ, either bump the pin in a fork (agent-swarm's own README documents "Bumping Substrate") or
-install a second cluster at agent-swarm's pin (`SUBSTRATE_REF=<pin> make install` there).
+While they differ, **run this lab on a second cluster at agent-swarm's pin**: follow the workshop setup there
+with `SUBSTRATE_REF=c7a1be17 make install`. Bumping agent-swarm to v0.2.0 in place is not validated:
+- It builds. Substrate is only an indirect dependency; after `go get github.com/agent-substrate/substrate@v0.2.0`,
+  `go build ./...` and `go test ./...` passed on a scratch checkout.
+- `manifests/actortemplate.yaml.tmpl` still uses `snapshotsConfig`, which v0.2.0 renamed to `snapshotConfig`.
+- v0.2.0 workers host several actors at once, and a worker's `resources.limits` is the budget those actors
+  share. `conf-workers` deliberately sets requests only, no limits, which was fine when each worker held one
+  actor. On v0.2.0 a worker with no limits reports no CPU budget, so actors that declare a CPU limit (the
+  conf template asks for `cpu: 1`) won't place on it until agent-swarm sizes its pool for v0.2.0. (agent-swarm's own README documents "Bumping Substrate".)
 
 You'll also need `docker` with the `buildx` plugin, on top of the workshop's usual tools.
 

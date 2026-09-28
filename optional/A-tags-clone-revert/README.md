@@ -47,7 +47,7 @@ curl -s localhost:8081/actors/buddy/state | jq '{turns, bootID}'                
 ## What to notice
 - **Tag scope vs. snapshot content scope are different knobs.** `--scope atespace|published` on a tag
   controls who can read it (its own atespace, or any atespace via a published reference) — it does not
-  choose FULL vs. DATA. Content scope is set once, on the template, via `snapshotsConfig.onCommit`
+  choose FULL vs. DATA. Content scope is set once, on the template, via `snapshotConfig.onCommit`
   (`agent-v3` uses `SNAPSHOT_CONTENT_SCOPE_FULL`, from Module 4).
 - **A clone shares its past with the source** (same `bootID`, same conversation), exactly like the
   golden-snapshot callout in Module 5 — except here the shared point is whatever moment you tagged, not the

@@ -19,8 +19,8 @@ which is installed unconditionally.
    copy of `agent-v3` with `sandboxConfig: {sandboxClass: SANDBOX_CLASS_MICROVM, configName: microvm}` — see
    `.workshop/substrate/demos/counter/counter-microvm-template.yaml.tmpl` for a working reference.
 4. Create an actor on `agent-vm-v1`, then compare restore P95 and snapshot size against gVisor's `agent-v3`
-   on the workshop dashboard (`ate.actor.restore.duration` and `atelet.snapshot.size` are both labeled by
-   `ate.sandbox.class`/`ate.template.name`, per `docs/metrics/registry/metrics.yaml` in the substrate
+   on the workshop dashboard (`ate.actor.restore.duration` and `atelet.snapshot.size` both carry `ate.template.name`,
+   and restore duration also carries `ate.sandbox.class`, per `docs/metrics/registry/metrics.yaml` in the substrate
    checkout, so the existing dashboard tiles should show both side by side without editing them).
 5. Discuss: when is the stronger VM boundary worth the extra cold-start and setup cost?
 

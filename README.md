@@ -30,8 +30,8 @@ Optional labs afterwards: [H — agent-substrate/env](optional/H-env/README.md) 
 [F](optional/F-grpc-client/README.md), [G](optional/G-hpa-workerpool/README.md), [I](optional/I-what-counts-as-idle/README.md).
 
 ## Prerequisites
-- A GCP project where you are **Owner**, with a GKE **1.37+** cluster (or 1.36 with the
-  `podcertificaterequests` and `clustertrustbundles` beta APIs enabled at creation): Workload Identity, managed
+- A GCP project where you are **Owner**, with a GKE **1.37+** cluster that serves the `v1beta1`
+  `clustertrustbundles` and `podcertificaterequests` APIs (enabled at creation), Workload Identity, managed
   OpenTelemetry, Managed Prometheus, no node auto-upgrade, no spot nodes, 2× `c3-standard-4`. `make preflight`
   checks all of it.
 - Local tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst`, `nc`, `curl`, `git`, `python3`.
@@ -71,7 +71,7 @@ make help                                # every target, one line each
 ## Versions
 Substrate moves fast. The workshop pins it with `SUBSTRATE_REF` in `workshop.env`. It uses published images when
 `SUBSTRATE_IMAGE_REPO`/`SUBSTRATE_IMAGE_TAG` are set, and builds from source otherwise. The runbook says which ref
-was validated for the next event.
+was validated for the next event. The workshop is validated on GKE 1.37, and `make preflight` rejects anything older.
 
 ## Clean up
 `make teardown` deletes the workshop's atespace, namespace, dashboards (the workshop's and substrate's three), and snapshots, and keeps your cluster,

@@ -23,10 +23,11 @@ nothing, so by its rules the actor was idle. The job was frozen mid-loop.
 Wait half a minute, then wake swarm-13 and read its log in one go. Logs only come from a running actor, and
 this one is back asleep 3s later:
 ```bash
-curl -s -o /dev/null localhost:8081/actors/swarm-13/state; kubectl ate logs actor swarm-13 -a workshop | grep 'job step' | tail -15
+curl -s -o /dev/null localhost:8081/actors/swarm-13/state; kubectl ate logs actor swarm-13 -a workshop | grep 'job step' | grep -v 'gap 0\.'
 ```
-Each line is JSON, and the log starts at the resume, so the first line you see is the one with the big gap:
-`{"time":"…","message":"… job step 13/60 (gap 46.8s)"}`. The job picked up where it froze. Wake it
+Each line is JSON. The log can include lines from earlier wakes on the same worker, so this keeps only the
+lines with a big gap, and the last one is where the job was frozen:
+`{"time":"…","message":"… job step 14/60 (gap 55.8s)"}`. The job picked up where it froze. Wake it
 again a few seconds later and it has moved on about a dozen steps. The job only runs in the 3–4s after each
 time someone talks to swarm-13.
 
@@ -68,7 +69,7 @@ cruncher was suspended again before you could read its log, so check the job in 
 after the job ends for the log to arrive:
 ```bash
 gcloud logging read 'resource.type="k8s_container" AND labels."ate.actor.name"="cruncher" AND jsonPayload.textPayload:"job done"' \
-  --freshness=10m --format='value(jsonPayload.textPayload)'   # job done: 60 steps in 17.5s, max gap 0.3s
+  --freshness=10m --format='value(jsonPayload.textPayload)'   # …job done: 60 steps in 17.5s, max gap 0.3s
 ```
 No gap: the job never froze. The gateway log shows the suspend a few seconds after the job ended:
 `kubectl -n workshop logs deploy/gateway | grep cruncher`.
@@ -80,7 +81,7 @@ curl -s -X POST -H 'ate-target-actor: workshop/cruncher' 'localhost:8080/jobs?st
 No `Busy-URL`, so nothing to call: cruncher is frozen mid-job, just like swarm-13.
 
 Run the gateway job once more. The frozen job wakes up too, and both finish: Cloud Logging shows one
-`job done` for each, and the old one reports a gap of a minute or more. The two share the CPU, so each takes about
+`job done` for each, and the old one reports a gap as long as it was frozen (about a minute). The two share the CPU, so each takes about
 twice as long and you'll count about twice the heartbeats.
 
 ## What just happened

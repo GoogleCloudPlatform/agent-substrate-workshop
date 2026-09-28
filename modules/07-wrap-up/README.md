@@ -21,7 +21,8 @@ just useful (Module 1 has the full table).
 
 ## Limits to know before you build
 - **No authz inside an atespace yet.** Anyone who can call ateapi for an atespace can act on all of its actors.
-- **CRASHED** actors need a human (or your code) to resume or delete them: `kubectl ate delete actor X -a Y --any-state`.
+- **CRASHED** actors need a human (or your code): resume refuses them, so `kubectl ate revert actor X -a Y`
+  (back to `SUSPENDED` with its last snapshot), then resume, or `kubectl ate delete actor X -a Y`.
 - **Idle is your job** (Module 5), and so is WorkerPool sizing (optional lab G).
 - IPv4 only, no GPUs, and gVisor supports one `durableDir` per actor.
 - **No actor-emitted metrics yet.** Actors share hostname and IP inside the sandbox, so `/metrics` has

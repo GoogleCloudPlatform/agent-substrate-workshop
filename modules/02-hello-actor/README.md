@@ -46,7 +46,7 @@ sequenceDiagram
    kubectl ate get actor-template agent-v1 -a workshop            # repeat until GOLDEN TAG is filled in
    kubectl ate get actor-template agent-v1 -a workshop -o yaml    # the full record; the tag is at status.goldenSnapshotStatus.goldenTag.name
    ```
-   Substrate starts your container once on a free worker, waits for `/readyz`, and snapshots it.
+   Substrate starts your container once on a free worker, waits for its `wakeupProbe` (`/readyz`) to pass, and snapshots it.
    That **golden snapshot** is the starting point for every actor of this template. Creating an actor
    restores a snapshot instead of cold-booting a process.
 5. **An actor.**

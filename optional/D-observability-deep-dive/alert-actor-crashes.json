@@ -9,5 +9,5 @@
       "evaluationInterval": "60s"
     }
   }],
-  "documentation": {"content": "An actor moved to CRASHED — a permanent loss of that actor's state (see `docs/metrics/registry/metrics.yaml`'s `ate.actor.crashes` entry in the substrate checkout). Find which one and why: filter Cloud Logging on `resource.labels.namespace_name=\"ate-system\"` and `\"Actor state changed\"` with `labels.\"ate.atespace\"=\"workshop\"`, then `kubectl ate delete actor <name> -a workshop --any-state` once you've captured what you need.", "mimeType": "text/markdown"}
+  "documentation": {"content": "An actor moved to CRASHED — its live execution is lost; `kubectl ate revert actor` brings it back to SUSPENDED from its last snapshot (see `docs/metrics/registry/metrics.yaml`'s `ate.actor.crashes` entry in the substrate checkout). Find which one and why: filter Cloud Logging on `resource.labels.namespace_name=\"ate-system\"` and `\"Actor state changed\"` with `labels.\"ate.atespace\"=\"workshop\"`, read `status.crash.message` on `kubectl ate get actor <name> -a workshop -o yaml`, then revert or delete it once you've captured what you need.", "mimeType": "text/markdown"}
 }

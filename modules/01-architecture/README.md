@@ -69,8 +69,9 @@ flowchart LR
 |---|---|
 | WorkerPool, SandboxConfig, CSIDriverConfig | Atespace, ActorTemplate, Actor, Worker, Tag |
 
-`EgressPolicy` is also a Substrate record, but it has **no `kubectl ate` verb** — it's managed only
-through the gRPC API. Module 4 uses the workshop's own `egressctl` (built in Module 0) to apply one.
+`EgressPolicy` is also a Substrate record, one per actor (`kubectl ate get egress-policy NAME -a workshop`).
+Module 4 applies them with the workshop's own `egressctl` (built in Module 0), because it can put one policy
+file on every actor at once.
 
 An **atespace** is Substrate's tenancy boundary for records, like a namespace but for actors.
 It is not a Kubernetes namespace. Your WorkerPool lives in namespace `workshop`, and your actors live in atespace `workshop`.

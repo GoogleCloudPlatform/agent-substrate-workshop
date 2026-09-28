@@ -13,7 +13,7 @@ containers:
 - name: agent
   image: ${AGENT_IMAGE}            # must be digest-pinned (@sha256:…); a CEL admission rule enforces this
   command: ["/ko-app/agent"]
-  readyz:
+  wakeupProbe:
     httpGet:
       path: /readyz
       port: 80
@@ -26,7 +26,7 @@ resources:
     quantity: "1"
   - name: memory
     quantity: 512Mi
-snapshotsConfig:
+snapshotConfig:
   onPause: SNAPSHOT_CONTENT_SCOPE_FULL     # pause: memory + disk
   onCommit: SNAPSHOT_CONTENT_SCOPE_FULL    # suspend: memory + disk
   storageLocation: gs://${BUCKET_NAME}/${ATESPACE}/agent-v1/

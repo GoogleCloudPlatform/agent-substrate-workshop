@@ -84,7 +84,9 @@ the one thing Substrate deliberately doesn't do for you: **decide when an actor 
 > Count work, not wall time, if a suspend can land in the middle.
 
 ## What just happened
-- **Density** comes from suspending. 20 actors fit on 2 workers because at most 2 are awake at a time.
+- **Density** comes from suspending. 20 actors fit on 2 workers because at most 2 are awake at a time. Why 2: each
+  worker's `cpu: 1` limit is a budget its actors share, and each actor asks for `cpu: 1`. Substrate workers can
+  host several actors at once, so a bigger worker limit (or smaller actors) packs more awake actors per worker.
 - **Parking** smooths bursts: a request waits, up to the router's budget, for the actor to get a worker.
 - **Idle detection is your job**, because only your app knows what "idle" means. A front door that sees all traffic
   is a natural place for it. Real systems also scale the WorkerPool itself (optional lab G).

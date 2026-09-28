@@ -11,8 +11,8 @@ Starts from the end of Module 6 (`make catch-up MODULE=7`).
 ## 1. Alerts on what the fleet already tells you
 
 Two of these come straight from the canned queries in `observability/queries.md`; the other two are the
-signals [Module 6](../../modules/06-observe/README.md) already teaches as the gaps to watch: crashes (a
-permanent loss of that actor) and a WorkerPool whose ready workers never catch up with desired.
+signals [Module 6](../../modules/06-observe/README.md) already teaches as the gaps to watch: crashes (the actor
+loses everything since its last snapshot until someone runs `kubectl ate revert actor`) and a WorkerPool whose ready workers never catch up with desired.
 
 ```bash
 source scripts/lib.sh && load_env
@@ -33,8 +33,9 @@ done
   jsonPayload."ate.actor.state"="crashed"
   ```
   ateapi's `Actor crashed` record names the actor (`ate.actor.name`, `ate.actor.uid`), the operation it
-  was in (`ate.actor.operation.name`), and why: `ate.failure.domain` and `ate.failure.reason` (for the pod
-  delete above, `infrastructure` / `WORKER_POD_GONE`).
+  was in (`ate.actor.operation.name`). For *why*, read the actor itself:
+  `kubectl ate get actor NAME -a workshop -o yaml` shows `status.crash.message` and `crashTime` (for the pod
+  delete above, "worker pod went away while hosting the actor").
 - **`alert-workers-desired-vs-ready.json`** fires when the `agents` WorkerPool's ready workers stay below
   what it asked for, for 5 minutes. It's hard to trigger honestly in the workshop's own 2-replica pool
   without breaking your cluster (over-request node capacity, or drop a quota) — read it as the alert you'd

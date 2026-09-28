@@ -39,7 +39,8 @@ Both end up in Cloud Monitoring, so you can query them with PromQL from one plac
 3. **Ask questions in the Prometheus UI** (http://localhost:9090 → Graph). Copy each query from
    [observability/queries.md](../../observability/queries.md):
    - How many workers are busy vs idle? `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="agents"})`
-     (`max`, not `sum`: each ateapi replica reports the whole pool.)
+     (`max`, not `sum`: each ateapi replica reports the whole pool.) A busy worker shows as `partial`, not
+     `at_capacity`: the state counts actor slots (1 of the default 1000), not CPU.
    - How often did the router have to resume an actor? The `"ate.router.resume"` query.
    - How long does a resume take? The lifecycle P95 query.
    - Chat turns by outcome, and awake vs tracked actors, from your gateway.

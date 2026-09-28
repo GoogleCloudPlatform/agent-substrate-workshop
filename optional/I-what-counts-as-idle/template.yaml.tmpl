@@ -16,7 +16,7 @@ containers:
   env:
   - name: MODEL_URL
     value: http://gateway.${NAMESPACE}.svc.cluster.local/v1/model
-  readyz:
+  wakeupProbe:
     httpGet: {path: /readyz, port: 80}
   volumeMounts:
   - {name: data, mountPath: /data}
@@ -24,7 +24,7 @@ resources:
   limits:
   - {name: cpu, quantity: "1"}
   - {name: memory, quantity: 512Mi}
-snapshotsConfig:
+snapshotConfig:
   onPause: SNAPSHOT_CONTENT_SCOPE_FULL
   onCommit: SNAPSHOT_CONTENT_SCOPE_FULL
   storageLocation: gs://${BUCKET_NAME}/${ATESPACE}/agent-v4/
