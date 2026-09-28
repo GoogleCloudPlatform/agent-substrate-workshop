@@ -9,7 +9,7 @@
 | `hello`, `memo` | suspend/resume, FULL vs DATA scope | agents that sleep between turns |
 | gateway `/v1/model` | presence vs cognition split | **always-on-agent**: presence service + suspendable cognition actor |
 | gateway-only EgressPolicy | deny-by-default egress | **agent-substrate/env**: sandboxed shells for LLM tools |
-| `swarm-01…20` + idle-suspend | density + parking | **agent-swarm**: 50 agents on 2 workers |
+| `swarm-01…20` + idle-suspend | density + parking | **agent-swarm**: 50 agents on 2–5 autoscaled workers, 4 per worker |
 | dashboards + logs | OTel + GMP | operating any of the above |
 | `buddy` remembers you | durable per-actor state | **hermes**: an agent with durable identity |
 
@@ -37,7 +37,7 @@ just useful (Module 1 has the full table).
 | **[H — Agent environments with `agent-substrate/env`](../../optional/H-env/README.md)** | Install `ate-env` on your cluster and drive sandboxed shells through a CLI and MCP. It's your gateway, productized. |
 | [D — Observability deep dive](../../optional/D-observability-deep-dive/README.md) | Alerts, SLOs, tracing, a per-actor drill-down dashboard |
 | [A — Tags, clone, revert](../../optional/A-tags-clone-revert/README.md) | Snapshot an actor, clone it, roll it back |
-| [E — agent-swarm at 50:2](../../optional/E-agent-swarm/README.md) | Deploy the reference multi-agent demo |
+| [E — agent-swarm at 50:20](../../optional/E-agent-swarm/README.md) | Deploy the reference multi-agent demo |
 | [B — microVM sandbox class](../../optional/B-microvm/README.md) | Stronger isolation than gVisor |
 | [C — Egress credential injection](../../optional/C-credential-injection/README.md) | `ate-secret://`: let egress add credentials so actors never hold them |
 | [F — Your own gRPC client](../../optional/F-grpc-client/README.md) | Drive ateapi directly from Go |

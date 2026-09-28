@@ -1,49 +1,61 @@
-# Optional lab E — agent-swarm at 50:2 (30 min)
+# Optional lab E — agent-swarm at 50:20 (30 min)
 
 [agent-swarm](https://github.com/agent-substrate/agent-swarm) is the reference conference demo: 50 attendee
-actors (`attendee-01`…`attendee-50`) on a 2-pod WorkerPool (`conf-workers`), with a presenter "stage" UI. Its
-gateway uses a **relay** instead of egress: the actor has no egress at all, and instead of calling out itself
-it returns a `model_call` step; the gateway calls Vertex and posts the result back through the router.
-Compare that with Module 4's gateway-only-egress pattern.
+actors (`attendee-01`…`attendee-50`) on an autoscaled WorkerPool (`conf-workers`, 2 to 5 pods), with a
+presenter "stage" UI. Its gateway uses a **relay** instead of egress: the actor has no egress at all, and
+instead of calling out itself it returns a `model_call` step; the gateway calls Vertex and posts the result
+back through the router. Compare that with Module 4's gateway-only-egress pattern.
 
-> **Fact-checked against an agent-swarm checkout** (commit `1bdbdb6`, 2026-09-25) — its `README.md`,
-> `hack/deploy.sh`, `manifests/workerpool.yaml.tmpl`, and `go.mod`. Two corrections from an earlier draft of
-> this lab:
+Each `conf-workers` pod hosts `DEMO_CONF_ACTORS_PER_WORKER` actors at once (default 4). `hack/deploy.sh` sets
+the worker's CPU limit to that many CPUs plus 500m, and each actor asks for 1 CPU, so the limit decides the
+seat count (the shared-budget rule from [Module 5](../../modules/05-density-idle/README.md)). At the default
+maximum of 5 workers, 20 of the 50 attendees run at once and the rest wait suspended. An HPA scales the pool
+on worker demand: workers that are `partial` or `at_capacity`, plus one worker for every
+`DEMO_CONF_ACTORS_PER_WORKER` requests parked at the router.
+
+> **Fact-checked against an agent-swarm checkout** (commit `7f22bb5`, 2026-09-28) — its `README.md`,
+> `hack/deploy.sh`, `manifests/workerpool.yaml.tmpl`, `manifests/actortemplate.yaml.tmpl`, and `go.mod`:
+> - agent-swarm pins `github.com/agent-substrate/substrate v0.2.0`, the same as this workshop's
+>   `SUBSTRATE_REF`. `hack/deploy.sh` requires the nodes' `ate.dev/substrate-version` label to equal that
+>   pin, and `make install` labels them `v0.2.0`, so it deploys onto your workshop cluster.
 > - The gateway image is built with **`docker buildx`**, not `ko` (`hack/deploy.sh`'s `conf_build_gateway`
 >   runs `docker buildx build --platform=linux/amd64 --push`). Only the *worker* image
 >   (`ko://github.com/agent-substrate/substrate/cmd/ateom-gvisor`, in `manifests/workerpool.yaml.tmpl`) is
 >   `ko`-resolved. You still push everything into your own `KO_DOCKER_REPO` — `hack/deploy.sh` reuses that
 >   env var as the target registry for the Docker build too — but you need `docker` with `buildx` installed
 >   as well as `ko`.
-> - **Keep `--patch-router`.** agent-swarm's `hack/deploy.sh` requires **both** router changes: once the
->   parked-request budget is ≥60s, it also requires `terminationGracePeriodSeconds ≥120` on `atenet-router`,
->   and refuses to deploy otherwise. This workshop's `install-substrate.sh` now sets both (60s budget, 120s
->   grace), but a cluster installed before that change still has substrate's default 60s grace, and
->   `hack/deploy.sh up` then fails with a "needs these changes" error. `--patch-router` covers that case
->   (it patches the grace period too, and says so: "not restored on delete").
+> - **Keep `--patch-router`.** agent-swarm's `hack/deploy.sh` requires a `--parked-request-budget` of at least
+>   60s, any `--route-timeout` at least 60s, and `terminationGracePeriodSeconds` of at least 120 on
+>   `atenet-router`, and refuses to deploy otherwise. This workshop's `install-substrate.sh` sets the budget
+>   (60s) and the grace period (120s), but a cluster installed before that change still has substrate's
+>   default 60s grace, and `hack/deploy.sh up` then fails with a "needs these changes" error.
+>   `--patch-router` covers that case (it sets all three, and says so: "not restored on delete").
 
 ## Before you start
 
-agent-swarm refuses to deploy unless your cluster runs the substrate commit pinned in its `go.mod`. At the
-commit above (and still at agent-swarm's `main` on 2026-09-27), that pin is
-`github.com/agent-substrate/substrate v0.0.0-20260918213005-c7a1be177d0f`. This workshop installs `v0.2.0`, so
-**they differ**. Re-check before each event, since agent-swarm's `main` moves:
+agent-swarm refuses to deploy unless your cluster runs the substrate version pinned in its `go.mod`. Its
+`main` moves, so re-check the pin against `SUBSTRATE_REF` before each event:
 ```bash
 git clone https://github.com/agent-substrate/agent-swarm .workshop/agent-swarm
-git -C .workshop/agent-swarm checkout 1bdbdb6
-grep 'agent-substrate/substrate ' .workshop/agent-swarm/go.mod     # compare with SUBSTRATE_REF in workshop.env
+git -C .workshop/agent-swarm checkout 7f22bb5
+grep 'agent-substrate/substrate ' .workshop/agent-swarm/go.mod     # expect v0.2.0, the SUBSTRATE_REF in workshop.env
 ```
-While they differ, **run this lab on a second cluster at agent-swarm's pin**: follow the workshop setup there
-with `SUBSTRATE_REF=c7a1be17 make install`. Bumping agent-swarm to v0.2.0 in place is not validated:
-- It builds. Substrate is only an indirect dependency; after `go get github.com/agent-substrate/substrate@v0.2.0`,
-  `go build ./...` and `go test ./...` passed on a scratch checkout.
-- `manifests/actortemplate.yaml.tmpl` still uses `snapshotsConfig`, which v0.2.0 renamed to `snapshotConfig`.
-- v0.2.0 workers host several actors at once, and a worker's `resources.limits` is the budget those actors
-  share. `conf-workers` deliberately sets requests only, no limits, which was fine when each worker held one
-  actor. On v0.2.0 a worker with no limits reports no CPU budget, so actors that declare a CPU limit (the
-  conf template asks for `cpu: 1`) won't place on it until agent-swarm sizes its pool for v0.2.0. (agent-swarm's own README documents "Bumping Substrate".)
+If they differ, `hack/deploy.sh up` stops and prints the pin and the cluster's version (agent-swarm's
+README has a "Bumping Substrate" section). Use an agent-swarm commit whose pin matches rather than bumping
+either side on the day.
+
+Skip agent-swarm's `hack/create-cluster.sh` and its one-time `setup-gcp` project setup. Your workshop
+cluster and `make gcp` already cover both: GKE 1.37 with the ClusterTrustBundle beta API, an upgrade freeze,
+the snapshot bucket, a registry, and the Workload Identity bindings.
 
 You'll also need `docker` with the `buildx` plugin, on top of the workshop's usual tools.
+
+Two things to know about sharing the cluster with the workshop:
+- agent-swarm installs prometheus-adapter as the cluster's `v1beta1.external.metrics.k8s.io` APIService, and
+  refuses to run if another adapter (for example the Stackdriver adapter) already serves it.
+- Its workers land on the same two nodes as the workshop's `agents` pool. At the default 4 seats, each
+  `conf-workers` pod requests 500m CPU and 2304Mi memory (512Mi per seat plus 256Mi), so 5 of them take
+  about 11.5 GiB. If pods stay `Pending`, run `make teardown` first or lower `DEMO_CONF_MAX_WORKERS`.
 
 ## Deploy
 
@@ -56,6 +68,7 @@ default this deploys with real Vertex calls through a fresh `conf-gateway` GSA. 
 source scripts/lib.sh && load_env
 cd .workshop/agent-swarm
 export KO_DOCKER_REPO BUCKET_NAME VERTEX_LOCATION KO_DEFAULTPLATFORMS=linux/amd64
+# Optional, with defaults: DEMO_CONF_ACTORS=50 DEMO_CONF_MIN_WORKERS=2 DEMO_CONF_MAX_WORKERS=5 DEMO_CONF_ACTORS_PER_WORKER=4
 ( export PROJECT_ID; hack/deploy.sh up --patch-router )        # real Vertex calls, or:
 ( unset PROJECT_ID;  hack/deploy.sh up --patch-router )        # mock replies, no Vertex AI cost
 cd "$REPO_ROOT"
@@ -69,6 +82,11 @@ Pick one of the two `hack/deploy.sh up` lines, not both.
 - `manifests/actortemplate.yaml.tmpl`: `onPause`/`onCommit` are both `SNAPSHOT_CONTENT_SCOPE_FULL`, and
   there's no `durableDir` at all — conversation history lives only in the actor's checkpointed memory, so a
   suspend/resume (or a worker pod loss) has to bring it back through the FULL snapshot, not a file.
+- The stage header. It shows the pod count ("3 of 5", or "scaling N → M" while the HPA resizes the pool),
+  the seat count (pods × seats per pod), and the oversubscription ratio (attendees ÷ seats), next to the
+  turns parked at the router. Each worker card lists its seats and the actor in each. Chat from a few
+  attendee slots at once and watch the pool grow with `kubectl -n ate-demo-conf get hpa conf-workers -w`.
+  It grows within about 20s of a burst and shrinks 5 minutes after the burst ends.
 - The stage view's live worker and actor states. Match them against your workshop dashboard queries, just
   pointed at this atespace instead — `observability/dashboard.json` and `observability/queries.md` are fixed
   to `workshop`/`agents`, so use ad hoc PromQL the way [optional lab H](../H-env/README.md) does for
@@ -77,7 +95,7 @@ Pick one of the two `hack/deploy.sh up` lines, not both.
   | Question | PromQL |
   |---|---|
   | Worker state on `conf-workers` | `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="conf-workers"})` |
-  | 50 attendees on 2 workers: desired vs ready | `{"ate.workerpool.desired_workers", "ate.workerpool.name"="conf-workers"}` vs `{"ate.workerpool.ready_workers", "ate.workerpool.name"="conf-workers"}` |
+  | 50 attendees on 2–5 workers: desired vs ready | `{"ate.workerpool.desired_workers", "ate.workerpool.name"="conf-workers"}` vs `{"ate.workerpool.ready_workers", "ate.workerpool.name"="conf-workers"}` |
   | Resume latency for `attendee-NN` | `histogram_quantile(0.95, sum by (le, "ate.actor.operation.name") (rate({"ate.actor.lifecycle.operation.duration_bucket"}[5m])))` |
 
   In Logs Explorer, swap the atespace label the way lab H does:
