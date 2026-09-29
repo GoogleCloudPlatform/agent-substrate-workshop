@@ -19,10 +19,17 @@ credential — confirmed present in this checkout) and `scripts/ate-api.sh` (whi
 3. Implement `list` (`ListActors` with paging — see `getActorsCmd` in substrate's
    `cmd/kubectl-ate/internal/cmd/actor.go` for the paging loop shape), `wake NAME` (`ResumeActor`), and
    `sleep-all` (`SuspendActor` on every actor whose `state` is `ACTOR_STATE_RUNNING`).
+   `ResumeActorResponse` has no status of its own: it wraps the actor (`GetActor().GetStatus()`) plus a
+   `GetResumed()` bool. And the gateway's idle-suspender (`IDLE_AFTER=3s`, Module 5) acts on *every* RUNNING
+   actor in the atespace, including the ones `fleetctl wake` resumed, so a `list` a few seconds after `wake`
+   shows SUSPENDED again. Run `sleep-all` right after a `wake`, or `make idle-off` first (and `make idle-on`
+   after).
 4. Add a fake-server test with `app/internal/testutil.FakeControl`, the way `internal/idle`'s tests do
    (`StartFake` spins up an in-process fake ateapi over TLS). Note: at this checkout `FakeControl` implements
    `ListActors` and `SuspendActor` (plus the EgressPolicy verbs) but not `ResumeActor` — you'll need to add a
-   small `ResumeActor` stub to it before `wake`'s test can run against the fake.
+   small `ResumeActor` stub to it before `wake`'s test can run against the fake. A shape that works well: give
+   `main` a `run(args []string, out io.Writer) error`, and have the test call `run` with `-addr`/`-ca-file`
+   pointing at `StartFake`'s server, so the test goes through the same `ateclient.Dial` path as the real CLI.
 5. Stretch: `watch`, which polls `ListActors` on an interval and prints state transitions (diff the actor
    list between polls).
 

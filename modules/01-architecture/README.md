@@ -90,6 +90,9 @@ kubectl ate get workers -n workshop              # none yet — Module 2 creates
 cat .workshop/worker-image                       # the worker build that matches your control plane
 ```
 
+Right after the install you may see an extra `atenet-router` pod in `Terminating`. That's the old one draining:
+the install patches the router (a longer parked-request budget and a 120s grace period), which rolls it.
+
 ## What just happened
 - You saw the control plane (ateapi, atecontroller, Postgres), the data plane (atelet in each worker, the router, egress),
   and the identity plumbing (podcertcontroller, ClusterTrustBundles).

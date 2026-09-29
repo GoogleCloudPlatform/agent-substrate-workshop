@@ -79,6 +79,9 @@ source scripts/lib.sh && load_env
 port_forward conf-gateway ate-demo-conf svc/conf-gateway 8090 80   # never hand-roll `kubectl port-forward &`
 open "http://localhost:8090/stage?key=$(kubectl get secret conf-gateway -n ate-demo-conf -o jsonpath='{.data.PRESENTER_TOKEN}' | base64 -d)"
 ```
+`?key=` sets a cookie and redirects (303) to `/stage`, which is what a browser wants. From `curl`, send the key
+as a header instead: `curl -H "X-Presenter-Key: $KEY" localhost:8090/stage`. After a `hack/deploy.sh down`
+and `up`, restart the port-forward: the Service's pods changed.
 Pick one of the two `hack/deploy.sh up` lines, not both.
 
 ## Things to find

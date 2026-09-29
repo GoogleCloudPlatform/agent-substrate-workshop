@@ -28,6 +28,8 @@ sequenceDiagram
    ```bash
    make build-agent
    ```
+   ko may warn `git doesn't contain any tags` and `git is in a dirty state … M app/cmd/agent/main.go`. That's
+   expected (you just edited the file), and the build still succeeds. Ignore both.
 2. **Workers.** A WorkerPool is a Kubernetes CRD. The controller turns it into worker Pods that run atelet.
    ```bash
    scripts/render.sh modules/02-hello-actor/manifests/workerpool.yaml.tmpl   # read it first

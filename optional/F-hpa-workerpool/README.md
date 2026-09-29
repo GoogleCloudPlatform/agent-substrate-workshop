@@ -54,6 +54,8 @@ kubectl get apiservice v1beta1.external.metrics.k8s.io        # AVAILABLE True a
 kubectl get --raw /apis/external.metrics.k8s.io/v1beta1/namespaces/workshop/workshop_worker_demand | jq '.items[].value'
 kubectl -n workshop get hpa agents                           # TARGETS n/1, not <unknown>
 ```
+A `FailedGetExternalMetric` event in `kubectl describe hpa agents` during the first ~30s is expected: the
+adapter answers before Prometheus has scraped anything. It stops once `TARGETS` shows a number.
 
 ## 4. Load it
 ```bash

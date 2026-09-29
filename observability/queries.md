@@ -26,7 +26,7 @@ Never `kubectl port-forward` by hand for this — `make prometheus-ui`, `make fo
 | Snapshot image sizes | `histogram_quantile(0.95, sum by (le, "file.name") (rate({"atelet.snapshot.size_bucket"}[10m])))` |
 | Actor CPU by template | `sum by ("ate.template.name") (rate({"ate.actor.stats.cpu.time"}[5m]))` |
 | Actor memory (working set) by template | `sum by ("ate.template.name") ({"ate.actor.stats.memory.working_set"})` |
-| Crashes | `sum(increase({"ate.actor.crashes"}[15m]))` |
+| Crashes | `sum(increase({"ate.actor.crashes"}[15m])) or vector(0)` (0 on a healthy fleet, not "no data") |
 | Is the controller keeping up? | `max by ("controller") ({"workqueue_depth"})` |
 | ateapi gRPC errors | `sum by ("rpc.method") (rate({"rpc.server.call.duration_count", top_level_controller_name="ate-api-server", "rpc.response.status_code"!="OK"}[5m]))` |
 

@@ -65,7 +65,7 @@ sed -i.bak -e 's/ContainerReadyz/ContainerWakeupProbe/g; s/Readyz:/WakeupProbe:/
 go build ./... && go test ./cmd/ate-env/
 export KO_DOCKER_REPO
 API_IMAGE=$(ko build --base-import-paths ./cmd/ate-env-api)
-GUEST_IMAGE=$(ko build --base-import-paths ./cmd/ate-env-guest)
+GUEST_IMAGE=$(ko build --base-import-paths ./cmd/ate-env-guest)   # ko's "git is in a dirty state" warning is the patch above; ignore it
 go build -o "$REPO_ROOT/bin/ate-env" ./cmd/ate-env
 cd "$REPO_ROOT"
 
@@ -80,7 +80,8 @@ kubectl ate get atespaces        # "ate-env" is listed next to "workshop"
 ```
 
 This creates a Kubernetes namespace `ate-env` with its own WorkerPool (`default-template-workerpool`, 2
-workers) and the `ate-env-api` Deployment, which plays the role of your gateway: it's the one always-on piece
+workers; it sets no CPU or memory limits, so `kubectl ate get workers -n ate-env` shows each worker offering
+the whole node, unlike the workshop's 1-CPU workers from Module 5) and the `ate-env-api` Deployment, which plays the role of your gateway: it's the one always-on piece
 that proxies to the (suspendable) environment actors. `ate-env` itself is a plain Go binary — no image to
 build, no cluster access needed to run it, just an address to the API service.
 

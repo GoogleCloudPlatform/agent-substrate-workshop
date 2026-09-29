@@ -97,7 +97,10 @@ gcloud logging metrics create actor_usage_events --project "$PROJECT_ID" \
 ```
 In the metric's settings (Logs Explorer → your new metric → "Convert to a metric" panel, or Metrics Explorer
 → edit), add label extractors for `labels."ate.template.name"` and `labels."ate.workerpool.name"` — **not**
-`labels."ate.actor.name"`. Chart it in Metrics Explorer grouped by template: this tells you which *template*
+`labels."ate.actor.name"`. (`gcloud logging metrics create` has no flag for label extractors, which is why
+this part is in the Console. Note the `labels.` prefix: atelet's usage samples carry `ate.*` in `labels`,
+while ateapi's records, such as `Actor state changed`, carry them in `jsonPayload`.) Chart it in Metrics
+Explorer grouped by template: this tells you which *template*
 generates the most usage events under `make load`, without ever creating a per-actor time series.
 
 To drill into one actor's own usage events (a log search, not a metric — no cardinality limit applies here),

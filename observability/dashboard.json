@@ -420,7 +420,7 @@
               },
               {
                 "timeSeriesQuery": {
-                  "prometheusQuery": "sum(increase({\"ate.actor.crashes\"}[15m]))"
+                  "prometheusQuery": "sum(increase({\"ate.actor.crashes\"}[15m])) or vector(0)"
                 },
                 "plotType": "LINE",
                 "legendTemplate": "crashes"

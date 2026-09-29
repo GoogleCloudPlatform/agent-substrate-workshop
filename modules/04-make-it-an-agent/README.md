@@ -49,7 +49,9 @@ flowchart LR
    curl -s localhost:8081/chat/buddy -d '{"message":"What is Agent Substrate?"}'; echo
    ```
    You get a `502`: `model call failed: …`. The agent tried to reach the gateway, but **egress is deny-by-default**
-   and `buddy` has no policy — no policy means no tunnel at all, not even a denied one.
+   and `buddy` has no policy — no policy means no tunnel at all, not even a denied one. That's why the error
+   reads `connection reset by peer` rather than "denied": the connection is dropped before anything could
+   refuse it.
 4. **Allow exactly one destination.**
    ```bash
    cat modules/04-make-it-an-agent/manifests/egress-gateway.yaml
@@ -61,6 +63,8 @@ flowchart LR
    next call may still see the old "no policy" answer — retry once if so. You don't need to suspend or
    resume `buddy` for the new policy to take effect; it isn't tied to the actor's lifecycle at all.
    EgressPolicy is a Substrate record: see it with `kubectl ate get egress-policy buddy -a workshop -o yaml`.
+   Both views show `metadata.name: default`, not `buddy`: an actor has exactly one policy, stored under the
+   fixed name `default` and looked up by the actor it belongs to.
    `make egress` runs `bin/egressctl`, a 100-line Go client in `app/cmd/egressctl`, rather than
    `kubectl ate create egress-policy`, because `create` fails when a policy already exists and `update`
    needs the record's current metadata.
@@ -74,6 +78,8 @@ flowchart LR
    curl -s localhost:8081/actors/buddy/state | jq
    ```
    History lives in `/data/history.json` and in memory, and both came back. The `turn` count continues.
+   Don't worry if the model's first reply says something like "as an AI I can't remember between
+   conversations": the agent sends the whole history with every turn, and "What is my name?" shows it did.
 
 ## If Vertex isn't available
 `MOCK_LLM=true make gateway`, or live: `kubectl -n workshop set env deploy/gateway MOCK_LLM=true`.

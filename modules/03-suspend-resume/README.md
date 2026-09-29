@@ -14,10 +14,11 @@ flowchart LR
 1. Make some state, then note the worker and the boot ID:
    ```bash
    for i in 1 2 3; do curl -s -H 'ate-target-actor: workshop/hello' localhost:8080/; done
-   curl -s -H 'ate-target-actor: workshop/hello' localhost:8080/state | jq '{memCount, bootID, hostname}'
-   kubectl ate get actors -a workshop
+   curl -s -H 'ate-target-actor: workshop/hello' localhost:8080/state | jq '{memCount, bootID}'
+   kubectl ate get actors -a workshop       # the WORKER POD column is the worker
    ```
-   If the port-forward died, restart it: `make forward-router`.
+   (The agent's `hostname` is always `actor` inside the sandbox, so it can't tell you the worker; the
+   `WORKER POD` column can.) If the port-forward died, restart it: `make forward-router`.
 2. Suspend it and watch the worker free up:
    ```bash
    kubectl ate suspend actor hello -a workshop
@@ -27,7 +28,7 @@ flowchart LR
 3. Talk to it again:
    ```bash
    curl -s -H 'ate-target-actor: workshop/hello' localhost:8080/
-   curl -s -H 'ate-target-actor: workshop/hello' localhost:8080/state | jq '{memCount, bootID, hostname}'
+   curl -s -H 'ate-target-actor: workshop/hello' localhost:8080/state | jq '{memCount, bootID}'
    ```
    `mem` **continues** from where it was, and the `bootID` is the **same**. The process never restarted:
    its memory was checkpointed to GCS and restored, possibly on the other worker.
@@ -56,6 +57,9 @@ with **DATA** scope: only the durable directory is saved, and resume cold-boots 
    ```bash
    kubectl ate logs actor memo -a workshop -f
    ```
+   Most of what scrolls past is gVisor's own runtime logging (lines starting `I0…`/`W0…`, from `cli.go`,
+   `config.go` and so on). The line to watch for is the agent's `agent listening …`. Add
+   `| grep -v '^[IW]0'` if you want only the agent's output.
 7. Make state, suspend, and come back:
    ```bash
    for i in 1 2 3; do curl -s -H 'ate-target-actor: workshop/memo' localhost:8080/; done

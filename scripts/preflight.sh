@@ -24,7 +24,13 @@ need() { if "$@"; then ok "$CHECK"; else warn "$CHECK — $HINT"; failures=$((fa
 
 step "Tools"
 for t in gcloud kubectl go ko jq envsubst nc curl git python3; do
-  CHECK="$t on PATH" HINT="install $t"; need bash -c "command -v $t >/dev/null"
+  case "$t" in
+    ko)       hint="install ko: go install github.com/google/ko@latest (then make sure \$(go env GOPATH)/bin is on PATH)" ;;
+    envsubst) hint="install envsubst (gettext: brew install gettext / apt install gettext-base)" ;;
+    nc)       hint="install nc (netcat)" ;;
+    *)        hint="install $t" ;;
+  esac
+  CHECK="$t on PATH" HINT="$hint"; need bash -c "command -v $t >/dev/null"
 done
 CHECK="go >= 1.27" HINT="install Go 1.27+"
 need bash -c '[[ "$(printf "%s\n" "go1.27" "$(go env GOVERSION)" | sort -V | head -1)" == "go1.27" ]]'

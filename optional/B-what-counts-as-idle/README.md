@@ -67,11 +67,14 @@ heartbeats on the gateway:
 ```bash
 curl -s localhost:8081/metrics | grep '^workshop_busy_heartbeats_total'   # one per second of work, ~17
 ```
+The counter lives in the gateway pod's memory, so it starts from 0 whenever the gateway rolls
+(`make idle-off`/`idle-on` in labs C and E, or any `kubectl set env`). Compare before/after within one run.
 cruncher was suspended again before you could read its log, so check the job in Cloud Logging. Give it ~15s
 after the job ends for the log to arrive:
 ```bash
+PROJECT_ID="$(sed -n 's/^PROJECT_ID=//p' workshop.env)"   # your project, not whatever gcloud defaults to
 gcloud logging read 'resource.type="k8s_container" AND labels."ate.actor.name"="cruncher" AND jsonPayload.textPayload:"job done"' \
-  --freshness=10m --format='value(jsonPayload.textPayload)'   # …job done: 60 steps in 17.5s, max gap 0.3s
+  --project "$PROJECT_ID" --freshness=10m --format='value(jsonPayload.textPayload)'   # …job done: 60 steps in 17.5s, max gap 0.3s
 ```
 No gap: the job never froze. The gateway log shows the suspend a few seconds after the job ended:
 `kubectl -n workshop logs deploy/gateway | grep cruncher`.

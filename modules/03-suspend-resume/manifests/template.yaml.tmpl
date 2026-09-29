@@ -1,33 +1,40 @@
-# ActorTemplate agent-v2: same agent, now keeping its counter on the durableDir.
-# Templates are immutable, so a behavior change means a new template version.
+# ActorTemplate agent-v2 — agent-v1 with a DATA-scope suspend: same image, same shape, so
+# `diff` against agent-v1 shows only what changed. Templates are immutable, so a behavior change
+# means a new template version.
 metadata:
   atespace: ${ATESPACE}
   name: agent-v2
+# Which workers may run this template's actors: matched against the WorkerPool's own labels
+# (workerpool.yaml.tmpl's metadata.labels), not the Kubernetes Pod labels.
 workerSelector:
   matchLabels:
     workload: workshop-agent
 containers:
 - name: agent
-  image: ${AGENT_IMAGE}
+  image: ${AGENT_IMAGE}            # must be digest-pinned (@sha256:…); a CEL admission rule enforces this
   command: ["/ko-app/agent"]
   wakeupProbe:
-    httpGet: {path: /readyz, port: 80}
+    httpGet:
+      path: /readyz
+      port: 80
   volumeMounts:
-  - {name: data, mountPath: /data}
+  - name: data
+    mountPath: /data
 resources:
   limits:
-  - {name: cpu, quantity: "1"}
-  - {name: memory, quantity: 512Mi}
+  - name: cpu
+    quantity: "1"
+  - name: memory
+    quantity: 512Mi
 snapshotConfig:
-  onPause: SNAPSHOT_CONTENT_SCOPE_FULL
-  # Suspend keeps only the durableDir: memory is thrown away, and resume cold-boots the process.
-  onCommit: SNAPSHOT_CONTENT_SCOPE_DATA
+  onPause: SNAPSHOT_CONTENT_SCOPE_FULL     # pause: memory + disk
+  onCommit: SNAPSHOT_CONTENT_SCOPE_DATA    # suspend: the durableDir only; memory is thrown away
   onResume:
-    fromData: RESUME_SOURCE_COLD_BOOT
+    fromData: RESUME_SOURCE_COLD_BOOT        # so resume cold-boots the process
   storageLocation: gs://${BUCKET_NAME}/${ATESPACE}/agent-v2/
 sandboxConfig:
   sandboxClass: SANDBOX_CLASS_GVISOR
   configName: gvisor-default
 volumes:
 - name: data
-  durableDir: {}
+  durableDir: {}                           # per-actor directory that survives suspend/resume

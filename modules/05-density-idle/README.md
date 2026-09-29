@@ -17,6 +17,8 @@ the one thing Substrate deliberately doesn't do for you: **decide when an actor 
    kubectl ate get actors -a workshop
    ```
    `ALL=1` applies the policy to every actor that exists **now**. Actors created later need it applied again.
+   That includes `hello` and `memo`, which never call a model. It's harmless here, but it isn't least
+   privilege; in production, apply policies per template or per actor, as Module 4 did for `buddy`.
 3. **Fill both workers.** Restart the gateway port-forward if it died (`make forward-gateway`).
    ```bash
    curl -s localhost:8081/chat/swarm-01 -d '{"message":"hi"}' | jq -c '{turn, backend}'
@@ -49,7 +51,8 @@ the one thing Substrate deliberately doesn't do for you: **decide when an actor 
    done; wait
    ```
    All four return `200`. Two answered right away. The other two parked until the idle-suspender freed their workers,
-   so they took about 5s: 3s of idle, up to 1s until the next check, then a suspend and a restore.
+   so they took about 5–8s: 3s of idle, up to 1s until the next check, a suspend and a restore, plus the
+   1–2s model call itself.
 7. **What the gateway can't see** (skippable). Every actor has a `/work?steps=N` endpoint that burns CPU for about
    0.3s per step inside the request. Ask swarm-03 for about 18s of work, but go straight to the router instead of
    through the gateway:
