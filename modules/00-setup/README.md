@@ -8,12 +8,16 @@ and start the Substrate install in the background. It runs while you take the ar
   managed OpenTelemetry, no node auto-upgrade, and no spot nodes. Your instructor created it, or you can follow
   [the substrate GCP guide](https://github.com/agent-substrate/substrate/tree/main/tools/setup-gcp).
 - `kubectl` pointed at that cluster: `kubectl config current-context`.
-- Locally installed: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `nc`, `curl`, `git`, `python3`.
+- Locally installed: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `nc`, `curl`, `git`, `python3`,
+  and a running **Docker** with `buildx` (the install builds one substrate image from a Dockerfile). Cloud Shell has all of these.
 
 ## Steps
 
-1. **Configure.** Copy the env file and set `PROJECT_ID`. Every other value has a working default.
+1. **Configure.** Copy the env file and set `PROJECT_ID` and `CLUSTER_LOCATION`, your cluster's zone or
+   region exactly as `gcloud container clusters list` shows it (a zonal cluster such as `us-central1-a` isn't
+   found under `us-central1`). Every other value has a working default.
    ```bash
+   gcloud container clusters list --project YOUR_PROJECT_ID    # NAME and LOCATION
    cp workshop.env.example workshop.env
    $EDITOR workshop.env
    ```

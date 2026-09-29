@@ -52,6 +52,16 @@ echo "PROJECT_ID=p" >"$WORKSHOP_ENV_FILE"
 check "first run creates" "[[ \$(grep -c 'dashboards create' '$TMP/log') == 1 ]]"
 check "second run updates the same dashboard" "grep -q 'dashboards update projects/p/dashboards/123' '$TMP/log'"
 check "update carries the live etag" "[[ \$(jq -r .etag '$TMP/body') == etag-1 ]]"
+check "uploaded queries are pinned to the cluster" "jq -e '[.. | .prometheusQuery? // empty | contains(\"cluster=\\\"ate-cluster\\\"\")] | all and length >= 10' '$TMP/body' >/dev/null"
+
+# promql_scope.py: every selector form the dashboards use, and the things that must stay untouched.
+scope() { python3 "$ROOT/scripts/promql_scope.py" query c "$1"; }
+scope_is() { [[ "$(scope "$1")" == "$2" ]] || { echo "  got: $(scope "$1")"; return 1; }; }
+check "scope: quoted selector" "scope_is '{\"a.b\", \"l\"=\"v\"}' '{\"a.b\", \"l\"=\"v\", cluster=\"c\"}'"
+check "scope: bare name, range, by-list, number" "scope_is 'sum by (le, x) (rate(m_total[5m])) * 60' 'sum by (le, x) (rate(m_total{cluster=\"c\"}[5m])) * 60'"
+check "scope: classic selector and or vector(0)" "scope_is 'm{a=\"b\"} or vector(0)' 'm{a=\"b\", cluster=\"c\"} or vector(0)'"
+check "scope: existing cluster matcher kept" "scope_is 'm{cluster=\"z\"}' 'm{cluster=\"z\"}'"
+check "scope: offset and subquery" "scope_is 'rate(m[5m:1m] offset 1h)' 'rate(m{cluster=\"c\"}[5m:1m] offset 1h)'"
 
 # Teardown deletes all four dashboards by title, and a failed delete doesn't stop it.
 mkdir -p "$TMP/td/bin"

@@ -82,7 +82,8 @@ compile/unit-test level only. Lab G's agent-swarm commit (`7f22bb5`) pins v0.2.0
    With a regional `--location`, `--num-nodes` is per zone (2 × 3 zones = 6 nodes). Put the cluster's
    location in each attendee's `workshop.env` as `CLUSTER_LOCATION`.
 
-   Send each attendee their `PROJECT_ID` and confirm they can `gcloud auth login` and reach it before the day.
+   Send each attendee their `PROJECT_ID` and `CLUSTER_LOCATION` (the example above: `us-central1-a`); both are
+   required in `workshop.env`. Confirm they can `gcloud auth login` and reach the project before the day.
 
 ## Day of
 

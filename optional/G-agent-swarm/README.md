@@ -62,26 +62,25 @@ Two things to know about sharing the cluster with the workshop:
 
 ## Deploy
 
-`load_env` exports `PROJECT_ID` (it's required for the whole workshop), and `hack/deploy.sh` treats "is
+`source scripts/env.sh` exports `PROJECT_ID` (it's required for the whole workshop), and `hack/deploy.sh` treats "is
 `PROJECT_ID` set" as its only mock-vs-Vertex switch — it does **not** read this workshop's `MOCK_LLM`. So by
 default this deploys with real Vertex calls through a fresh `conf-gateway` GSA. Run it in a subshell with
 `PROJECT_ID` unset if you want mock replies instead:
 
 ```bash
-source scripts/lib.sh && load_env
+source scripts/env.sh   # workshop.env into this shell (bash or zsh)
 cd .workshop/agent-swarm
-export KO_DOCKER_REPO BUCKET_NAME VERTEX_LOCATION KO_DEFAULTPLATFORMS=linux/amd64
+export KO_DOCKER_REPO BUCKET_NAME VERTEX_LOCATION KO_DEFAULTPLATFORMS   # KO_DEFAULTPLATFORMS: linux/amd64 unless workshop.env says otherwise
 # Optional, with defaults: DEMO_CONF_ACTORS=50 DEMO_CONF_MIN_WORKERS=2 DEMO_CONF_MAX_WORKERS=5 DEMO_CONF_ACTORS_PER_WORKER=4
 ( export PROJECT_ID; hack/deploy.sh up --patch-router )        # real Vertex calls, or:
 ( unset PROJECT_ID;  hack/deploy.sh up --patch-router )        # mock replies, no Vertex AI cost
 cd "$REPO_ROOT"
-source scripts/lib.sh && load_env
-port_forward conf-gateway ate-demo-conf svc/conf-gateway 8090 80   # never hand-roll `kubectl port-forward &`
+scripts/forward.sh conf-gateway ate-demo-conf svc/conf-gateway 8090 80   # never hand-roll `kubectl port-forward &`
 open "http://localhost:8090/stage?key=$(kubectl get secret conf-gateway -n ate-demo-conf -o jsonpath='{.data.PRESENTER_TOKEN}' | base64 -d)"
 ```
 `?key=` sets a cookie and redirects (303) to `/stage`, which is what a browser wants. From `curl`, send the key
 as a header instead: `curl -H "X-Presenter-Key: $KEY" localhost:8090/stage`. After a `hack/deploy.sh down`
-and `up`, restart the port-forward: the Service's pods changed.
+and `up`, run the same `scripts/forward.sh` line again: the Service's pods changed.
 Pick one of the two `hack/deploy.sh up` lines, not both.
 
 ## Things to find
@@ -100,12 +99,12 @@ Pick one of the two `hack/deploy.sh up` lines, not both.
 
   | Question | PromQL |
   |---|---|
-  | Worker state on `conf-workers` | `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="conf-workers"})` |
-  | 50 attendees on 2–5 workers: desired vs ready | `{"ate.workerpool.desired_workers", "ate.workerpool.name"="conf-workers"}` vs `{"ate.workerpool.ready_workers", "ate.workerpool.name"="conf-workers"}` |
-  | Resume latency for `attendee-NN` | `histogram_quantile(0.95, sum by (le, "ate.actor.operation.name") (rate({"ate.actor.lifecycle.operation.duration_bucket", "ate.template.name"="conf-agent"}[5m])))` |
+  | Worker state on `conf-workers` | `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="conf-workers", cluster="ate-cluster"})` |
+  | 50 attendees on 2–5 workers: desired vs ready | `{"ate.workerpool.desired_workers", "ate.workerpool.name"="conf-workers", cluster="ate-cluster"}` vs `{"ate.workerpool.ready_workers", "ate.workerpool.name"="conf-workers", cluster="ate-cluster"}` |
+  | Resume latency for `attendee-NN` | `histogram_quantile(0.95, sum by (le, "ate.actor.operation.name") (rate({"ate.actor.lifecycle.operation.duration_bucket", "ate.template.name"="conf-agent", cluster="ate-cluster"}[5m])))` |
 
-  Managed Prometheus is per project, not per cluster. If another cluster in your project also runs
-  substrate, add `"cluster"="<your CLUSTER_NAME>"` inside each selector, or the numbers mix both clusters.
+  Like `observability/queries.md`, these are pinned to `cluster="ate-cluster"`: Managed Prometheus is per
+  project, not per cluster. Change the matcher if your `CLUSTER_NAME` is different.
 
   In Logs Explorer, swap the atespace label the way lab A does:
   `resource.type="k8s_container"`, `"Actor state changed"`, `jsonPayload."ate.atespace"="ate-demo-conf"` (ateapi writes the atespace in `jsonPayload`, not `labels`).
@@ -116,7 +115,7 @@ Pick one of the two `hack/deploy.sh up` lines, not both.
 ```bash
 cd .workshop/agent-swarm
 hack/deploy.sh down
-cd "$REPO_ROOT" && source scripts/lib.sh && stop_port_forwards
+cd "$REPO_ROOT" && make stop-forwards
 ```
 `hack/deploy.sh down` leaves the router flags and the `conf-gateway` service account's IAM bindings in
 place — it prints the `gcloud` commands to remove them if you want them gone.

@@ -39,8 +39,8 @@ observe: ## Deploy the gateway PodMonitoring and the Prometheus UI
 	@scripts/observability.sh
 prometheus-ui: ## Port-forward the Prometheus UI to http://localhost:9090
 	@source scripts/lib.sh && load_env && port_forward prom-ui $$NAMESPACE svc/prometheus-ui 9090 9090 && echo "open http://localhost:9090"
-forward-router: ## Port-forward the atenet-router to http://localhost:8080
-	@source scripts/lib.sh && load_env && port_forward router ate-system svc/atenet-router 8080 80 && echo "open http://localhost:8080"
+forward-router: ## (Re)start the atenet-router port-forward on http://localhost:8080
+	@source scripts/lib.sh && load_env && stop_port_forward router && port_forward router ate-system svc/atenet-router 8080 80 && echo "open http://localhost:8080"
 forward-gateway: ## (Re)start the gateway port-forward on http://localhost:8081
 	@source scripts/lib.sh && load_env && stop_port_forward gateway && port_forward gateway $$NAMESPACE svc/gateway 8081 80 && echo "open http://localhost:8081"
 patch-router: ## Re-apply the workshop router settings (60s park budget, 120s grace) after a substrate reinstall

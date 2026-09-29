@@ -54,7 +54,7 @@ redo this check (or drop the patch) before trusting the pin.
 ## 1. Build and install (you build every image)
 
 ```bash
-source scripts/lib.sh && load_env
+source scripts/env.sh   # workshop.env into this shell (bash or zsh): KO_DOCKER_REPO, BUCKET_NAME, REPO_ROOT, …
 ENV_REF=ab40c7bfb2049af1a7aade9e7bf9c6cac925b5ca
 git clone https://github.com/agent-substrate/env .workshop/env 2>/dev/null; git -C .workshop/env checkout "$ENV_REF"
 cd .workshop/env
@@ -88,7 +88,7 @@ build, no cluster access needed to run it, just an address to the API service.
 ## 2. Use an environment
 
 ```bash
-port_forward ate-env-api ate-env svc/ate-env-api 7777 7777   # from scripts/lib.sh, sourced in step 1
+scripts/forward.sh ate-env-api ate-env svc/ate-env-api 7777 7777   # background port-forward; `make stop-forwards` stops it
 ate-env create dev1
 ate-env dev1 shell 'uname -a; echo hello > /note.txt; ls -la /note.txt'
 echo "print('hi from the sandbox')" | ate-env dev1 write /hi.py
@@ -180,15 +180,16 @@ Paste into the Prometheus UI (or Cloud Console → Monitoring → Metrics Explor
 
 | Question | PromQL |
 |---|---|
-| Fleet: worker state on env's pool | `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="default-template-workerpool"})` |
-| Multiplexing: did ~10 envs ever need more than 2 workers? | `{"ate.workerpool.desired_workers", "ate.workerpool.name"="default-template-workerpool"}` vs `{"ate.workerpool.ready_workers", "ate.workerpool.name"="default-template-workerpool"}` |
-| Suspend/resume latency for envN | `histogram_quantile(0.95, sum by (le, "ate.actor.operation.name") (rate({"ate.actor.lifecycle.operation.duration_bucket"}[5m])))` |
-| Did `ate-env envN shell` trigger a resume or join a warm one? | `sum by ("ate.router.resume") (rate({"atenet.router.route.duration_count", top_level_controller_name="atenet-router"}[5m]))` |
+| Fleet: worker state on env's pool | `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="default-template-workerpool", cluster="ate-cluster"})` |
+| Multiplexing: did ~10 envs ever need more than 2 workers? | `{"ate.workerpool.desired_workers", "ate.workerpool.name"="default-template-workerpool", cluster="ate-cluster"}` vs `{"ate.workerpool.ready_workers", "ate.workerpool.name"="default-template-workerpool", cluster="ate-cluster"}` |
+| Suspend/resume latency for envN | `histogram_quantile(0.95, sum by (le, "ate.actor.operation.name") (rate({"ate.actor.lifecycle.operation.duration_bucket", cluster="ate-cluster"}[5m])))` |
+| Did `ate-env envN shell` trigger a resume or join a warm one? | `sum by ("ate.router.resume") (rate({"atenet.router.route.duration_count", top_level_controller_name="atenet-router", cluster="ate-cluster"}[5m]))` |
 
 In Cloud Console → Logging → Logs Explorer, the per-actor view from Module 6 works the same way, just with
 the atespace swapped (ateapi writes it in `jsonPayload`, not `labels`):
 ```
 resource.type="k8s_container"
+resource.labels.cluster_name="ate-cluster"
 resource.labels.namespace_name="ate-system"
 "Actor state changed"
 jsonPayload."ate.atespace"="ate-env"
@@ -215,7 +216,7 @@ atespace, the same way you used the Prometheus UI in Module 6.
 ```bash
 for e in dev1 $(seq -f 'env%g' 1 10); do ate-env delete "$e"; done
 ate-env manifest --api-image x --worker-image x | kubectl delete -f - --ignore-not-found
-stop_port_forwards   # from scripts/lib.sh; stops step 2's ate-env-api forward (and any others this shell started)
+make stop-forwards   # stops step 2's ate-env-api forward (and the workshop's other port-forwards)
 ```
 
 ## Next

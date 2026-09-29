@@ -16,6 +16,7 @@
 # Checks laptop tools and the GKE cluster before anything is installed.
 source "$(dirname "$0")/lib.sh"
 load_env
+require_cluster_location
 failures=0
 # need <cmd...>: the checked command must silence its own stdout/stderr
 # (e.g. via `bash -c '... >/dev/null'`) so only the ok/warn line prints —
@@ -34,6 +35,17 @@ for t in gcloud kubectl go ko jq envsubst nc curl git python3; do
 done
 CHECK="go >= 1.27" HINT="install Go 1.27+"
 need bash -c '[[ "$(printf "%s\n" "go1.27" "$(go env GOVERSION)" | sort -V | head -1)" == "go1.27" ]]'
+# Building substrate from source (SUBSTRATE_IMAGE_REPO empty, the default) includes one Dockerfile image,
+# the Envoy dataplane, which ate-setup builds and pushes with `docker buildx build --push`. Without a working
+# Docker the background install would get most of the way and then fail.
+if [[ -z "${SUBSTRATE_IMAGE_REPO:-}" ]]; then
+  CHECK="docker on PATH" HINT="install Docker (Docker Desktop, or docker-ce on Linux). make install builds substrate's Envoy image with docker buildx"
+  need bash -c 'command -v docker >/dev/null'
+  CHECK="docker daemon reachable" HINT="start Docker (Docker Desktop, or: sudo systemctl start docker) and make sure your user may use it: docker info"
+  need bash -c 'docker info >/dev/null 2>&1'
+  CHECK="docker buildx available" HINT="install the buildx plugin (bundled with Docker Desktop; apt install docker-buildx-plugin on Linux): docker buildx version"
+  need bash -c 'docker buildx version >/dev/null 2>&1'
+fi
 
 step "gcloud"
 CHECK="gcloud authenticated" HINT="run: gcloud auth login && gcloud auth application-default login"

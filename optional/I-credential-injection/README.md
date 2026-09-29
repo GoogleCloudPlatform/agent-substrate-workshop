@@ -34,10 +34,15 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
    settings**. `ate-setup deploy` re-renders `atenet-router` with substrate's defaults (a 5s parked-request
    budget and a 60s grace period); `make install` can't restore them for you, because it would redeploy
    *without* the experimental flags. Then build and apply the reference provider. Its Deployment's image is a
-   `ko://` reference, so `kubectl apply` it only after `ko resolve`:
+   `ko://` reference, so `kubectl apply` it only after `ko resolve`.
+
+   The reinstall also restarts the router, api-server and egress gateway. A `kubectl port-forward` to a pod
+   that went away keeps its local port open but fails every connection, so stop the workshop's forwards
+   first and start the ones you need again at the end:
    ```bash
-   source scripts/lib.sh && load_env
-   (cd .workshop/substrate && GOWORK=off KO_DOCKER_REPO="$KO_DOCKER_REPO" go run ./cmd/ate-setup deploy ate-system \
+   source scripts/env.sh          # workshop.env into this shell (bash or zsh): KO_DOCKER_REPO, KO_DEFAULTPLATFORMS, …
+   make stop-forwards             # router, gateway, Prometheus UI, ateapi: they'd all point at pods about to go away
+   (cd .workshop/substrate && GOWORK=off go run ./cmd/ate-setup deploy ate-system \
        --experimental-use-sdsmint --atenet-dataplane=envoy --experimental-egress-credential-injection)
    make patch-router              # --parked-request-budget=60s and a 120s grace, as after `make install`
    (cd .workshop/substrate && export GOWORK=off KO_DOCKER_REPO &&
@@ -45,10 +50,10 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
      ./hack/run-tool.sh ko resolve --base-import-paths "${ldflags[@]}" -f manifests/egress-credential-injection/) |
      kubectl apply -f -
    kubectl -n ate-system logs deploy/atenet-egress --all-containers | grep 'egress credential injection enabled'
+   make forward-router forward-gateway   # fresh forwards to the new pods (step 5 uses the router's)
    ```
-   The reinstall restarts the router, api-server and egress gateway, so your port-forwards die. Restart the
-   ones you use (`scripts/lib.sh`'s `stop_port_forward router` then `make forward-router`, and
-   `make forward-gateway`).
+   `make prometheus-ui` brings the Prometheus UI back if you want it; `scripts/egress.sh` and
+   `source scripts/ate-api.sh` start their own ateapi forward when they need one.
 3. Put your API key in a Secret, say `example-api` with key `token` in namespace `workshop-secrets`, and add a
    `namespace-policy.yaml` entry letting atespace `workshop` read `workshop-secrets`. The provider reads its
    policy only at startup, so restart it afterwards:

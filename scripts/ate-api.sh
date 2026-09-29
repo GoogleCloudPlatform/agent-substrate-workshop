@@ -16,6 +16,21 @@
 # Source this to talk to ateapi from your laptop the way kubectl-ate does:
 #   port-forward svc/api, mint a short-lived token for ate-system/ate-client (audience
 #   api.ate-system.svc), and fetch the ClusterTrustBundle that signs ateapi's certificate.
+# Scripts source it (scripts/egress.sh). You can too, from the repo root in bash or zsh:
+#   source scripts/ate-api.sh
+# In an interactive shell the work runs in a bash child, so lib.sh's strict mode and `exit`s never reach
+# your shell; only the three ATE_* exports do. This block is POSIX so zsh never parses the bash below.
+case $- in *i*)
+  if [ ! -f scripts/ate-api.sh ]; then
+    echo "run this from the workshop repo root: source scripts/ate-api.sh" >&2
+    return 1
+  fi
+  bash scripts/ate-api.sh || return 1
+  export ATE_API_ADDR=localhost:8443 \
+    ATE_TOKEN_FILE="${WORKSHOP_STATE_DIR:-$PWD/.workshop}/ate-token" \
+    ATE_CA_FILE="${WORKSHOP_STATE_DIR:-$PWD/.workshop}/ate-ca.pem"
+  return 0 ;;
+esac
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 load_env
 port_forward ate-api ate-system svc/api 8443 443

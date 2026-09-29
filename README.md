@@ -37,7 +37,8 @@ can't break an earlier one (see [Module 7](modules/07-wrap-up/README.md#keep-goi
   `clustertrustbundles` and `podcertificaterequests` APIs (enabled at creation), Workload Identity, managed
   OpenTelemetry, Managed Prometheus, no node auto-upgrade, no spot nodes, 2× `c3-standard-4`. `make preflight`
   checks all of it.
-- Local tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst`, `nc`, `curl`, `git`, `python3`.
+- Local tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst`, `nc`, `curl`, `git`, `python3`, and a running
+  Docker with `buildx`. Cloud Shell has all of them.
 - Comfort with Kubernetes. No prior Substrate knowledge needed.
 
 For comparison, [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) solves a
@@ -54,7 +55,7 @@ has the full comparison.
 
 ## Quick start
 ```bash
-cp workshop.env.example workshop.env     # set PROJECT_ID
+cp workshop.env.example workshop.env     # set PROJECT_ID and CLUSTER_LOCATION
 make preflight
 export PATH="$PWD/bin:$PATH"             # `kubectl ate` lands in bin/ during the install (Module 0 step 5)
 make help                                # every target, one line each

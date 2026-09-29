@@ -37,8 +37,11 @@ exit 0
 STUB
 printf '#!/usr/bin/env bash\necho go1.27.1\n' >"$TMP/bin/go"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$TMP/bin/ko"
+# docker: DOCKER_DOWN=1 makes `docker info` fail the way a stopped daemon does.
+printf '#!/usr/bin/env bash\n[[ "$1" == info && -n "${DOCKER_DOWN:-}" ]] && exit 1\nexit 0\n' >"$TMP/bin/docker"
 chmod +x "$TMP/bin/"*
 printf 'PROJECT_ID=demo-proj\nCLUSTER_NAME=c\nCLUSTER_LOCATION=r\n' >"$TMP/env"
+printf 'PROJECT_ID=demo-proj\nCLUSTER_NAME=c\nREGION=us-central1\nCLUSTER_LOCATION=\n' >"$TMP/noloc.env"
 
 # A cluster that passes every check, with a quote in a label and in the description.
 cat >"$TMP/good.json" <<'JSON'
@@ -77,4 +80,11 @@ jq '.currentMasterVersion = "1.36.4-gke.200" | .enableK8sBetaApis.enabledApis = 
   "$TMP/good.json" >"$TMP/old.json"
 out="$(run "$TMP/old.json")"; rc=$?
 check "1.36 fails the version check, even with the beta APIs" "[[ $rc != 0 && \"\$out\" == *'>= 1.37 —'* ]]"
+out="$(DOCKER_DOWN=1 run "$TMP/good.json")"; rc=$?
+check "source install with Docker stopped fails the daemon check" "[[ $rc != 0 && \"\$out\" == *'docker daemon reachable —'* ]]"
+out="$(DOCKER_DOWN=1 SUBSTRATE_IMAGE_REPO=r SUBSTRATE_IMAGE_TAG=t run "$TMP/good.json")"; rc=$?
+check "published images skip the Docker checks" "[[ $rc == 0 && \"\$out\" != *docker* ]]"
+out="$(PATH="$TMP/bin:$PATH" WORKSHOP_ENV_FILE="$TMP/noloc.env" WORKSHOP_STATE_DIR="$TMP/ws" CLUSTER_JSON="$TMP/good.json" \
+  bash "$ROOT/scripts/preflight.sh" 2>&1)"; rc=$?
+check "an empty CLUSTER_LOCATION fails with the command to find it" "[[ $rc != 0 && \"\$out\" == *'CLUSTER_LOCATION is empty'*'gcloud container clusters list'* ]]"
 exit "$fails"

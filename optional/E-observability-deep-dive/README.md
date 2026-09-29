@@ -22,7 +22,7 @@ one project (a shared workshop project, or your own second cluster), and an aler
 filter would page on theirs too.
 
 ```bash
-source scripts/lib.sh && load_env
+source scripts/env.sh   # workshop.env into this shell (bash or zsh)
 for f in alert-actor-crashes alert-workers-desired-vs-ready alert-resume-latency alert-router-503; do
   scripts/render.sh "optional/E-observability-deep-dive/$f.json" > "/tmp/$f.json"
   gcloud monitoring policies create --project "$PROJECT_ID" --policy-from-file="/tmp/$f.json"
@@ -80,7 +80,7 @@ done
 
 ## 2. An SLO on chat success
 In Cloud Console → Monitoring → SLOs, create a request-based SLO on the gateway:
-good = `workshop_chat_turns_total{outcome="ok"}`, total = `workshop_chat_turns_total`, target 99%, rolling 1 day.
+good = `workshop_chat_turns_total{outcome="ok", cluster="ate-cluster"}`, total = `workshop_chat_turns_total{cluster="ate-cluster"}`, target 99%, rolling 1 day.
 Watch the error budget burn during step 1's `IDLE_AFTER=0s` run.
 
 ## 3. Usage events as a logs-based metric — labeled by template/pool, not actor

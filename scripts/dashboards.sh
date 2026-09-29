@@ -17,9 +17,14 @@
 # Dashboards are matched by displayName, so re-running updates in place instead of duplicating.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
+# scoped <json-file>: the dashboard with every PromQL selector pinned to cluster="$CLUSTER_NAME".
+# Managed Prometheus is per project; without this, tiles mix in every other cluster reporting there.
+scoped() { python3 "$REPO_ROOT/scripts/promql_scope.py" dashboard "$CLUSTER_NAME" <"$1"; }
+
 # upsert_dashboard <json-file>
 upsert_dashboard() {
-  local file="$1"
+  local file
+  file="$(mktemp)"; scoped "$1" >"$file"
   local title existing name etag
   title="$(jq -r .displayName "$file")"
   existing="$(gcloud monitoring dashboards list --project "$PROJECT_ID" \
@@ -33,12 +38,13 @@ upsert_dashboard() {
       | gcloud monitoring dashboards update "$name" --project "$PROJECT_ID" --config-from-file=- --quiet >/dev/null
     ok "updated dashboard: $title"
   fi
+  rm -f "$file"
 }
 
 [[ "${1:-}" == "--source-only" ]] && return 0
 
 load_env
-step "Cloud Monitoring dashboards"
+step "Cloud Monitoring dashboards (queries pinned to cluster=\"$CLUSTER_NAME\")"
 upsert_dashboard "$REPO_ROOT/observability/dashboard.json"
 # The substrate checkout is created early by install-substrate.sh; wait briefly if the install just started.
 wait_for 180 "substrate checkout (make install-bg)" test -d "$STATE_DIR/substrate/tools/setup-gcp/dashboards"

@@ -17,8 +17,12 @@
 # otherwise builds from source with ko into KO_DOCKER_REPO. Safe to re-run.
 source "$(dirname "$0")/lib.sh"
 load_env
+require_cluster_location
 SRC="$STATE_DIR/substrate"
-export KO_DOCKER_REPO
+# KO_DEFAULTPLATFORMS (load_env: linux/amd64 by default) replaces substrate's .ko.yaml default of
+# amd64 + arm64, which would build every image twice for a cluster that runs only one of them.
+# ate-setup also passes it to docker buildx for the Envoy image.
+export KO_DOCKER_REPO KO_DEFAULTPLATFORMS
 # Guard against a go.work in a parent directory (the repo no longer ships one): substrate is its own module.
 export GOWORK=off
 

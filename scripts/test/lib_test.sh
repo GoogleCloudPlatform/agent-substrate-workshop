@@ -268,6 +268,31 @@ t_make_teardown_all_passes_flag() {
     [[ "$(make -s -n -C "$REPO_ROOT" teardown)" != *--all* ]]
 }
 
+# Your own terminal: lib.sh refuses politely, env.sh and ate-api.sh never change your shell's options or
+# exit it. Interactive bash (and zsh, when installed) are real child shells; stdin is closed so they exit.
+ROOT_DIR="$(cd "$HERE/../.." && pwd)"
+interactive() { (cd "$ROOT_DIR" && "$@" </dev/null 2>/dev/null); }
+t_lib_refuses_interactive_shell() {
+  [[ "$(interactive bash --norc -i -c 'source scripts/lib.sh; echo "alive rc=$?"')" == "alive rc=1" ]]
+}
+t_env_sh_loads_without_strict_mode() {
+  local sh want="demo-proj-ate|linux/amd64|$ROOT_DIR|errexit off|still here"
+  for sh in bash zsh; do
+    command -v "$sh" >/dev/null || continue
+    local flags=(-i -c); [[ $sh == bash ]] && flags=(--norc -i -c)
+    [[ "$(interactive "$sh" "${flags[@]}" 'source scripts/env.sh; printf "%s|%s|%s|" "$BUCKET_NAME" "$KO_DEFAULTPLATFORMS" "$REPO_ROOT"
+      case $- in *e*) printf "errexit on|";; *) printf "errexit off|";; esac; false; echo "still here"')" == "$want" ]] || return 1
+  done
+}
+t_env_sh_missing_file_returns() {
+  local sh
+  for sh in bash zsh; do
+    command -v "$sh" >/dev/null || continue
+    local flags=(-i -c); [[ $sh == bash ]] && flags=(--norc -i -c)
+    [[ "$(WORKSHOP_ENV_FILE="$TMP/nope.env" interactive "$sh" "${flags[@]}" 'source scripts/env.sh; echo "alive rc=$?"')" == "alive rc=1" ]] || return 1
+  done
+}
+
 load_env
 check "load_env expands references" t_load_env_expands
 check "load_env requires PROJECT_ID" t_load_env_requires_project
@@ -294,4 +319,7 @@ check "catch-up RESET=1 refuses MODULE<3" t_catch_up_reset_needs_module_3
 check "reset_template deletes its actors, then the template (idempotent)" t_reset_template_deletes_its_actors_then_template
 check "make help lists every target" t_make_help_lists_every_target
 check "make teardown ALL=1 passes --all" t_make_teardown_all_passes_flag
+check "lib.sh refuses an interactive shell instead of taking it over" t_lib_refuses_interactive_shell
+check "env.sh loads workshop.env in bash/zsh without strict mode" t_env_sh_loads_without_strict_mode
+check "env.sh returns (not exits) when workshop.env is missing" t_env_sh_missing_file_returns
 exit "$fails"

@@ -7,7 +7,8 @@ going through `kubectl ate` or the gateway.
 
 **You'll need:** the workshop's `app/internal/ateclient` package (`Dial`, `TLSConfig`, the file-token
 credential — confirmed present in this checkout) and `scripts/ate-api.sh` (which already wraps
-`scripts/lib.sh`'s `port_forward`, so sourcing it never hand-rolls a `kubectl port-forward`).
+`scripts/lib.sh`'s `port_forward`, so sourcing it never hand-rolls a `kubectl port-forward`; it works from
+bash or zsh and leaves your shell's options alone).
 
 1. `source scripts/ate-api.sh` to get `ATE_API_ADDR`, `ATE_TOKEN_FILE`, and `ATE_CA_FILE` — the same
    address/token/CA `kubectl-ate` itself uses (`api.ate-system.svc:443` via port-forward, a short-lived

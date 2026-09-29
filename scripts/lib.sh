@@ -14,14 +14,19 @@
 # limitations under the License.
 
 # Shared helpers for workshop scripts. Source this file; do not execute it.
+# Not for your own terminal: it turns on `set -euo pipefail` and its helpers `exit` on error, which would
+# close an interactive shell, and it's bash-only. This guard is POSIX so zsh reads it before anything else.
+case $- in *i*)
+  echo "scripts/lib.sh is for the workshop's scripts. In your own shell (bash or zsh), run: source scripts/env.sh" >&2
+  return 1 ;;
+esac
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE_DIR="${WORKSHOP_STATE_DIR:-$REPO_ROOT/.workshop}"
 # Your shell's PATH before we prepend bin/, so checks can tell whether *you* can type `kubectl ate`.
-# Exported once, so a script run by another script still sees the original. Not when you source this file
-# in your own interactive shell (the optional labs do): that would pin a stale value into later make runs.
-if [[ $- == *i* ]]; then WORKSHOP_USER_PATH="$PATH"; else : "${WORKSHOP_USER_PATH:=$PATH}"; export WORKSHOP_USER_PATH; fi
+# Exported once, so a script run by another script still sees the original.
+: "${WORKSHOP_USER_PATH:=$PATH}"; export WORKSHOP_USER_PATH
 export PATH="$REPO_ROOT/bin:$PATH"
 
 if [[ -t 1 ]]; then C_B=$'\e[1m'; C_G=$'\e[32m'; C_Y=$'\e[33m'; C_R=$'\e[31m'; C_0=$'\e[0m'; else C_B=; C_G=; C_Y=; C_R=; C_0=; fi
@@ -33,12 +38,10 @@ die()  { echo "${C_R}  ✗ $*${C_0}" >&2; exit 1; }
 # load_env reads workshop.env (auto-exporting every variable) and checks the essentials.
 load_env() {
   local f="${WORKSHOP_ENV_FILE:-$REPO_ROOT/workshop.env}"
-  [[ -f "$f" ]] || die "missing $f — run: cp workshop.env.example workshop.env and set PROJECT_ID"
+  [[ -f "$f" ]] || die "missing $f — run: cp workshop.env.example workshop.env and set PROJECT_ID and CLUSTER_LOCATION"
   # A MOCK_LLM you pass on the command line (MOCK_LLM=true make …) beats workshop.env. Captured once and
   # exported, so a script run by another script still sees what you typed, not workshop.env's value.
-  # Interactive shells skip the capture for the same reason as WORKSHOP_USER_PATH above.
-  if [[ $- == *i* ]]; then local WORKSHOP_MOCK_LLM_OVERRIDE="${MOCK_LLM:-}"
-  else : "${WORKSHOP_MOCK_LLM_OVERRIDE=${MOCK_LLM:-}}"; export WORKSHOP_MOCK_LLM_OVERRIDE; fi
+  : "${WORKSHOP_MOCK_LLM_OVERRIDE=${MOCK_LLM:-}}"; export WORKSHOP_MOCK_LLM_OVERRIDE
   set -a; # shellcheck disable=SC1090
   source "$f"; set +a
   if [[ -n "$WORKSHOP_MOCK_LLM_OVERRIDE" ]]; then MOCK_LLM="$WORKSHOP_MOCK_LLM_OVERRIDE"; fi
@@ -46,10 +49,20 @@ load_env() {
   : "${NAMESPACE:=workshop}" "${ATESPACE:=workshop}" "${MOCK_LLM:=false}"
   export NAMESPACE ATESPACE MOCK_LLM
   # Substrate's ate-setup reads CLUSTER_NAME / CLUSTER_LOCATION (and fails without them when PROJECT_ID is
-  # set). Older workshop.env files used CLUSTER / ZONE_OR_REGION; accept those too.
-  : "${CLUSTER_NAME:=${CLUSTER:-ate-cluster}}" "${CLUSTER_LOCATION:=${ZONE_OR_REGION:-${REGION:-us-central1}}}"
+  # set). Older workshop.env files used CLUSTER / ZONE_OR_REGION; accept those too. CLUSTER_LOCATION has no
+  # default on purpose: a zonal cluster (us-central1-a) is not found under its region (us-central1), so
+  # scripts that talk to the cluster call require_cluster_location instead of guessing.
+  : "${CLUSTER_NAME:=${CLUSTER:-ate-cluster}}" "${CLUSTER_LOCATION:=${ZONE_OR_REGION:-}}"
   export CLUSTER_NAME CLUSTER_LOCATION
+  # ko (and ate-setup's docker buildx build) target the cluster's nodes, not your laptop. GKE nodes here
+  # are amd64; set KO_DEFAULTPLATFORMS=linux/arm64 in workshop.env for an Arm (e.g. C4A/Axion) cluster.
+  : "${KO_DEFAULTPLATFORMS:=linux/amd64}"; export KO_DEFAULTPLATFORMS
   mkdir -p "$STATE_DIR"
+}
+
+# require_cluster_location: fail with the command that tells you the value.
+require_cluster_location() {
+  [[ -n "${CLUSTER_LOCATION:-}" ]] || die "CLUSTER_LOCATION is empty in workshop.env — set it to your cluster's zone or region (the LOCATION column of: gcloud container clusters list --project $PROJECT_ID)"
 }
 
 # user_has_ate: true if your shell (not just our scripts) finds kubectl-ate, or already has bin/ on PATH.
