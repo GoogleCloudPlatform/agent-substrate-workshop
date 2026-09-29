@@ -2,9 +2,9 @@
 
 **Last validated:** 2026-09-27, `SUBSTRATE_REF=v0.2.0`, GKE `1.37.0-gke.3503000` (Rapid, zonal, 2× `c3-standard-4`),
 source install mode. `make e2e` passed with real Vertex (14.5 min on a fresh cluster, install included) and with
-`MOCK_LLM=true` (7 min, install already done). Optional lab I passed by hand. Not run: published-image mode
-(the v0.2.0 release notes name no image repo), and labs A–H. Lab H's `ENV_REF` patch was checked at the
-compile/unit-test level only. Lab E's agent-swarm commit (`7f22bb5`) pins v0.2.0, which matches the node label
+`MOCK_LLM=true` (7 min, install already done). Optional lab B passed by hand. Not run: published-image mode
+(the v0.2.0 release notes name no image repo), and the other optional labs. Lab A's `ENV_REF` patch was checked at the
+compile/unit-test level only. Lab G's agent-swarm commit (`7f22bb5`) pins v0.2.0, which matches the node label
 `make install` writes, but it hasn't been deployed on a workshop cluster.
 
 ## One week before
@@ -33,10 +33,10 @@ compile/unit-test level only. Lab E's agent-swarm commit (`7f22bb5`) pins v0.2.0
    gained auto suspend/resume or multi-sandbox-per-Pod, update the comparison table in
    [Module 1](../modules/01-architecture/README.md) and the wrap-up table in
    [Module 7](../modules/07-wrap-up/README.md).
-5. **For optional lab H** (`agent-substrate/env`): pick a tag whose `go.mod` substrate version matches
+5. **For optional lab A** (`agent-substrate/env`): pick a tag whose `go.mod` substrate version matches
    `SUBSTRATE_REF`, so the sandboxed-shell lab isn't running against a different substrate build than the core
    workshop.
-   **For optional lab E** (`agent-substrate/agent-swarm`): pick a commit whose `go.mod` substrate version is
+   **For optional lab G** (`moficodes/agent-swarm`, which must be public before the event): pick a commit whose `go.mod` substrate version is
    exactly `SUBSTRATE_REF`. Its `hack/deploy.sh` refuses to deploy onto a cluster running any other version.
 6. **Provision attendee projects and clusters.** Each attendee is Owner on their own GCP project, with a
    bare GKE cluster that has, at creation:
@@ -104,7 +104,7 @@ compile/unit-test level only. Lab E's agent-swarm commit (`7f22bb5`) pins v0.2.0
 | 4 Agent | 13 | No secrets in actors. Egress is deny-by-default. Presence vs cognition. | The `egress-open` comparison |
 | 5 Density & idle | 10 | Substrate doesn't know when you're idle; your front door does. | Step 4 (the 60s 503 demo): describe it instead |
 | 6 Observe | 12 | Platform metrics + product metrics. The 1–3 min lag. | Logs Explorer step |
-| 7 Wrap-up | 3 | Point everyone at lab H. | — |
+| 7 Wrap-up | 3 | Point everyone at lab A. | — |
 
 That's 85 minutes with no slack. If a module runs long, take the "cut if behind" for that module rather than
 compressing the next one — Module 6 in particular needs its 1–3 minute Cloud Monitoring lag no matter how fast

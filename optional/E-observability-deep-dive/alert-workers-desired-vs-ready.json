@@ -1,0 +1,18 @@
+{
+  "displayName": "Workshop: WorkerPool capacity not arriving",
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "desired minus ready workers > 0 for 5m (WorkerPool agents)",
+      "conditionPrometheusQueryLanguage": {
+        "query": "({\"ate.workerpool.desired_workers\", \"ate.workerpool.name\"=\"agents\", \"cluster\"=\"${CLUSTER_NAME}\"} - {\"ate.workerpool.ready_workers\", \"ate.workerpool.name\"=\"agents\", \"cluster\"=\"${CLUSTER_NAME}\"}) > 0",
+        "duration": "300s",
+        "evaluationInterval": "60s"
+      }
+    }
+  ],
+  "documentation": {
+    "content": "The WorkerPool `agents` has fewer ready workers than it asked for. Per substrate's metrics registry: \"the cause is usually an empty node pool, a quota, or a worker pod that cannot start.\" Check `kubectl -n workshop get pods -l workload=workshop-agent` and node capacity.",
+    "mimeType": "text/markdown"
+  }
+}

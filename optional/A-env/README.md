@@ -1,4 +1,6 @@
-# Optional lab H — Agent environments with `agent-substrate/env` (30–45 min)
+# Optional lab A — Agent environments with `agent-substrate/env` (30–45 min)
+
+> **Cluster impact:** Namespace-scoped. Adds the `ate-env` namespace, atespace and WorkerPool next to the workshop; nothing in `workshop` changes. Step 5 (HTTPS egress rules) needs [lab I](../I-credential-injection/README.md)'s egress install, so skip it for now and come back after lab I.
 
 [`agent-substrate/env`](https://github.com/agent-substrate/env) gives an LLM (or you) a **sandboxed shell
 environment** that lives in a Substrate actor. You create it, run commands, read and write files, and let it
@@ -71,9 +73,10 @@ cd "$REPO_ROOT"
 ate-env manifest --api-image "$API_IMAGE" --worker-image "$(cat .workshop/worker-image)" --replicas 2 \
   | kubectl apply -f -
 kubectl -n ate-env rollout status deploy/ate-env-api
+kubectl ate create atespace ate-env   # the template below lives in it, and env only creates it on first use
 ate-env manifest template --guest-image "$GUEST_IMAGE" --snapshots-bucket "gs://$BUCKET_NAME/ate-env/" \
   | kubectl ate create actor-template -f -
-kubectl ate get atespaces        # an "ate-env" atespace now exists — env creates it on first use
+kubectl ate get atespaces        # "ate-env" is listed next to "workshop"
 ```
 
 This creates a Kubernetes namespace `ate-env` with its own WorkerPool (`default-template-workerpool`, 2
@@ -137,24 +140,32 @@ curl -s -X POST localhost:7777/v1alpha/envs/dev1/mcp \
 Point any MCP client at that URL (`http://localhost:7777/v1alpha/envs/<id>/mcp`) and your LLM gets a
 persistent, sandboxed, suspendable shell plus file tools.
 
-## 5. Lock down egress (env sets no policy)
+## 5. Lock down egress (env sets no policy) — after lab I
+
+> **Do this step after [lab I](../I-credential-injection/README.md).** A hostname rule for an **HTTPS** host
+> only works when the egress gateway can read the TLS SNI, which takes lab I's `--experimental-use-sdsmint`
+> install. On the workshop's default install, pypi.org stays unreachable even with this policy in place. Go on
+> to step 6 now, and come back here once lab I is done.
 
 From the workshop you know an actor with no EgressPolicy has no outbound network at all. Give the sandboxes
 just PyPI, the way you'd lock down a real coding-agent sandbox:
 
 ```bash
 source scripts/ate-api.sh
-egressctl -a ate-env apply -f optional/H-env/egress-pypi.yaml --all
+egressctl -a ate-env apply -f optional/A-env/egress-pypi.yaml --all
 ate-env suspend dev1
 ate-env dev1 shell '
-  wget -q -T 5 -O /dev/null https://pypi.org/simple/ && echo "pypi: reachable" || echo "pypi: FAILED (check the policy)"
-  wget -q -T 5 -O /dev/null https://example.com 2>/dev/null && echo "example.com: reachable (should not happen)" || echo "example.com: denied"
+  wget -q --no-check-certificate -T 5 -O /dev/null https://pypi.org/simple/ && echo "pypi: reachable" || echo "pypi: FAILED (check the policy)"
+  wget -q --no-check-certificate -T 5 -O /dev/null https://example.com 2>/dev/null && echo "example.com: reachable (should not happen)" || echo "example.com: denied"
 '
 ```
 
-`wget` stands in for `curl` here for the reason in "Two things to know before you start." If your guest image
-does have TLS trust roots baked in you'll see a clean 200-equivalent success for pypi.org; either way, the
-important signal is the contrast between the two lines.
+`wget` stands in for `curl` here for the reason in "Two things to know before you start." Why
+`--no-check-certificate`? Under sdsmint the gateway terminates TLS and presents a certificate it minted for
+pypi.org, which chains to the gateway's own CA. The env template doesn't mount that CA (lab I's step 5 shows
+how, with a `systemInfo` trust-bundle volume), so a verifying client stops at `certificate verify failed`.
+Either way, what matters is the contrast between the two lines: pypi.org gets through the gateway, and
+example.com is refused.
 
 ## 6. Find it on the dashboard
 
@@ -174,12 +185,12 @@ Paste into the Prometheus UI (or Cloud Console → Monitoring → Metrics Explor
 | Did `ate-env envN shell` trigger a resume or join a warm one? | `sum by ("ate.router.resume") (rate({"atenet.router.route.duration_count", top_level_controller_name="atenet-router"}[5m]))` |
 
 In Cloud Console → Logging → Logs Explorer, the per-actor view from Module 6 works the same way, just with
-the atespace label swapped:
+the atespace swapped (ateapi writes it in `jsonPayload`, not `labels`):
 ```
 resource.type="k8s_container"
 resource.labels.namespace_name="ate-system"
 "Actor state changed"
-labels."ate.atespace"="ate-env"
+jsonPayload."ate.atespace"="ate-env"
 ```
 That's the whole `dev1`/`env1`…`env10` fleet suspending and resuming, next to the fleet you already built.
 The workshop's own Cloud Monitoring dashboard (`observability/dashboard.json`, applied in Module 0) and

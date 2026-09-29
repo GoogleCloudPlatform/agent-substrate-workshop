@@ -97,7 +97,7 @@ func (f *FrontDoor) HandleWork(w http.ResponseWriter, r *http.Request) {
 
 // HandleJob serves POST /actors/{actor}/jobs?steps=N: a background job. The actor answers 202
 // right away, so no request stays in flight. Busy-URL tells it where to report that it's still
-// busy; an actor can't know its own name, so the gateway hands it one (optional lab I).
+// busy; an actor can't know its own name, so the gateway hands it one (optional lab B).
 func (f *FrontDoor) HandleJob(w http.ResponseWriter, r *http.Request) {
 	actor := r.PathValue("actor")
 	if !dnsLabel.MatchString(actor) {

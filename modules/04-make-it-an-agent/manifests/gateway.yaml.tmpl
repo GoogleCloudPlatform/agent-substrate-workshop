@@ -32,7 +32,7 @@ spec:
         - {name: GOOGLE_CLOUD_PROJECT, value: "${PROJECT_ID}"}
         - {name: VERTEX_LOCATION, value: "${VERTEX_LOCATION}"}
         - {name: IDLE_AFTER, value: "${IDLE_AFTER}"}
-        # Where actors reach the gateway: background jobs send heartbeats here (optional lab I).
+        # Where actors reach the gateway: background jobs send heartbeats here (optional lab B).
         - {name: SELF_URL, value: "http://gateway.${NAMESPACE}.svc.cluster.local"}
         readinessProbe:
           httpGet: {path: /readyz, port: http}

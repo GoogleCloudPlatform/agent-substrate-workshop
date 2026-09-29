@@ -43,6 +43,12 @@ forward-router: ## Port-forward the atenet-router to http://localhost:8080
 	@source scripts/lib.sh && load_env && port_forward router ate-system svc/atenet-router 8080 80 && echo "open http://localhost:8080"
 forward-gateway: ## (Re)start the gateway port-forward on http://localhost:8081
 	@source scripts/lib.sh && load_env && stop_port_forward gateway && port_forward gateway $$NAMESPACE svc/gateway 8081 80 && echo "open http://localhost:8081"
+patch-router: ## Re-apply the workshop router settings (60s park budget, 120s grace) after a substrate reinstall
+	@scripts/patch-router.sh
+idle-off: ## Turn the gateway's idle-suspend off (IDLE_AFTER=0s) and restart the gateway port-forward
+	@scripts/idle.sh off
+idle-on: ## Turn idle-suspend back on and restart the gateway port-forward [IDLE_AFTER=3s]
+	@scripts/idle.sh on
 catch-up: ## Bring your environment to the start of a module [MODULE=N RESET=1 (rebuild its template)]
 	@RESET="$(RESET)" scripts/catch-up.sh "$(MODULE)"
 verify: ## Check the end state of a module [MODULE=N]
@@ -60,4 +66,4 @@ teardown: ## Delete workshop resources, keeps the cluster [ALL=1 (also bucket, r
 	@scripts/teardown.sh $(if $(ALL),--all)
 clean: ## Remove local build output (bin/, dist/)
 	@rm -rf bin dist
-.PHONY: help preflight gcp install install-bg install-status dashboards build-agent build-gateway build gateway egress tools load observe prometheus-ui forward-router forward-gateway catch-up verify e2e test test-go test-scripts stop-forwards teardown clean
+.PHONY: help preflight gcp install install-bg install-status dashboards build-agent build-gateway build gateway egress tools load observe prometheus-ui forward-router forward-gateway patch-router idle-off idle-on catch-up verify e2e test test-go test-scripts stop-forwards teardown clean

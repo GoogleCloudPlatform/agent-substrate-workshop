@@ -1,4 +1,6 @@
-# Optional lab D — Observability deep dive (30 min)
+# Optional lab E — Observability deep dive (30 min)
+
+> **Cluster impact:** Shared, with a revert. Creates alert policies in the project, deliberately crashes every actor on two workers (including [lab A](../A-env/README.md)'s, if they share them), and saturates the pool for 7 minutes. Step 1 ends with a revert loop and `make idle-on`; run them before moving on.
 
 Starts from the end of Module 6 (`make catch-up MODULE=7`).
 
@@ -14,39 +16,67 @@ Two of these come straight from the canned queries in `observability/queries.md`
 signals [Module 6](../../modules/06-observe/README.md) already teaches as the gaps to watch: crashes (the actor
 loses everything since its last snapshot until someone runs `kubectl ate revert actor`) and a WorkerPool whose ready workers never catch up with desired.
 
+The policy files use `${CLUSTER_NAME}` and `${ATESPACE}` (from `workshop.env`), so `scripts/render.sh` fills
+them in before `gcloud` reads them. Every query is pinned to your cluster: several clusters can report into
+one project (a shared workshop project, or your own second cluster), and an alert without a `cluster`
+filter would page on theirs too.
+
 ```bash
 source scripts/lib.sh && load_env
 for f in alert-actor-crashes alert-workers-desired-vs-ready alert-resume-latency alert-router-503; do
-  gcloud monitoring policies create --project "$PROJECT_ID" \
-    --policy-from-file="optional/D-observability-deep-dive/$f.json"
+  scripts/render.sh "optional/E-observability-deep-dive/$f.json" > "/tmp/$f.json"
+  gcloud monitoring policies create --project "$PROJECT_ID" --policy-from-file="/tmp/$f.json"
 done
 ```
 
-- **`alert-actor-crashes.json`** fires on any `ate.actor.crashes` increase in the workshop atespace. Trigger
-  it by crashing an actor — the easiest repeatable way without touching an actor's own code is to delete its
-  worker pod out from under it while it's RUNNING (`kubectl -n workshop delete pod -l workload=workshop-agent
-  --wait=false` while a chat is in flight) and watch `kubectl ate get actors -a workshop` for `CRASHED`.
-  The metric tells you *that* something crashed, not *what*. The alert can't name the actor (that would be
-  a series per actor), so go to Logs Explorer:
+- **`alert-actor-crashes.json`** is a **log-based** alert: it matches ateapi's `Actor crashed` record in your
+  atespace and extracts the actor's name into the incident, so the alert tells you *which* actor, not just
+  *that* one crashed. (Why not a metric alert on `ate.actor.crashes`? That counter's series is born at 1
+  the first time a template's actor crashes, and `increase()` needs two samples, so a metric alert, and
+  Module 6's "Crashes" query, miss the first crash of every template. The log record has no such gap, and
+  its actor name is fine in a log where it would be a cardinality problem as a metric label.) Trigger it
+  by crashing an actor. The easiest repeatable way without touching an actor's own code is to delete its
+  worker pod while it's RUNNING:
+  ```bash
+  curl -s localhost:8081/chat/swarm-05 -d '{"message":"Tell me a long story."}' >/dev/null &
+  sleep 1; kubectl -n workshop delete pod -l workload=workshop-agent --wait=false
+  kubectl ate get actors -a workshop | grep CRASHED
+  ```
+  Every actor RUNNING on those workers crashes (and, if you did [lab A](../A-env/README.md), env's actors
+  on them too). The same record is what you'd search by hand in Logs Explorer:
   ```
   resource.type="k8s_container"
   jsonPayload."ate.actor.state"="crashed"
   ```
-  ateapi's `Actor crashed` record names the actor (`ate.actor.name`, `ate.actor.uid`), the operation it
-  was in (`ate.actor.operation.name`). For *why*, read the actor itself:
+  It names the actor (`ate.actor.name`, `ate.actor.uid`) and the operation it was in
+  (`ate.actor.operation.name`). For *why*, read the actor itself:
   `kubectl ate get actor NAME -a workshop -o yaml` shows `status.crash.message` and `crashTime` (for the pod
-  delete above, "worker pod went away while hosting the actor").
+  delete above, "worker pod went away while hosting the actor"). A CRASHED actor stays CRASHED, so **bring
+  each one back** before you move on:
+  ```bash
+  for ns in workshop ate-env; do                  # ate-env only exists if you did lab A
+    for a in $(kubectl ate get actors -a "$ns" 2>/dev/null | awk '/CRASHED/{print $2}'); do
+      kubectl ate revert actor "$a" -a "$ns"      # back to SUSPENDED from its last snapshot
+    done
+  done
+  ```
 - **`alert-workers-desired-vs-ready.json`** fires when the `agents` WorkerPool's ready workers stay below
   what it asked for, for 5 minutes. It's hard to trigger honestly in the workshop's own 2-replica pool
   without breaking your cluster (over-request node capacity, or drop a quota) — read it as the alert you'd
   actually run in production, per the metric registry's own note: *"the cause is usually an empty node pool,
   a quota, or a worker pod that cannot start."*
 - **`alert-resume-latency.json`** and **`alert-router-503.json`** are easier to trigger live. For the second
-  one: set `IDLE_AFTER=0s` (`kubectl -n workshop set env deploy/gateway IDLE_AFTER=0s`) — this *disables* the
-  idle-suspender (`internal/idle/idle.go`: `IdleAfter <= 0` is a no-op), so nothing frees a worker once it's
-  used, and `CONCURRENCY=4 make load` saturates both workers. Parked requests hit the router's 60s budget,
-  error turns climb, and the alert fires in about 5–7 min. Restore `IDLE_AFTER=3s` afterwards
-  (`kubectl -n workshop set env deploy/gateway IDLE_AFTER=3s`).
+  one, turn the idle-suspender off, so nothing frees a worker once it's used (`internal/idle/idle.go`:
+  `IdleAfter <= 0` is a no-op), and saturate both workers for 7 minutes. Parked requests hit the router's
+  60s budget, error turns climb, and the alert's 5-minute condition holds while the load is still running:
+  ```bash
+  make idle-off                            # IDLE_AFTER=0s; restarts the gateway port-forward
+  CONCURRENCY=4 DURATION=420 make load     # ~7 min; the alert fires after ~5–7 min
+  make idle-on                             # IDLE_AFTER=3s again: step 5 needs a free worker
+  ```
+  (The default 180s load ends before a 5-minute condition can complete.) If you've already done
+  [lab F](../F-hpa-workerpool/README.md) (it comes after this one), its HPA grows the pool under this load and the errors may never
+  reach 10%: delete the HPA first (`kubectl -n workshop delete hpa agents`) and re-apply it afterwards.
 
 ## 2. An SLO on chat success
 In Cloud Console → Monitoring → SLOs, create a request-based SLO on the gateway:
@@ -91,7 +121,7 @@ quoted, at least 10 queries).
     "title": "Worker utilization (awake actors / desired workers, pool agents)",
     "xyChart": {
       "dataSets": [{
-        "timeSeriesQuery": {"prometheusQuery": "workshop_actors_awake / on() group_left max({\"ate.workerpool.desired_workers\", \"ate.workerpool.name\"=\"agents\"})"},
+        "timeSeriesQuery": {"prometheusQuery": "max(workshop_actors_awake) / max({\"ate.workerpool.desired_workers\", \"ate.workerpool.name\"=\"agents\"})"},
         "plotType": "LINE", "legendTemplate": "utilization"
       }],
       "yAxis": {"label": "ratio", "scale": "LINEAR"}
@@ -134,7 +164,7 @@ resource.type="k8s_container"
 jsonPayload.trace_id="<the ID the CLI printed>"
 ```
 You get the request across three components: ateapi (`Picked worker`, the lease, `Actor state changed`),
-atelet (`Image cache hit`, `Restore timing breakdown`), and ateom (`Actor restoring`, `Actor restored`).
+atelet (`Image cache hit`, `Restore timing breakdown`), and ateom (`About to run runsc restore`, `Wakeup probe reached 200`).
 Records from untraced requests carry a `trace_id` too, with `trace_flags` `00`: not sampled, so no spans
 exist for it.
 

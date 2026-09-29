@@ -1,0 +1,26 @@
+{
+  "displayName": "Workshop: actors crashing",
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "ateapi logged \"Actor crashed\" in atespace ${ATESPACE}",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"k8s_container\" AND resource.labels.cluster_name=\"${CLUSTER_NAME}\" AND jsonPayload.msg=\"Actor crashed\" AND jsonPayload.\"ate.atespace\"=\"${ATESPACE}\"",
+        "labelExtractors": {
+          "actor": "EXTRACT(jsonPayload.\"ate.actor.name\")",
+          "operation": "EXTRACT(jsonPayload.\"ate.actor.operation.name\")"
+        }
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "300s"
+    },
+    "autoClose": "1800s"
+  },
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "An actor moved to CRASHED: its live execution is lost. This is a log-based alert on ateapi's `Actor crashed` record, so the incident names the actor (`actor` label) and the operation it was in. It fires on every crash, including the first one for a template: a metric alert on `increase({\"ate.actor.crashes\"}[…])` misses that one, because the counter series is born at 1 and `increase()` needs two samples. Read why with `kubectl ate get actor <name> -a ${ATESPACE} -o yaml` (`status.crash.message`), then `kubectl ate revert actor <name> -a ${ATESPACE}` to send it back to SUSPENDED from its last snapshot."
+  }
+}

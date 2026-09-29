@@ -1,4 +1,6 @@
-# Optional lab A — Tags, clone, revert (20 min)
+# Optional lab C — Tags, clone, revert (20 min)
+
+> **Cluster impact:** Namespace-scoped. Works on `buddy` and a clone. It switches the gateway's idle-suspend off (`make idle-off`) and back on (`make idle-on`) at the end.
 
 Starts from the end of Module 4 or later (`make catch-up MODULE=5` gets you a `buddy` actor on `agent-v3`
 if you skipped ahead).
@@ -14,8 +16,14 @@ back to its own last snapshot (**revert**).
 > all**: it sends a crashed, running, or paused actor back to **its own last external snapshot**, discarding
 > only the execution since then. See "What to notice" below for why that's actually the more useful demo.
 
+**First, turn off idle-suspend for this lab.** Module 5's gateway suspends any actor that's been idle
+for 3s, and a suspend *is* a new snapshot: it would overwrite buddy's "pineapple" snapshot with whatever
+buddy said last, and leave it SUSPENDED, a state `revert` refuses. `make idle-off` sets `IDLE_AFTER=0s` and
+restarts the gateway port-forward on localhost:8081 (the gateway pod rolls); `make idle-on` at the end puts
+it back.
+
 ```bash
-make forward-gateway      # never hand-roll `kubectl port-forward &`; this wraps scripts/lib.sh's port_forward
+make idle-off             # also (re)starts the gateway port-forward; never hand-roll `kubectl port-forward &`
 curl -s localhost:8081/chat/buddy -d '{"message":"The secret word is pineapple."}' | jq .reply
 
 # Suspend before tagging. An actor keeps exactly one external snapshot, replaced by its next suspend;
@@ -30,7 +38,7 @@ kubectl ate create actor buddy-2 --template=agent-v3 --tag knows-pineapple -a wo
 make egress POLICY=modules/04-make-it-an-agent/manifests/egress-gateway.yaml ACTOR=buddy-2
 curl -s localhost:8081/chat/buddy-2 -d '{"message":"What is the secret word?"}' | jq .reply   # pineapple
 
-# Same past, same bootID: buddy-2 hasn't suspended on its own yet, so it's running the exact FULL
+# Same past, same bootID: buddy-2 hasn't suspended yet (idle-suspend is off), so it's running the exact FULL
 # snapshot buddy had when you tagged it (module 3's "restore process, same bootID" callout, module 5's
 # "clones share a past" callout — this is the same mechanism, just via a tag instead of a golden snapshot).
 curl -s localhost:8081/actors/buddy/state   | jq -r .bootID
@@ -42,7 +50,12 @@ curl -s localhost:8081/chat/buddy -d '{"message":"Forget that. The secret word i
 kubectl ate revert actor buddy -a workshop
 curl -s localhost:8081/chat/buddy -d '{"message":"What is the secret word?"}' | jq .reply     # pineapple again
 curl -s localhost:8081/actors/buddy/state | jq '{turns, bootID}'                              # turns rolled back; bootID matches buddy-2's
+
+make idle-on              # restore Module 5's IDLE_AFTER=3s
 ```
+With idle-suspend on, the diverge-then-revert above only works if both commands run within 3s: the
+suspender would snapshot "mango" first. That's the lesson of this lab from the other side: anything that
+suspends replaces the actor's one external snapshot, and only a tag keeps an older one.
 
 ## What to notice
 - **Tag scope vs. snapshot content scope are different knobs.** `--scope atespace|published` on a tag
@@ -61,7 +74,7 @@ curl -s localhost:8081/actors/buddy/state | jq '{turns, bootID}'                
 - Revert rolls back **everything in the snapshot's scope**, including `/data` for a `DATA`-scope template.
 - Use cases: checkpoints before risky tool calls, forking a conversation (clone), an "undo" for the last
   turn or tool call (revert), and warm-starting many actors from one prepared state (clone, at scale — see
-  optional lab E).
+  optional lab G).
 
 ## Clean up
 ```bash

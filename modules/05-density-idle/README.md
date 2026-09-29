@@ -89,7 +89,7 @@ the one thing Substrate deliberately doesn't do for you: **decide when an actor 
   host several actors at once, so a bigger worker limit (or smaller actors) packs more awake actors per worker.
 - **Parking** smooths bursts: a request waits, up to the router's budget, for the actor to get a worker.
 - **Idle detection is your job**, because only your app knows what "idle" means. A front door that sees all traffic
-  is a natural place for it. Real systems also scale the WorkerPool itself (optional lab G).
+  is a natural place for it. Real systems also scale the WorkerPool itself (optional lab F).
 - **Suspend early.** Measured on this cluster: a snapshot is about 1 MB (P95 about 4 MB). Suspend takes about 0.4s
   and restore about 0.25s. The five GCS writes per snapshot cost about $0.000025, while a c3-standard-4 worker
   costs about $0.00006 a second. So an actor idle for more than a second or two is cheaper asleep. That's why

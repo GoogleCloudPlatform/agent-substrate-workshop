@@ -23,26 +23,31 @@ just useful (Module 1 has the full table).
 - **No authz inside an atespace yet.** Anyone who can call ateapi for an atespace can act on all of its actors.
 - **CRASHED** actors need a human (or your code): resume refuses them, so `kubectl ate revert actor X -a Y`
   (back to `SUSPENDED` with its last snapshot), then resume, or `kubectl ate delete actor X -a Y`.
-- **Idle is your job** (Module 5), and so is WorkerPool sizing (optional lab G).
+- **Idle is your job** (Module 5), and so is WorkerPool sizing (optional lab F).
 - IPv4 only, no GPUs, and gVisor supports one `durableDir` per actor.
 - **No actor-emitted metrics yet.** Actors share hostname and IP inside the sandbox, so `/metrics` has
   to live on the always-on tier (Module 6). Per-actor detail lives in logs instead.
-- Template env is literal and snapshotted. Keep secrets in a gateway or use egress credential injection (optional lab C).
+- Template env is literal and snapshotted. Keep secrets in a gateway or use egress credential injection (optional lab I).
 - Substrate moves fast. Pin `SUBSTRATE_REF` and rebuild worker images with the control plane.
 
 ## Keep going: optional labs
 
-| Lab | What you'll do |
-|---|---|
-| **[H — Agent environments with `agent-substrate/env`](../../optional/H-env/README.md)** | Install `ate-env` on your cluster and drive sandboxed shells through a CLI and MCP. It's your gateway, productized. |
-| [D — Observability deep dive](../../optional/D-observability-deep-dive/README.md) | Alerts, SLOs, tracing, a per-actor drill-down dashboard |
-| [A — Tags, clone, revert](../../optional/A-tags-clone-revert/README.md) | Snapshot an actor, clone it, roll it back |
-| [E — agent-swarm at 50:20](../../optional/E-agent-swarm/README.md) | Deploy the reference multi-agent demo |
-| [B — microVM sandbox class](../../optional/B-microvm/README.md) | Stronger isolation than gVisor |
-| [C — Egress credential injection](../../optional/C-credential-injection/README.md) | `ate-secret://`: let egress add credentials so actors never hold them |
-| [F — Your own gRPC client](../../optional/F-grpc-client/README.md) | Drive ateapi directly from Go |
-| [G — Autoscale the WorkerPool](../../optional/G-hpa-workerpool/README.md) | HPA on worker demand |
-| [I — What counts as idle?](../../optional/I-what-counts-as-idle/README.md) | Background work vs idle-suspend: a heartbeat that keeps a busy actor awake |
+The labs are ordered by how much they change your cluster, so do them in order and nothing a later lab
+does can break an earlier one. **A–D** stay inside your own namespace and actors. **E–G** touch shared,
+cluster-wide pieces; finish each one's clean-up before moving on. **H–I** change the cluster itself, so do them
+last. Each lab's README opens with the same impact note.
+
+| Lab | What you'll do | Cluster impact |
+|---|---|---|
+| **[A — Agent environments with `agent-substrate/env`](../../optional/A-env/README.md)** (start here) | Install `ate-env` on your cluster and drive sandboxed shells through a CLI and MCP. It's your gateway, productized. | Adds the `ate-env` namespace, atespace and WorkerPool. Step 5 needs lab I |
+| [B — What counts as idle?](../../optional/B-what-counts-as-idle/README.md) | Background work vs idle-suspend: a heartbeat that keeps a busy actor awake | Your agent and one new template |
+| [C — Tags, clone, revert](../../optional/C-tags-clone-revert/README.md) | Snapshot an actor, clone it, roll it back | Your actors; switches idle-suspend off and back on |
+| [D — Your own gRPC client](../../optional/D-grpc-client/README.md) | Drive ateapi directly from Go | Your actors |
+| [E — Observability deep dive](../../optional/E-observability-deep-dive/README.md) | Alerts, SLOs, tracing, a per-actor drill-down dashboard | Project alert policies; deliberately crashes the actors on two workers and saturates the pool |
+| [F — Autoscale the WorkerPool](../../optional/F-hpa-workerpool/README.md) | HPA on worker demand | Claims the cluster's external-metrics API. Clean up before G |
+| [G — agent-swarm at 50:20](../../optional/G-agent-swarm/README.md) | Deploy the reference multi-agent demo | Claims the external-metrics API, patches router flags (not restored), needs ~11.5 GiB. Clean up after |
+| [H — microVM sandbox class](../../optional/H-microvm/README.md) | Stronger isolation than gVisor | Adds a tainted nested-virt node pool and a cluster-wide SandboxConfig; extra cost |
+| [I — Egress credential injection](../../optional/I-credential-injection/README.md) | `ate-secret://`: let egress add credentials so actors never hold them | **Reinstalls substrate** with the experimental egress dataplane. Do it last, or on a fresh cluster |
 
 ## Clean up
 ```bash

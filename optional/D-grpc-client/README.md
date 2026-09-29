@@ -1,4 +1,6 @@
-# Optional lab F — Your own gRPC client (outline)
+# Optional lab D — Your own gRPC client (outline)
+
+> **Cluster impact:** Namespace-scoped. A client program that lists, creates, suspends and resumes your own actors.
 
 **Goal:** write a Go program that drives ateapi directly: list, create, suspend, and resume actors, without
 going through `kubectl ate` or the gateway.

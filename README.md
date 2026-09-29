@@ -24,10 +24,13 @@ Everything you deploy, you build: the agent, the gateway, and (in source mode) S
 | 6 | [Observe the fleet](modules/06-observe/README.md) | 12 | Substrate OTel + app metrics, PromQL, dashboards, per-actor logs |
 | 7 | [Wrap-up](modules/07-wrap-up/README.md) | 3 | Real-world patterns, limits, optional labs |
 
-Optional labs afterwards: [H — agent-substrate/env](optional/H-env/README.md) (start here),
-[D](optional/D-observability-deep-dive/README.md), [A](optional/A-tags-clone-revert/README.md),
-[E](optional/E-agent-swarm/README.md), [B](optional/B-microvm/README.md), [C](optional/C-credential-injection/README.md),
-[F](optional/F-grpc-client/README.md), [G](optional/G-hpa-workerpool/README.md), [I](optional/I-what-counts-as-idle/README.md).
+Optional labs afterwards, in order: each one changes the cluster more than the one before, so a later lab
+can't break an earlier one (see [Module 7](modules/07-wrap-up/README.md#keep-going-optional-labs)).
+[A — agent-substrate/env](optional/A-env/README.md) (start here), [B](optional/B-what-counts-as-idle/README.md),
+[C](optional/C-tags-clone-revert/README.md), [D](optional/D-grpc-client/README.md) stay in your namespace;
+[E](optional/E-observability-deep-dive/README.md), [F](optional/F-hpa-workerpool/README.md),
+[G](optional/G-agent-swarm/README.md) touch shared cluster pieces and have a clean-up;
+[H](optional/H-microvm/README.md) and [I](optional/I-credential-injection/README.md) change the cluster itself and go last.
 
 ## Prerequisites
 - A GCP project where you are **Owner**, with a GKE **1.37+** cluster that serves the `v1beta1`

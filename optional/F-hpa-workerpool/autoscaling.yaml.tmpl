@@ -1,0 +1,373 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Autoscales the agents pool on worker demand: workers hosting actors plus the
+# workers parked turns would fill.
+# Ported from agent-swarm's manifests/autoscaling.yaml.tmpl (optional lab G), which adapts Substrate's
+# demos/autoscaled-workerpool: conf-workers -> agents, 4 seats per worker -> 1, 2..5 workers -> 2..4.
+#
+# Flow: atenet-router and ate-api-server :9090/metrics --5s scrape-->
+#       workshop-prometheus --query--> workshop-prometheus-adapter
+#       --external.metrics.k8s.io--> HPA --/scale--> WorkerPool agents.
+# The APIService lives in autoscaling-apiservice.yaml.tmpl next to this file.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workshop-prometheus
+  namespace: ${NAMESPACE}
+---
+# Pod discovery for the scrape targets in ate-system.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workshop-prometheus
+  namespace: ate-system
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workshop-prometheus
+  namespace: ate-system
+subjects:
+- kind: ServiceAccount
+  name: workshop-prometheus
+  namespace: ${NAMESPACE}
+roleRef:
+  kind: Role
+  name: workshop-prometheus
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workshop-prometheus-config
+  namespace: ${NAMESPACE}
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+      scrape_timeout: 4s
+    scrape_configs:
+    - job_name: ate-system
+      kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: [ate-system]
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        regex: atenet-router|ate-api-server
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_phase]
+        regex: Running
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_ip]
+        regex: (.+)
+        target_label: __address__
+        replacement: $1:9090
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        target_label: app
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workshop-prometheus
+  namespace: ${NAMESPACE}
+  labels:
+    app: workshop-prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: workshop-prometheus
+  template:
+    metadata:
+      labels:
+        app: workshop-prometheus
+    spec:
+      serviceAccountName: workshop-prometheus
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v3.5.0
+        args:
+        - --config.file=/etc/prometheus/prometheus.yml
+        - --storage.tsdb.path=/prometheus
+        - --storage.tsdb.retention.time=2h
+        ports:
+        - name: http
+          containerPort: 9090
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: http
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 512Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: config
+          mountPath: /etc/prometheus
+          readOnly: true
+        - name: data
+          mountPath: /prometheus
+      volumes:
+      - name: config
+        configMap:
+          name: workshop-prometheus-config
+      - name: data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: workshop-prometheus
+  namespace: ${NAMESPACE}
+spec:
+  type: ClusterIP
+  selector:
+    app: workshop-prometheus
+  ports:
+  - name: http
+    port: 9090
+    targetPort: http
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workshop-prometheus-adapter
+  namespace: ${NAMESPACE}
+---
+# workshop_worker_demand = agents workers hosting at least one actor (partial or
+# at_capacity) + ceil(parked requests / seats per worker (1 in the workshop pool)), in workers.
+# Substrate exports no per-worker actor count, so a partly filled worker
+# counts as a whole one. max() because every ate-api-server replica reports
+# the same pool-wide count; sum() because each router replica counts only
+# its own parked requests. Each term falls back to 0 when its series is
+# missing. The series query keys on
+# ate_workerpool_workers, which exists whenever the pool does, so the metric
+# stays listed while the router reports nothing. The router is shared with
+# other pools (lab A's ate-env, lab G's conf-workers): parked requests for them count here too.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workshop-prometheus-adapter-config
+  namespace: ${NAMESPACE}
+data:
+  config.yaml: |
+    externalRules:
+    - seriesQuery: '{__name__="ate_workerpool_workers",ate_workerpool_namespace="${NAMESPACE}",ate_workerpool_name="agents"}'
+      resources:
+        namespaced: false
+      name:
+        matches: "^ate_workerpool_workers$"
+        as: "workshop_worker_demand"
+      metricsQuery: '(max(ate_workerpool_workers{ate_workerpool_namespace="${NAMESPACE}",ate_workerpool_name="agents",ate_worker_state="partial"}) or vector(0)) + (max(ate_workerpool_workers{ate_workerpool_namespace="${NAMESPACE}",ate_workerpool_name="agents",ate_worker_state="at_capacity"}) or vector(0)) + ceil((sum(atenet_router_parking_active) or vector(0)) / 1)'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workshop-prometheus-adapter
+  namespace: ${NAMESPACE}
+  labels:
+    app: workshop-prometheus-adapter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: workshop-prometheus-adapter
+  template:
+    metadata:
+      labels:
+        app: workshop-prometheus-adapter
+    spec:
+      serviceAccountName: workshop-prometheus-adapter
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: prometheus-adapter
+        image: registry.k8s.io/prometheus-adapter/prometheus-adapter:v0.12.0
+        args:
+        - --secure-port=6443
+        - --cert-dir=/tmp/cert
+        - --prometheus-url=http://workshop-prometheus.${NAMESPACE}.svc:9090/
+        - --metrics-relist-interval=30s
+        - --config=/etc/adapter/config.yaml
+        ports:
+        - name: https
+          containerPort: 6443
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: https
+            scheme: HTTPS
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 5
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: https
+            scheme: HTTPS
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: config
+          mountPath: /etc/adapter/
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: config
+        configMap:
+          name: workshop-prometheus-adapter-config
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: workshop-prometheus-adapter
+  namespace: ${NAMESPACE}
+spec:
+  type: ClusterIP
+  selector:
+    app: workshop-prometheus-adapter
+  ports:
+  - name: https
+    port: 443
+    targetPort: https
+---
+# Let the adapter authenticate and authorize aggregated-API requests.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: workshop-prometheus-adapter-auth-delegator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+- kind: ServiceAccount
+  name: workshop-prometheus-adapter
+  namespace: ${NAMESPACE}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workshop-prometheus-adapter-auth-reader
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+- kind: ServiceAccount
+  name: workshop-prometheus-adapter
+  namespace: ${NAMESPACE}
+---
+# The adapter resolves namespaces and pods at startup even for external
+# metrics.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: workshop-prometheus-adapter-resource-reader
+rules:
+- apiGroups: [""]
+  resources: ["namespaces", "pods", "services", "configmaps"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: workshop-prometheus-adapter-resource-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: workshop-prometheus-adapter-resource-reader
+subjects:
+- kind: ServiceAccount
+  name: workshop-prometheus-adapter
+  namespace: ${NAMESPACE}
+---
+# GKE's HPA controller can already read external metrics and scale any
+# /scale subresource, so no extra binding is needed for it.
+# replicas = ceil(workshop_worker_demand / 1): one replica per busy worker or
+# seats per worker (1 in the workshop pool) waiting turns, between 2 and 4 workers.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: agents
+  namespace: ${NAMESPACE}
+spec:
+  scaleTargetRef:
+    apiVersion: ate.dev/v1alpha1
+    kind: WorkerPool
+    name: agents
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+  - type: External
+    external:
+      metric:
+        name: workshop_worker_demand
+      target:
+        type: AverageValue
+        averageValue: "1"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      selectPolicy: Max
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 4
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 120

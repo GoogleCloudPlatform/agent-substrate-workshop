@@ -35,7 +35,7 @@ func main() {
 		DataDir: "",
 		// WORKSHOP(module-4): set ModelURL to os.Getenv("MODEL_URL") so the agent asks the gateway's model.
 		ModelURL: "",
-		// WORKSHOP(lab-i): set Heartbeat to true so background jobs tell the gateway they're busy.
+		// WORKSHOP(lab-b): set Heartbeat to true so background jobs tell the gateway they're busy.
 		Heartbeat: false,
 	}
 

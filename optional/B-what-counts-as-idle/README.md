@@ -1,4 +1,6 @@
-# Optional lab I — What counts as idle? (20 min)
+# Optional lab B — What counts as idle? (20 min)
+
+> **Cluster impact:** Namespace-scoped. Changes your agent and adds template `agent-v4`; the gateway and other actors are untouched.
 
 **Goal:** see what idle-suspend does to work that runs with no request in flight, and fix it by having the
 actor tell the gateway it's busy.
@@ -40,12 +42,12 @@ reaches the actor. So the gateway sends a callback URL with each job, in a `Busy
 `http://gateway.workshop.svc.cluster.local/actors/swarm-13/busy`. A POST there restarts that actor's idle clock.
 The job in step 1 got one too; agent-v3 just ignores it.
 
-In `app/cmd/agent/main.go`, find `WORKSHOP(lab-i)` and set `Heartbeat: true`. The job then POSTs its
+In `app/cmd/agent/main.go`, find `WORKSHOP(lab-b)` and set `Heartbeat: true`. The job then POSTs its
 `Busy-URL` every second until it finishes (`app/internal/agent/work.go`). Build it into a new template. A
 golden snapshot can't change, so this is agent-v4:
 ```bash
 make build-agent
-scripts/render.sh optional/I-what-counts-as-idle/template.yaml.tmpl | kubectl ate create actor-template -f -
+scripts/render.sh optional/B-what-counts-as-idle/template.yaml.tmpl | kubectl ate create actor-template -f -
 kubectl ate get actor-template agent-v4 -a workshop     # repeat until GOLDEN TAG is set (~25s)
 kubectl ate create actor cruncher --template=agent-v4 -a workshop
 scripts/egress.sh apply modules/04-make-it-an-agent/manifests/egress-gateway.yaml --actor=cruncher

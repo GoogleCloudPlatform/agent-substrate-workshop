@@ -155,9 +155,9 @@ func TestWorkshopPolicyFilesParse(t *testing.T) {
 	}
 }
 
-// The policy file optional lab H applies to the ate-env atespace must parse too.
+// The policy file optional lab A applies to the ate-env atespace must parse too.
 func TestOptionalLabHPolicyFileParses(t *testing.T) {
-	const f = "../../../optional/H-env/egress-pypi.yaml"
+	const f = "../../../optional/A-env/egress-pypi.yaml"
 	b, err := os.ReadFile(f)
 	if err != nil {
 		t.Fatal(err)

@@ -1,6 +1,8 @@
-# Optional lab E — agent-swarm at 50:20 (30 min)
+# Optional lab G — agent-swarm at 50:20 (30 min)
 
-[agent-swarm](https://github.com/agent-substrate/agent-swarm) is the reference conference demo: 50 attendee
+> **Cluster impact:** Cluster-wide, with a clean-up. Claims the `external.metrics.k8s.io` APIService (run [lab F](../F-hpa-workerpool/README.md)'s clean-up first), patches `atenet-router` flags that aren't restored, and needs ~11.5 GiB of node memory at full scale. Run its clean-up before lab H.
+
+[agent-swarm](https://github.com/moficodes/agent-swarm) is the reference conference demo: 50 attendee
 actors (`attendee-01`…`attendee-50`) on an autoscaled WorkerPool (`conf-workers`, 2 to 5 pods), with a
 presenter "stage" UI. Its gateway uses a **relay** instead of egress: the actor has no egress at all, and
 instead of calling out itself it returns a `model_call` step; the gateway calls Vertex and posts the result
@@ -36,7 +38,7 @@ on worker demand: workers that are `partial` or `at_capacity`, plus one worker f
 agent-swarm refuses to deploy unless your cluster runs the substrate version pinned in its `go.mod`. Its
 `main` moves, so re-check the pin against `SUBSTRATE_REF` before each event:
 ```bash
-git clone https://github.com/agent-substrate/agent-swarm .workshop/agent-swarm
+git clone https://github.com/moficodes/agent-swarm .workshop/agent-swarm
 git -C .workshop/agent-swarm checkout 7f22bb5
 grep 'agent-substrate/substrate ' .workshop/agent-swarm/go.mod     # expect v0.2.0, the SUBSTRATE_REF in workshop.env
 ```
@@ -52,7 +54,8 @@ You'll also need `docker` with the `buildx` plugin, on top of the workshop's usu
 
 Two things to know about sharing the cluster with the workshop:
 - agent-swarm installs prometheus-adapter as the cluster's `v1beta1.external.metrics.k8s.io` APIService, and
-  refuses to run if another adapter (for example the Stackdriver adapter) already serves it.
+  refuses to run if another adapter (the Stackdriver adapter, KEDA, or [lab F](../F-hpa-workerpool/README.md)'s
+  prometheus-adapter) already serves it. If you did lab F, run its clean-up first.
 - Its workers land on the same two nodes as the workshop's `agents` pool. At the default 4 seats, each
   `conf-workers` pod requests 500m CPU and 2304Mi memory (512Mi per seat plus 256Mi), so 5 of them take
   about 11.5 GiB. If pods stay `Pending`, run `make teardown` first or lower `DEMO_CONF_MAX_WORKERS`.
@@ -89,17 +92,20 @@ Pick one of the two `hack/deploy.sh up` lines, not both.
   It grows within about 20s of a burst and shrinks 5 minutes after the burst ends.
 - The stage view's live worker and actor states. Match them against your workshop dashboard queries, just
   pointed at this atespace instead — `observability/dashboard.json` and `observability/queries.md` are fixed
-  to `workshop`/`agents`, so use ad hoc PromQL the way [optional lab H](../H-env/README.md) does for
+  to `workshop`/`agents`, so use ad hoc PromQL the way [optional lab A](../A-env/README.md) does for
   `ate-env`:
 
   | Question | PromQL |
   |---|---|
   | Worker state on `conf-workers` | `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="conf-workers"})` |
   | 50 attendees on 2–5 workers: desired vs ready | `{"ate.workerpool.desired_workers", "ate.workerpool.name"="conf-workers"}` vs `{"ate.workerpool.ready_workers", "ate.workerpool.name"="conf-workers"}` |
-  | Resume latency for `attendee-NN` | `histogram_quantile(0.95, sum by (le, "ate.actor.operation.name") (rate({"ate.actor.lifecycle.operation.duration_bucket"}[5m])))` |
+  | Resume latency for `attendee-NN` | `histogram_quantile(0.95, sum by (le, "ate.actor.operation.name") (rate({"ate.actor.lifecycle.operation.duration_bucket", "ate.template.name"="conf-agent"}[5m])))` |
 
-  In Logs Explorer, swap the atespace label the way lab H does:
-  `resource.type="k8s_container"`, `"Actor state changed"`, `labels."ate.atespace"="ate-demo-conf"`.
+  Managed Prometheus is per project, not per cluster. If another cluster in your project also runs
+  substrate, add `"cluster"="<your CLUSTER_NAME>"` inside each selector, or the numbers mix both clusters.
+
+  In Logs Explorer, swap the atespace label the way lab A does:
+  `resource.type="k8s_container"`, `"Actor state changed"`, `jsonPayload."ate.atespace"="ate-demo-conf"` (ateapi writes the atespace in `jsonPayload`, not `labels`).
 - `substrate-gaps.md`: the maintainers' list of what Substrate doesn't do yet — worth comparing against
   [Module 7](../../modules/07-wrap-up/README.md#limits-to-know-before-you-build)'s own limits list.
 

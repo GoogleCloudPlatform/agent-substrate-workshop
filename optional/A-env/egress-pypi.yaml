@@ -15,7 +15,7 @@
 # EgressPolicy for ate-env sandboxes: allow the Python package index, nothing else.
 # env ships no EgressPolicy of its own, and an actor with none gets no tunnel at all —
 # so without this, `pip install` (and everything else) fails closed.
-# Applied with: egressctl -a ate-env apply -f optional/H-env/egress-pypi.yaml --all
+# Applied with: egressctl -a ate-env apply -f optional/A-env/egress-pypi.yaml --all
 rules:
 - hostnames:
     patterns: ["pypi.org", "files.pythonhosted.org"]
