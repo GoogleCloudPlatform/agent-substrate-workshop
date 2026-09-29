@@ -81,7 +81,7 @@ stage_template() {
 }
 # Tightened past a bare `install-substrate.sh` substring match so this doesn't also match,
 # say, an editor buffer or a grep for the same string in someone's shell history.
-_no_bg_install() { ! pgrep -f 'bash .*scripts/install-substrate.sh' >/dev/null; }
+_no_bg_install() { ! install_running && ! pgrep -f 'bash .*scripts/install-substrate.sh' >/dev/null; }
 _two_workers() {
   [[ "$(kubectl -n "$NAMESPACE" get pods -l workload=workshop-agent --field-selector=status.phase=Running -o name | wc -l)" -ge 2 ]]
 }

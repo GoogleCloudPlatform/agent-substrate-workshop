@@ -70,11 +70,16 @@ go build -o "$REPO_ROOT/bin/ate-env" ./cmd/ate-env
 cd "$REPO_ROOT"
 
 # --replicas 2 matches this workshop's WorkerPool size (module 2); env's own default is 5.
+# env's WorkerPool carries no labels and its template no workerSelector, so env's actors would run on any
+# worker, the workshop's `agents` included. The awk adds a `workload: ate-env` label to env's WorkerPool;
+# the printf adds the template's workerSelector for it. Same pairing as your Module 2 manifests.
 ate-env manifest --api-image "$API_IMAGE" --worker-image "$(cat .workshop/worker-image)" --replicas 2 \
+  | awk '/^kind: WorkerPool$/ {wp=1} wp && /^metadata:$/ {print; print "  labels:"; print "    workload: ate-env"; wp=0; next} {print}' \
   | kubectl apply -f -
 kubectl -n ate-env rollout status deploy/ate-env-api
 kubectl ate create atespace ate-env   # the template below lives in it, and env only creates it on first use
-ate-env manifest template --guest-image "$GUEST_IMAGE" --snapshots-bucket "gs://$BUCKET_NAME/ate-env/" \
+{ ate-env manifest template --guest-image "$GUEST_IMAGE" --snapshots-bucket "gs://$BUCKET_NAME/ate-env/"
+  printf 'workerSelector:\n  matchLabels:\n    workload: ate-env\n'; } \
   | kubectl ate create actor-template -f -
 kubectl ate get atespaces        # "ate-env" is listed next to "workshop"
 ```
@@ -206,7 +211,8 @@ atespace, the same way you used the Prometheus UI in Module 6.
   the separate `manifest template` subcommand that produces the ActorTemplate. Compare it with your own
   Module 2 manifests — notably, it sets no `workerSelector` on the template and no labels on the WorkerPool,
   relying on the default (unrestricted) match instead of the explicit `workload: workshop-agent` label pair
-  you wrote by hand.
+  you wrote by hand. That's why step 1 adds a `workload: ate-env` pair: without it, env's actors run on the
+  workshop's `agents` workers, env's own pool sits idle, and step 6's pool queries show nothing.
 - `internal/ate/client.go`: a second production ateapi client — TLS, a re-read-on-every-call bearer token
   file, and the same `ate-target-actor` router header your gateway sets. Compare its `fileTokenCreds` with
   `app/internal/ateclient`'s `fileToken`: same idea, independently written.

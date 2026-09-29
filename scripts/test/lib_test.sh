@@ -293,6 +293,20 @@ t_env_sh_missing_file_returns() {
   done
 }
 
+# make install-status: running / finished / died / never started, from the pid file and the marker.
+install_status() { WORKSHOP_STATE_DIR="$1" bash "$HERE/../install-bg.sh" --status 2>&1; }
+t_install_status_states() {
+  local d="$TMP/inst"; rm -rf "$d"; mkdir -p "$d"
+  [[ "$(install_status "$d")" == *"no background install has been started"* ]] || return 1
+  bash -c 'exec -a install-substrate.sh sleep 30' & local live=$!
+  echo "$live" >"$d/install.pid"
+  [[ "$(install_status "$d")" == *"install running (pid $live)"* ]] || { kill "$live"; return 1; }
+  kill "$live"; wait "$live" 2>/dev/null
+  [[ "$(install_status "$d")" == *"not running and did not finish"* ]] || return 1
+  sleep 1; echo "2026-01-01T00:00:00Z SUBSTRATE_REF=v0" >"$d/install-complete"
+  [[ "$(install_status "$d")" == *"install finished: 2026-01-01T00:00:00Z"* ]]
+}
+
 load_env
 check "load_env expands references" t_load_env_expands
 check "load_env requires PROJECT_ID" t_load_env_requires_project
@@ -319,6 +333,7 @@ check "catch-up RESET=1 refuses MODULE<3" t_catch_up_reset_needs_module_3
 check "reset_template deletes its actors, then the template (idempotent)" t_reset_template_deletes_its_actors_then_template
 check "make help lists every target" t_make_help_lists_every_target
 check "make teardown ALL=1 passes --all" t_make_teardown_all_passes_flag
+check "install-status tells running, finished, died, and never started apart" t_install_status_states
 check "lib.sh refuses an interactive shell instead of taking it over" t_lib_refuses_interactive_shell
 check "env.sh loads workshop.env in bash/zsh without strict mode" t_env_sh_loads_without_strict_mode
 check "env.sh returns (not exits) when workshop.env is missing" t_env_sh_missing_file_returns

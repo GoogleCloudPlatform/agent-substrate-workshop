@@ -19,7 +19,7 @@ Managed Prometheus is per project, so a query without a `cluster` matcher mixes 
 into the project (an instructor's second cluster, a shared workshop project). dashboards.sh runs each
 dashboard through this before upload, so the repo's JSON stays cluster-agnostic.
 
-  promql_scope.py dashboard CLUSTER < dashboard.json > scoped.json   # every "prometheusQuery"
+  promql_scope.py dashboard CLUSTER < dashboard.json > scoped.json   # every "prometheusQuery" and logsPanel filter
   promql_scope.py query CLUSTER 'sum(rate(workshop_chat_turns_total[2m]))'
 
 Handles the PromQL the workshop and substrate dashboards use: UTF-8 quoted selectors ({"a.b", "l"="v"}),
@@ -131,10 +131,24 @@ def scope(q, cluster):
     return "".join(out)
 
 
+def scope_log_filter(f, cluster):
+    """A Logs Explorer filter narrowed to one cluster (lines are ANDed)."""
+    if "resource.labels.cluster_name" in f:
+        return f
+    return f + f'\nresource.labels.cluster_name="{cluster}"'
+
+
 def scope_dashboard(obj, cluster):
     if isinstance(obj, dict):
-        return {k: (scope(v, cluster) if k == "prometheusQuery" and isinstance(v, str)
-                    else scope_dashboard(v, cluster)) for k, v in obj.items()}
+        out = {}
+        for k, v in obj.items():
+            if k == "prometheusQuery" and isinstance(v, str):
+                out[k] = scope(v, cluster)
+            elif k == "logsPanel" and isinstance(v, dict) and isinstance(v.get("filter"), str):
+                out[k] = {**v, "filter": scope_log_filter(v["filter"], cluster)}
+            else:
+                out[k] = scope_dashboard(v, cluster)
+        return out
     if isinstance(obj, list):
         return [scope_dashboard(v, cluster) for v in obj]
     return obj

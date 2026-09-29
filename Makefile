@@ -17,9 +17,9 @@ gcp: ## Create bucket, Artifact Registry repo, IAM bindings
 install: ## Install Agent Substrate (foreground)
 	@scripts/install-substrate.sh
 install-bg: ## Install Agent Substrate in the background (log: .workshop/install.log)
-	@mkdir -p .workshop && nohup scripts/install-substrate.sh >.workshop/install.log 2>&1 & echo "installing… tail -f .workshop/install.log"
-install-status: ## Show background install progress
-	@tail -n 20 .workshop/install.log && source scripts/lib.sh && { user_has_ate || path_hint; }
+	@scripts/install-bg.sh
+install-status: ## Show background install progress: running, finished, or died
+	@scripts/install-bg.sh --status
 dashboards: ## Create/update Cloud Monitoring dashboards
 	@scripts/dashboards.sh
 build-agent: ## ko build the agent -> .workshop/agent-image

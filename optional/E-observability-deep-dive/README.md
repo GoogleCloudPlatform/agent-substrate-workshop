@@ -32,8 +32,9 @@ done
 - **`alert-actor-crashes.json`** is a **log-based** alert: it matches ateapi's `Actor crashed` record in your
   atespace and extracts the actor's name into the incident, so the alert tells you *which* actor, not just
   *that* one crashed. (Why not a metric alert on `ate.actor.crashes`? That counter's series is born at 1
-  the first time a template's actor crashes, and `increase()` needs two samples, so a metric alert, and
-  Module 6's "Crashes" query, miss the first crash of every template. The log record has no such gap, and
+  the first time a template's actor crashes, and `increase()` needs two samples, so a metric alert misses
+  the first crash of every template; that's why Module 6's "Crashes" query shows the running total instead,
+  and a total can't say *which* actor. The log record has no such gap, and
   its actor name is fine in a log where it would be a cardinality problem as a metric label.) Trigger it
   by crashing an actor. The easiest repeatable way without touching an actor's own code is to delete its
   worker pod while it's RUNNING:

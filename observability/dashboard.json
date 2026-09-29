@@ -260,16 +260,16 @@
         "width": 6,
         "height": 4,
         "widget": {
-          "title": "Snapshot image size P95 by file",
+          "title": "Snapshot image size P95 by template",
           "xyChart": {
             "dataSets": [
               {
                 "timeSeriesQuery": {
-                  "prometheusQuery": "histogram_quantile(0.95, sum by (le, \"file.name\") (rate({\"atelet.snapshot.size_bucket\"}[10m])))",
+                  "prometheusQuery": "histogram_quantile(0.95, sum by (le, \"ate.template.name\") (rate({\"atelet.snapshot.size_bucket\"}[10m])))",
                   "unitOverride": "By"
                 },
                 "plotType": "LINE",
-                "legendTemplate": "${metric.labels.file.name}"
+                "legendTemplate": "${metric.labels.ate.template.name}"
               }
             ],
             "yAxis": {
@@ -408,7 +408,7 @@
         "width": 6,
         "height": 4,
         "widget": {
-          "title": "Idle suspends (5m) and actor crashes (15m)",
+          "title": "Idle suspends (5m) and actor crashes (total)",
           "xyChart": {
             "dataSets": [
               {
@@ -420,10 +420,10 @@
               },
               {
                 "timeSeriesQuery": {
-                  "prometheusQuery": "sum(increase({\"ate.actor.crashes\"}[15m])) or vector(0)"
+                  "prometheusQuery": "sum({\"ate.actor.crashes\"}) or vector(0)"
                 },
                 "plotType": "LINE",
-                "legendTemplate": "crashes"
+                "legendTemplate": "crashes (total)"
               }
             ],
             "yAxis": {

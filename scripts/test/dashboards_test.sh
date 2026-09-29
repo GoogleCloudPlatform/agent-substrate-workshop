@@ -54,6 +54,8 @@ check "second run updates the same dashboard" "grep -q 'dashboards update projec
 check "update carries the live etag" "[[ \$(jq -r .etag '$TMP/body') == etag-1 ]]"
 check "uploaded queries are pinned to the cluster" "jq -e '[.. | .prometheusQuery? // empty | contains(\"cluster=\\\"ate-cluster\\\"\")] | all and length >= 10' '$TMP/body' >/dev/null"
 
+check "uploaded logs panels are pinned to the cluster" "jq -e '[.. | .logsPanel? // empty | .filter | contains(\"resource.labels.cluster_name=\\\"ate-cluster\\\"\")] | all and length >= 1' '$TMP/body' >/dev/null"
+
 # promql_scope.py: every selector form the dashboards use, and the things that must stay untouched.
 scope() { python3 "$ROOT/scripts/promql_scope.py" query c "$1"; }
 scope_is() { [[ "$(scope "$1")" == "$2" ]] || { echo "  got: $(scope "$1")"; return 1; }; }

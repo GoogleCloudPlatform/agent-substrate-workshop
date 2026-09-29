@@ -65,6 +65,14 @@ require_cluster_location() {
   [[ -n "${CLUSTER_LOCATION:-}" ]] || die "CLUSTER_LOCATION is empty in workshop.env — set it to your cluster's zone or region (the LOCATION column of: gcloud container clusters list --project $PROJECT_ID)"
 }
 
+# install_running: true while a background install (make install-bg) is alive. Checks the pid file's
+# process is still install-substrate.sh, so a recycled pid doesn't count.
+install_running() {
+  local pid
+  pid="$(cat "$STATE_DIR/install.pid" 2>/dev/null)" || return 1
+  [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null && ps -o command= -p "$pid" 2>/dev/null | grep -q 'install-substrate\.sh'
+}
+
 # user_has_ate: true if your shell (not just our scripts) finds kubectl-ate, or already has bin/ on PATH.
 user_has_ate() {
   local p IFS=:

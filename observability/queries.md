@@ -28,10 +28,10 @@ Never `kubectl port-forward` by hand for this — `make prometheus-ui`, `make fo
 | Did requests hit a warm actor or trigger a resume? | `sum by ("ate.router.resume") (rate({"atenet.router.route.duration_count", top_level_controller_name="atenet-router", cluster="ate-cluster"}[2m]))` |
 | Router latency, warm vs resumed | `histogram_quantile(0.95, sum by (le, "ate.router.resume") (rate({"atenet.router.route.duration_bucket", top_level_controller_name="atenet-router", cluster="ate-cluster"}[5m])))` |
 | Router requests by outcome (ok, no_capacity, timeout, ...) | `sum by ("ate.router.outcome") (rate({"atenet.router.route.duration_count", top_level_controller_name="atenet-router", cluster="ate-cluster"}[2m]))` |
-| Snapshot image sizes | `histogram_quantile(0.95, sum by (le, "file.name") (rate({"atelet.snapshot.size_bucket", cluster="ate-cluster"}[10m])))` |
+| Snapshot image sizes by template (swap in `"file.name"` to see which file: gVisor's `pages.img`, a microVM's `memory-ranges`) | `histogram_quantile(0.95, sum by (le, "ate.template.name") (rate({"atelet.snapshot.size_bucket", cluster="ate-cluster"}[10m])))` |
 | Actor CPU by template | `sum by ("ate.template.name") (rate({"ate.actor.stats.cpu.time", cluster="ate-cluster"}[5m]))` |
 | Actor memory (working set) by template | `sum by ("ate.template.name") ({"ate.actor.stats.memory.working_set", cluster="ate-cluster"})` |
-| Crashes | `sum(increase({"ate.actor.crashes", cluster="ate-cluster"}[15m])) or vector(0)` (0 on a healthy fleet, not "no data") |
+| Crashes so far (a step up = a new crash) | `sum({"ate.actor.crashes", cluster="ate-cluster"}) or vector(0)` (0 on a healthy fleet, not "no data"). The running total, not `increase()`: each template's series is born at 1 on its first crash, and `increase()` needs a sample before that, so it misses exactly that crash. The total drops back when ateapi restarts |
 | Is the controller keeping up? | `max by ("controller") ({"workqueue_depth", cluster="ate-cluster"})` |
 | ateapi gRPC errors | `sum by ("rpc.method") (rate({"rpc.server.call.duration_count", top_level_controller_name="ate-api-server", "rpc.response.status_code"!="OK", cluster="ate-cluster"}[5m]))` |
 

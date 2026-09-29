@@ -52,19 +52,31 @@ Both end up in Cloud Monitoring, so you can query them with PromQL from one plac
    - Substrate's **gRPC**, **E2E latency**, and **Snapshot** dashboards: the maintainers' own views.
 
    While `make load` runs, watch awake actors track worker capacity, "resumed" requests rise, and idle suspends follow each burst.
-5. **Follow one actor across workers.** An actor isn't tied to a pod, so its logs aren't either. Stop
-   `make load` first so both workers are free. In one terminal, stream `buddy`'s logs:
+5. **Follow one actor across workers.** An actor isn't tied to a pod, so its logs aren't either. You'll
+   wake `buddy`, let it go back to sleep, and delete the worker pod it ran on, so the next wake has to land
+   on a different pod. Stop `make load` first. In one terminal, stream `buddy`'s logs:
    ```bash
    kubectl ate logs actor buddy -a workshop -f
    ```
-   In another, bounce it, and park `hello` on its worker in between so the second resume lands elsewhere:
+   In another, wake it and note its pod:
    ```bash
-   kubectl ate resume actor buddy -a workshop && kubectl ate suspend actor buddy -a workshop
-   kubectl ate resume actor hello -a workshop
+   kubectl ate resume actor buddy -a workshop
+   FIRST=$(kubectl ate get actor buddy -a workshop -o json | jq -r .status.workerAssignment.workerPod)
+   echo "$FIRST"
+   ```
+   The gateway suspends idle actors after about 3s. Wait about 10s, then check that nothing is running on
+   that worker. `buddy` should be `ACTOR_STATE_SUSPENDED`, and that pod's worker should show `0/1000` actors:
+   ```bash
+   kubectl ate get actors -a workshop
+   kubectl ate get workers -n workshop
+   ```
+   Deleting a worker pod crashes any actor still running on it, so don't skip this check. Then delete the
+   pod and wake `buddy` again:
+   ```bash
+   kubectl -n workshop delete pod "$FIRST"
    kubectl ate --trace resume actor buddy -a workshop     # prints: Tracing enabled. Trace ID: <id>
    ```
-   Paste all three lines at once. The gateway suspends `hello` about 3s after it wakes, and once it's gone,
-   `buddy` can land back on the same worker.
+   The deployment replaces the pod, and `buddy` wakes on a different one.
    The stream prints `Actor is currently running on pod …` twice with two different pods, and keeps going.
    The `Actor restoring` / `Actor restored` lines carry a `trace_id`: after the `--trace` resume it's the
    ID the CLI printed.
@@ -83,8 +95,6 @@ Both end up in Cloud Monitoring, so you can query them with PromQL from one plac
    Now replace the filter with `jsonPayload.trace_id="<id>"`, using the ID from the `--trace` resume. That
    one request, across ateapi, atelet, and ateom. Paste the same ID into Cloud Trace → Trace Explorer to
    see it as spans.
-
-   Put `hello` back to sleep: `kubectl ate suspend actor hello -a workshop`.
 
 ## What just happened
 - Substrate's telemetry tells you about the **platform**: workers, lifecycle operations, routing, snapshots.

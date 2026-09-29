@@ -72,7 +72,9 @@ source scripts/env.sh    # workshop.env into this shell (bash or zsh): PROJECT_I
    Then compare restore P95 and snapshot size against gVisor's `agent-v3`
    on the workshop dashboard (`ate.actor.restore.duration` and `atelet.snapshot.size` both carry `ate.template.name`,
    and restore duration also carries `ate.sandbox.class`, per `docs/metrics/registry/metrics.yaml` in the substrate
-   checkout, so the existing dashboard tiles should show both side by side without editing them).
+   checkout, so the workshop dashboard's "Actor restore P95 by template" and "Snapshot image size P95 by template" tiles show
+   both side by side). Substrate's own "Snapshot Size & QPS" dashboard filters to `file.name="pages.img"`,
+   gVisor's memory file, so microVM snapshots (`memory-ranges`) don't appear there.
 5. Discuss: when is the stronger VM boundary worth the extra cold-start and setup cost?
 
 For local (non-GKE) experimentation with the same runtime, `.workshop/substrate/docs/dev/microvm-local.md`
