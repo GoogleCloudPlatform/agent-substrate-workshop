@@ -81,7 +81,8 @@ kubectl ate create atespace ate-env   # the template below lives in it, and env 
 { ate-env manifest template --guest-image "$GUEST_IMAGE" --snapshots-bucket "gs://$BUCKET_NAME/ate-env/"
   printf 'workerSelector:\n  matchLabels:\n    workload: ate-env\n'; } \
   | kubectl ate create actor-template -f -
-kubectl ate get atespaces        # "ate-env" is listed next to "workshop"
+kubectl ate get atespaces                                      # "ate-env" is listed next to "workshop"
+kubectl ate get actor-template default-template -a ate-env     # repeat until GOLDEN TAG is set (~20s)
 ```
 
 This creates a Kubernetes namespace `ate-env` with its own WorkerPool (`default-template-workerpool`, 2
@@ -104,9 +105,10 @@ ate-env dev1 shell 'cat /note.txt'       # auto-resumes; verify the file is stil
 ```
 
 > **Verify on your cluster:** env's `ActorTemplate` (from `manifest template` above) sets no explicit
-> `durableDir` and no `snapshotConfig.onPause`/`onCommit` scope — it relies on whatever your Substrate build
-> defaults to for an unset scope. If the last command above comes back empty, that's the thing to check first
-> (compare with module 3's explicit `SNAPSHOT_CONTENT_SCOPE_FULL`).
+> `durableDir` and no `snapshotConfig.onPause`/`onCommit` scope — on Substrate `v0.2.0` both default to
+> `SNAPSHOT_CONTENT_SCOPE_FULL`, so `/note.txt` survives the suspend. If the last command above comes back
+> empty on a newer Substrate build, check its default scope first (compare with module 3's explicit
+> `SNAPSHOT_CONTENT_SCOPE_FULL`).
 
 ## 3. Multiplexing
 
@@ -158,6 +160,7 @@ just PyPI, the way you'd lock down a real coding-agent sandbox:
 
 ```bash
 source scripts/ate-api.sh
+scripts/forward.sh ate-env-api ate-env svc/ate-env-api 7777 7777   # restart the forward if lab I's `make stop-forwards` stopped it
 egressctl -a ate-env apply -f optional/A-env/egress-pypi.yaml --all
 ate-env suspend dev1
 ate-env dev1 shell '
@@ -203,7 +206,8 @@ That's the whole `dev1`/`env1`…`env10` fleet suspending and resuming, next to 
 The workshop's own Cloud Monitoring dashboard (`observability/dashboard.json`, applied in Module 0) and
 substrate's three dashboards (applied by `make dashboards`) are fixed to the `workshop` atespace and the
 `agents` WorkerPool, so they won't show `ate-env` traffic directly — use the ad hoc queries above for this
-atespace, the same way you used the Prometheus UI in Module 6.
+atespace, the same way you used the Prometheus UI in Module 6 (if your `CLUSTER_NAME` in `workshop.env` is
+not `ate-cluster`, replace `ate-cluster` in the queries above).
 
 ## Read the code
 
@@ -219,8 +223,12 @@ atespace, the same way you used the Prometheus UI in Module 6.
 
 ## Clean up
 
+If you plan to run [step 5](#5-lock-down-egress-env-sets-no-policy--after-lab-i) after [lab I](../I-credential-injection/README.md), wait to run this clean-up until after step 5:
+
 ```bash
 for e in dev1 $(seq -f 'env%g' 1 10); do ate-env delete "$e"; done
+kubectl ate delete actor-template default-template -a ate-env
+kubectl ate delete atespace ate-env
 ate-env manifest --api-image x --worker-image x | kubectl delete -f - --ignore-not-found
 make stop-forwards   # stops step 2's ate-env-api forward (and the workshop's other port-forwards)
 ```

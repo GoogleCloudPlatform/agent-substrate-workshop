@@ -444,30 +444,6 @@
             "filter": "resource.type=\"k8s_container\"\njsonPayload.msg=\"Actor state changed\"\njsonPayload.\"ate.atespace\"=\"workshop\""
           }
         }
-      },
-      {
-        "xPos": 0,
-        "yPos": 36,
-        "width": 6,
-        "height": 4,
-        "widget": {
-          "title": "Worker utilization (awake actors / desired workers, pool agents)",
-          "xyChart": {
-            "dataSets": [
-              {
-                "timeSeriesQuery": {
-                  "prometheusQuery": "max(workshop_actors_awake) / max({\"ate.workerpool.desired_workers\", \"ate.workerpool.name\"=\"agents\"})"
-                },
-                "plotType": "LINE",
-                "legendTemplate": "utilization"
-              }
-            ],
-            "yAxis": {
-              "label": "ratio",
-              "scale": "LINEAR"
-            }
-          }
-        }
       }
     ]
   }

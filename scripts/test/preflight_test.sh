@@ -35,7 +35,8 @@ cat >"$TMP/bin/kubectl" <<'STUB'
 case "$*" in *certificates.k8s.io/v1beta1*) [[ -n "${V1_ONLY:-}" ]] && exit 1; echo '{"resources":[{"name":"clustertrustbundles"},{"name":"podcertificaterequests"}]}' ;; esac
 exit 0
 STUB
-printf '#!/usr/bin/env bash\necho go1.27.1\n' >"$TMP/bin/go"
+# Simulate a host go1.26 wrapper that resolves go1.27.1 via GOTOOLCHAIN=auto only inside a module with go.mod (app/).
+printf '#!/usr/bin/env bash\n[[ -f go.mod ]] && echo go1.27.1 || echo go1.26.3\n' >"$TMP/bin/go"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$TMP/bin/ko"
 # docker: DOCKER_DOWN=1 makes `docker info` fail the way a stopped daemon does.
 printf '#!/usr/bin/env bash\n[[ "$1" == info && -n "${DOCKER_DOWN:-}" ]] && exit 1\nexit 0\n' >"$TMP/bin/docker"

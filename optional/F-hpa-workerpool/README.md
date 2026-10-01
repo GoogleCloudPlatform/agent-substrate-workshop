@@ -68,7 +68,7 @@ template's golden snapshot, so scaling out doesn't change the warm-start story f
 load's `==> status codes` summary with Module 6's run on a fixed 2 workers.
 
 Watch the same thing on the dashboard: `ate.workerpool.workers` by state (Module 6), and
-`{"ate.workerpool.desired_workers", "ate.workerpool.name"="agents", cluster="ate-cluster"}`. When the load stops, the gateway
+`{"ate.workerpool.desired_workers", "ate.workerpool.name"="agents", cluster="ate-cluster"}` (replace `ate-cluster` if your `CLUSTER_NAME` differs). When the load stops, the gateway
 idle-suspends every actor within 3s, demand drops to 0, and the pool shrinks back to 2 after the HPA's
 2-minute scale-down window.
 

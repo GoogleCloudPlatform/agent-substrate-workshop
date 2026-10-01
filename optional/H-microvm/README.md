@@ -22,13 +22,16 @@ source scripts/env.sh    # workshop.env into this shell (bash or zsh): PROJECT_I
      --cluster "$CLUSTER_NAME" --location "$CLUSTER_LOCATION" \
      --machine-type c3-standard-4 --num-nodes 1 --enable-nested-virtualization \
      --node-labels="ate.dev/substrate-version=$(cat .workshop/substrate-version),workshop-pool=microvm" \
-     --node-taints=workshop-pool=microvm:NoSchedule
+     --node-taints=ate.dev/sandboxClass=microvm:NoSchedule
    kubectl get nodes -l workshop-pool=microvm      # Ready about 15s after the command returns
    ```
-   **Why the taint:** the gVisor WorkerPools (`agents`, lab G's `conf-workers`, lab A's pool) select only
-   `ate.dev/substrate-version`, so without it they land on this node too. A nested-virt CPU exposes the
-   `vmx` feature, so a gVisor snapshot taken there fails to restore on an ordinary node
-   (`runsc restore … incompatible FeatureSet: missing features: map[vmx:{}]`) and the actor goes CRASHED.
+   **Why this taint:** the gVisor WorkerPools (`agents`, lab G's `conf-workers`, lab A's pool) select only
+   `ate.dev/substrate-version` and tolerate only `ate.dev/sandboxClass=gvisor:NoSchedule`, so without this taint
+   they land on this node too. A nested-virt CPU exposes the `vmx` feature, so a gVisor snapshot taken there
+   fails to restore on an ordinary node (`runsc restore … incompatible FeatureSet: missing features: map[vmx:{}]`)
+   and the actor goes CRASHED. Use `ate.dev/sandboxClass=microvm:NoSchedule` (not an arbitrary key): the `atelet`
+   DaemonSet tolerates `ate.dev/sandboxClass:NoSchedule`, and without `atelet` on the node the `/dev/kvm` device
+   plugin (`ate.dev/kvm`) is never registered and `agents-vm` stays `Pending`.
    On a regional cluster, `--num-nodes` is per zone.
 2. **Stage the microVM assets and apply the `SandboxConfig`.** substrate's script downloads
    cloud-hypervisor, virtiofsd, the guest kernel and rootfs, uploads them to `gs://$BUCKET_NAME/kata-assets/`,

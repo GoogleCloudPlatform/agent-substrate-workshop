@@ -5,8 +5,7 @@ and start the Substrate install in the background. It runs while you take the ar
 
 ## What you need
 - A GCP project where you are Owner, and a GKE **1.37+** cluster in it. The cluster needs the `v1beta1` certificate APIs, Workload Identity,
-  managed OpenTelemetry, no node auto-upgrade, and no spot nodes. Your instructor created it, or you can follow
-  [the substrate GCP guide](https://github.com/agent-substrate/substrate/tree/main/tools/setup-gcp).
+  managed OpenTelemetry, Managed Prometheus, no node auto-upgrade (or an active maintenance exclusion), and no spot nodes. Your instructor created it, or you can use the cluster creation commands in the [instructor runbook](../../instructor/runbook.md#the-day-before-t-24h) (also see [the substrate GCP guide](https://github.com/agent-substrate/substrate/tree/main/tools/setup-gcp)).
 - `kubectl` pointed at that cluster: `kubectl config current-context`.
 - Locally installed: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `nc`, `curl`, `git`, `python3`,
   and a running **Docker** with `buildx` (the install builds one substrate image from a Dockerfile). Cloud Shell has all of these.
@@ -15,7 +14,8 @@ and start the Substrate install in the background. It runs while you take the ar
 
 1. **Configure.** Copy the env file and set `PROJECT_ID` and `CLUSTER_LOCATION`, your cluster's zone or
    region exactly as `gcloud container clusters list` shows it (a zonal cluster such as `us-central1-a` isn't
-   found under `us-central1`). Every other value has a working default.
+   found under `us-central1`). If your cluster isn't named `ate-cluster`, set `CLUSTER_NAME` too. Every other
+   value has a working default.
    ```bash
    gcloud container clusters list --project YOUR_PROJECT_ID    # NAME and LOCATION
    cp workshop.env.example workshop.env
@@ -32,21 +32,21 @@ and start the Substrate install in the background. It runs while you take the ar
    ```bash
    make gcp
    ```
-4. **Start the install in the background.** It clones substrate at `SUBSTRATE_REF`, builds `kubectl ate`,
+4. **Put `bin/` on your PATH.** The install builds the `kubectl ate` plugin into `bin/kubectl-ate`. The
+   `make` targets find it on their own, but `make install-status` and Module 2 onwards expect `kubectl ate …`
+   on your shell's PATH. Run this from the repo root:
+   ```bash
+   export PATH="$PWD/bin:$PATH"
+   ```
+   It only lasts for this terminal. Add the same line, with the absolute repo path instead of `$PWD`, to
+   `~/.zshrc` or `~/.bashrc`. If you use direnv, put `PATH_add bin` in an `.envrc` at the repo root.
+5. **Start the install in the background.** It clones substrate at `SUBSTRATE_REF`, builds `kubectl ate`,
    deploys `ate-system`, pins a worker image that matches the control plane, labels your nodes, and
    raises the router's parked-request budget (and its shutdown grace period to match).
    ```bash
    make install-bg
    make install-status     # any time: running, finished, or stopped; the install takes about 5–10 minutes
    ```
-5. **Put `bin/` on your PATH.** The install builds the `kubectl ate` plugin into `bin/kubectl-ate`. The
-   `make` targets find it on their own, but from Module 2 on you type `kubectl ate …` yourself, so your
-   shell needs it too. Run this from the repo root:
-   ```bash
-   export PATH="$PWD/bin:$PATH"
-   ```
-   It only lasts for this terminal. Add the same line, with the absolute repo path instead of `$PWD`, to
-   `~/.zshrc` or `~/.bashrc`. If you use direnv, put `PATH_add bin` in an `.envrc` at the repo root.
    Once the install finishes, `kubectl ate --help` works. `make verify MODULE=0` checks that `bin/` is on your PATH.
 6. **Dashboards.** This creates the workshop dashboard and substrate's three dashboards in Cloud Monitoring.
    They stay empty until Module 6. Setting them up now means data is already flowing by then.

@@ -57,9 +57,9 @@ with **DATA** scope: only the durable directory is saved, and resume cold-boots 
    ```bash
    kubectl ate logs actor memo -a workshop -f
    ```
-   Most of what scrolls past is gVisor's own runtime logging (lines starting `I0…`/`W0…`, from `cli.go`,
-   `config.go` and so on). The line to watch for is the agent's `agent listening …`. Add
-   `| grep -v '^[IW]0'` if you want only the agent's output.
+   Most of what scrolls past is gVisor's own runtime logging (`I…`/`W…` lines from `cli.go`,
+   `config.go` and so on, wrapped in JSON). The line to watch for is the agent's `agent listening …`. Add
+   `| grep -v '"message":"[IW][01]'` (or `| grep 'agent listening'`) if you want only the agent's output.
 7. Make state, suspend, and come back:
    ```bash
    for i in 1 2 3; do curl -s -H 'ate-target-actor: workshop/memo' localhost:8080/; done

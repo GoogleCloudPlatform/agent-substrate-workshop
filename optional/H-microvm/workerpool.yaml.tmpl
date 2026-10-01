@@ -34,7 +34,7 @@ spec:
       ate.dev/substrate-version: "${SUBSTRATE_VERSION}"
       workshop-pool: microvm
     tolerations:
-    - {key: workshop-pool, operator: Equal, value: microvm, effect: NoSchedule}
+    - {key: ate.dev/sandboxClass, operator: Equal, value: microvm, effect: NoSchedule}
     resources:
       limits:
         cpu: "1"

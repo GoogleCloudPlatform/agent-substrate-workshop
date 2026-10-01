@@ -81,7 +81,7 @@ done
 
 ## 2. An SLO on chat success
 In Cloud Console → Monitoring → SLOs, create a request-based SLO on the gateway:
-good = `workshop_chat_turns_total{outcome="ok", cluster="ate-cluster"}`, total = `workshop_chat_turns_total{cluster="ate-cluster"}`, target 99%, rolling 1 day.
+good = `workshop_chat_turns_total{outcome="ok", cluster="ate-cluster"}`, total = `workshop_chat_turns_total{cluster="ate-cluster"}` (replace `ate-cluster` if your `CLUSTER_NAME` differs), target 99%, rolling 1 day.
 Watch the error budget burn during step 1's `IDLE_AFTER=0s` run.
 
 ## 3. Usage events as a logs-based metric — labeled by template/pool, not actor

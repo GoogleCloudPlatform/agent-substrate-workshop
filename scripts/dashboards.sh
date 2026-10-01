@@ -46,8 +46,8 @@ upsert_dashboard() {
 load_env
 step "Cloud Monitoring dashboards (queries pinned to cluster=\"$CLUSTER_NAME\")"
 upsert_dashboard "$REPO_ROOT/observability/dashboard.json"
-# The substrate checkout is created early by install-substrate.sh; wait briefly if the install just started.
-wait_for 180 "substrate checkout (make install-bg)" test -d "$STATE_DIR/substrate/tools/setup-gcp/dashboards"
+# The substrate checkout is created early by install-substrate.sh; wait until its dashboard JSON files are checked out.
+wait_for 180 "substrate checkout (make install-bg)" bash -c 'compgen -G "$1/substrate/tools/setup-gcp/dashboards/*.json" >/dev/null' _ "$STATE_DIR"
 for f in "$STATE_DIR"/substrate/tools/setup-gcp/dashboards/*.json; do
   upsert_dashboard "$f"
 done

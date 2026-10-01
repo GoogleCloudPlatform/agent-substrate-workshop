@@ -18,10 +18,11 @@ source "$(dirname "$0")/common.sh"
 step "verify module 0 (setup)"
 check "bucket gs://$BUCKET_NAME exists" gcloud storage buckets describe "gs://$BUCKET_NAME" --project "$PROJECT_ID"
 check "Artifact Registry repo $AR_REPO exists" gcloud artifacts repositories describe "$AR_REPO" --location "$REGION" --project "$PROJECT_ID"
-check "Substrate install started (.workshop/install.log or ate-system)" \
-  bash -c "[[ -s '$STATE_DIR/install.log' ]] || kubectl get ns ate-system"
-check "workshop dashboard exists" bash -c \
-  "gcloud monitoring dashboards list --project '$PROJECT_ID' --filter='displayName=\"Agent Substrate Workshop\"' --format='value(name)' | grep -q ."
+check "Substrate install running or complete" \
+  bash -c 'source "$1/scripts/lib.sh"; install_running || [[ -s "$STATE_DIR/install-complete" && ( ! -f "$STATE_DIR/install.pid" || "$STATE_DIR/install-complete" -nt "$STATE_DIR/install.pid" ) ]] || kubectl get ns ate-system' _ "$REPO_ROOT"
+check "workshop and Substrate dashboards exist" bash -c \
+  "gcloud monitoring dashboards list --project '$PROJECT_ID' --filter='displayName=\"Agent Substrate Workshop\"' --format='value(name)' | grep -q . &&
+   gcloud monitoring dashboards list --project '$PROJECT_ID' --filter='displayName=\"Substrate gRPC Server — latency / QPS / errors\"' --format='value(name)' | grep -q ."
 check "bin/egressctl built" test -x "$REPO_ROOT/bin/egressctl"
 # Scripts get bin/ on PATH from lib.sh; your shell doesn't. Module 2 onwards you type `kubectl ate …`.
 check "kubectl ate on your shell's PATH (bin/)" user_has_ate

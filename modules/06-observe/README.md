@@ -37,7 +37,8 @@ Both end up in Cloud Monitoring, so you can query them with PromQL from one plac
    make load
    ```
 3. **Ask questions in the Prometheus UI** (http://localhost:9090 → Graph). Copy each query from
-   [observability/queries.md](../../observability/queries.md):
+   [observability/queries.md](../../observability/queries.md) (if your `CLUSTER_NAME` in `workshop.env` isn't
+   `ate-cluster`, change `cluster="ate-cluster"` to match):
    - How many workers are busy vs idle? `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="agents", cluster="ate-cluster"})`
      (`max`, not `sum`: each ateapi replica reports the whole pool.) A busy worker shows as `partial`, not
      `at_capacity`: the state counts actor slots (1 of the default 1000), not CPU.
@@ -81,7 +82,7 @@ Both end up in Cloud Monitoring, so you can query them with PromQL from one plac
    The `Actor restoring` / `Actor restored` lines carry a `trace_id`: after the `--trace` resume it's the
    ID the CLI printed.
 
-   The CLI only reaches the pod the actor is on right now. For the full history, open Logs Explorer:
+   The CLI only reaches the pod the actor is on right now. For the full history, open Logs Explorer (replace `ate-cluster` if your `CLUSTER_NAME` differs):
    ```
    resource.type="k8s_container"
    resource.labels.cluster_name="ate-cluster"

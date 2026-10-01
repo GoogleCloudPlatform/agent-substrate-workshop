@@ -62,11 +62,20 @@ func main() {
 	mux.HandleFunc("POST /actors/{actor}/jobs", fd.HandleJob)
 	mux.HandleFunc("POST /actors/{actor}/busy", fd.HandleBusy)
 	mux.Handle("GET /metrics", m.Handler())
-	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "ok\n") })
+	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) {
+		if ctx.Err() != nil {
+			http.Error(w, "draining\n", http.StatusServiceUnavailable)
+			return
+		}
+		_, _ = io.WriteString(w, "ok\n")
+	})
 
 	srv := &http.Server{Addr: cfg.ListenAddr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
+		// Keep the listener open briefly after SIGTERM so /v1/model calls routed via a cached Service
+		// endpoint during a gateway rollout don't fail before EndpointSlice removal propagates.
+		time.Sleep(3 * time.Second)
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutdown)

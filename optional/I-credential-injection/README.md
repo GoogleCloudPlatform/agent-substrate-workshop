@@ -65,6 +65,7 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
    #   - atespace: workshop
    #     allowedNamespaces: [workshop-secrets]
    kubectl -n ate-system rollout restart deploy/k8s-credential-provider
+   kubectl -n ate-system rollout status deploy/k8s-credential-provider
    ```
    (The manifests also create a sample `ns1` namespace and Secret for atespace `team-a`. You don't need them.)
 4. Extend `egress-gateway.yaml` with a hostname rule whose `effects.injectStaticHeaders` adds an
@@ -79,7 +80,8 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
    ```bash
    export FETCH_IMAGE="$(cd app && ko build --base-import-paths ./cmd/agent-fetch)"
    scripts/render.sh optional/I-credential-injection/template.yaml.tmpl | kubectl ate create actor-template -f -
-   kubectl ate create actor fetch1 --template=agent-fetch-v1 -a workshop     # once the golden tag appears
+   kubectl ate get actor-template agent-fetch-v1 -a workshop                 # repeat until GOLDEN TAG is set (~20s)
+   kubectl ate create actor fetch1 --template=agent-fetch-v1 -a workshop
    scripts/egress.sh apply optional/I-credential-injection/egress-fetch.yaml --actor=fetch1
    curl -s -H 'ate-target-actor: workshop/fetch1' 'localhost:8080/fetch?url=https://httpbin.org/headers'
    curl -s -H 'ate-target-actor: workshop/fetch1' 'localhost:8080/fetch?url=https://example.com/'   # egress denied

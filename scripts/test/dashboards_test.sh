@@ -44,6 +44,7 @@ case "$*" in
 esac
 STUB
 chmod +x "$TMP/bin/gcloud"
+unset CLUSTER_NAME CLUSTER PROJECT_ID
 export STUB_LOG="$TMP/log" STUB_STATE="$TMP/state" STUB_UPDATE_BODY="$TMP/body" PATH="$TMP/bin:$PATH"
 export WORKSHOP_ENV_FILE="$TMP/env" WORKSHOP_STATE_DIR="$TMP/ws"
 echo "PROJECT_ID=p" >"$WORKSHOP_ENV_FILE"
