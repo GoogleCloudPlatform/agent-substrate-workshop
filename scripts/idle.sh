@@ -27,6 +27,12 @@ esac
 step "gateway IDLE_AFTER=$value"
 kubectl -n "$NAMESPACE" set env deploy/gateway "IDLE_AFTER=$value" >/dev/null
 kubectl -n "$NAMESPACE" rollout status deploy/gateway --timeout=180s >/dev/null
+# Wait for the replaced gateway pod's 3s drain sleep to finish so kubectl port-forward and
+# atenet-egress never talk to a pod that is about to close its listener.
+_no_terminating_gateway() {
+  [[ -z "$(kubectl -n "$NAMESPACE" get pods -l app=gateway -o jsonpath='{.items[*].metadata.deletionTimestamp}' 2>/dev/null)" ]]
+}
+wait_for 30 "old gateway pod to terminate" _no_terminating_gateway
 stop_port_forward gateway
 port_forward gateway "$NAMESPACE" svc/gateway 8081 80
 if [[ "$value" == 0s ]]; then

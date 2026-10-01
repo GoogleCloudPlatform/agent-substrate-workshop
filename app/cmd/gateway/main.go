@@ -73,6 +73,10 @@ func main() {
 	srv := &http.Server{Addr: cfg.ListenAddr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
+		// Disable keep-alives immediately so any /v1/model response served during the drain
+		// window sends Connection: close, preventing atenet-egress Envoy from pooling a
+		// connection to a terminating gateway pod and failing the next turn with 503 UC.
+		srv.SetKeepAlivesEnabled(false)
 		// Keep the listener open briefly after SIGTERM so /v1/model calls routed via a cached Service
 		// endpoint during a gateway rollout don't fail before EndpointSlice removal propagates.
 		time.Sleep(3 * time.Second)

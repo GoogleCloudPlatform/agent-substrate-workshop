@@ -188,19 +188,35 @@ func (s *Server) generate(ctx context.Context, msgs []chatapi.Message) (reply, b
 	if err != nil {
 		return "", "", err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.cfg.ModelURL, bytes.NewReader(body))
-	if err != nil {
-		return "", "", err
+	var b []byte
+	var status string
+	var code int
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return "", "", ctx.Err()
+			case <-time.After(200 * time.Millisecond):
+			}
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.cfg.ModelURL, bytes.NewReader(body))
+		if err != nil {
+			return "", "", err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := s.cfg.Client.Do(req)
+		if err != nil {
+			return "", "", err
+		}
+		b, _ = io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		resp.Body.Close()
+		code, status = resp.StatusCode, resp.Status
+		if code != http.StatusBadGateway && code != http.StatusServiceUnavailable && code != http.StatusGatewayTimeout {
+			break
+		}
 	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := s.cfg.Client.Do(req)
-	if err != nil {
-		return "", "", err
-	}
-	defer resp.Body.Close()
-	b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if resp.StatusCode != http.StatusOK {
-		return "", "", fmt.Errorf("%s: %s", resp.Status, strings.TrimSpace(string(b)))
+	if code != http.StatusOK {
+		return "", "", fmt.Errorf("%s: %s", status, strings.TrimSpace(string(b)))
 	}
 	var mr chatapi.ModelResponse
 	if err := json.Unmarshal(b, &mr); err != nil {

@@ -204,6 +204,24 @@ func TestChatUnreachableModelReturns502(t *testing.T) {
 	}
 }
 
+func TestChatRetriesTransient503FromModel(t *testing.T) {
+	calls := 0
+	model := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls == 1 {
+			http.Error(w, "upstream connect error or disconnect/reset before headers", http.StatusServiceUnavailable)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(chatapi.ModelResponse{Reply: "recovered", Backend: "mock"})
+	}))
+	defer model.Close()
+	ts := newTestServer(t, Config{Greeting: "hi", ModelURL: model.URL})
+	code, out := chat(t, ts.URL, "hello")
+	if code != http.StatusOK || out["reply"] != "recovered" || calls != 2 {
+		t.Fatalf("chat = %d %v (calls=%d), want 200 recovered after 1 retry", code, out, calls)
+	}
+}
+
 func TestHistorySurvivesRestart(t *testing.T) {
 	dir := t.TempDir()
 	a := newTestServer(t, Config{Greeting: "hi", DataDir: dir})

@@ -5,7 +5,7 @@ and start the Substrate install in the background. It runs while you take the ar
 
 ## What you need
 - A GCP project where you are Owner, and a GKE **1.37+** cluster in it. The cluster needs the `v1beta1` certificate APIs, Workload Identity,
-  managed OpenTelemetry, Managed Prometheus, no node auto-upgrade (or an active maintenance exclusion), and no spot nodes. Your instructor created it, or you can use the cluster creation commands in the [instructor runbook](../../instructor/runbook.md#the-day-before-t-24h) (also see [the substrate GCP guide](https://github.com/agent-substrate/substrate/tree/main/tools/setup-gcp)).
+  managed OpenTelemetry, Managed Prometheus, no node auto-upgrade (or an active maintenance exclusion), and no spot nodes. Your instructor created it, or you can use the cluster creation commands in the [instructor runbook](../../instructor/runbook.md#one-week-before) (also see [the substrate GCP guide](https://github.com/agent-substrate/substrate/tree/main/tools/setup-gcp)).
 - `kubectl` pointed at that cluster: `kubectl config current-context`.
 - Locally installed: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `nc`, `curl`, `git`, `python3`,
   and a running **Docker** with `buildx` (the install builds one substrate image from a Dockerfile). Cloud Shell has all of these.

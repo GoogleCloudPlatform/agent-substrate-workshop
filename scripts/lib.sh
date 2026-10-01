@@ -139,9 +139,14 @@ port_forward() {
 
 # stop_port_forward <name>: stop one forward we started (no-op if it isn't running).
 stop_port_forward() {
-  local pidf="$STATE_DIR/pf-$1.pid"
+  local pidf="$STATE_DIR/pf-$1.pid" pid i
   [[ -f "$pidf" ]] || return 0
-  kill "$(cat "$pidf")" 2>/dev/null || true
+  pid="$(cat "$pidf")"
+  kill "$pid" 2>/dev/null || true
+  for ((i = 0; i < 20; i++)); do
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.05
+  done
   rm -f "$pidf"
 }
 
