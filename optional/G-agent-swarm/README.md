@@ -15,11 +15,11 @@ maximum of 5 workers, 20 of the 50 attendees run at once and the rest wait suspe
 on worker demand: workers that are `partial` or `at_capacity`, plus one worker for every
 `DEMO_CONF_ACTORS_PER_WORKER` requests parked at the router.
 
-> **Fact-checked against an agent-swarm checkout** (commit `7f22bb5`, 2026-09-28) — its `README.md`,
+> **Fact-checked against an agent-swarm checkout** (commit `401a366`, 2026-10-01) — its `README.md`,
 > `hack/deploy.sh`, `manifests/workerpool.yaml.tmpl`, `manifests/actortemplate.yaml.tmpl`, and `go.mod`:
-> - agent-swarm pins `github.com/agent-substrate/substrate v0.2.0`, the same as this workshop's
+> - agent-swarm pins `github.com/agent-substrate/substrate v0.3.0`, the same as this workshop's
 >   `SUBSTRATE_REF`. `hack/deploy.sh` requires the nodes' `ate.dev/substrate-version` label to equal that
->   pin, and `make install` labels them `v0.2.0`, so it deploys onto your workshop cluster.
+>   pin, and `make install` labels them `v0.3.0`, so it deploys onto your workshop cluster.
 > - The gateway image is built with **`docker buildx`**, not `ko` (`hack/deploy.sh`'s `conf_build_gateway`
 >   runs `docker buildx build --platform=linux/amd64 --push`). Only the *worker* image
 >   (`ko://github.com/agent-substrate/substrate/cmd/ateom-gvisor`, in `manifests/workerpool.yaml.tmpl`) is
@@ -39,8 +39,8 @@ agent-swarm refuses to deploy unless your cluster runs the substrate version pin
 `main` moves, so re-check the pin against `SUBSTRATE_REF` before each event:
 ```bash
 git clone https://github.com/moficodes/agent-swarm .workshop/agent-swarm
-git -C .workshop/agent-swarm checkout 7f22bb5
-grep 'agent-substrate/substrate ' .workshop/agent-swarm/go.mod     # expect v0.2.0, the SUBSTRATE_REF in workshop.env
+git -C .workshop/agent-swarm checkout 401a366
+grep 'agent-substrate/substrate ' .workshop/agent-swarm/go.mod     # expect v0.3.0, the SUBSTRATE_REF in workshop.env
 ```
 If they differ, `hack/deploy.sh up` stops and prints the pin and the cluster's version (agent-swarm's
 README has a "Bumping Substrate" section). Use an agent-swarm commit whose pin matches rather than bumping

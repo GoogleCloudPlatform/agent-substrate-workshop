@@ -3,7 +3,7 @@ module github.com/agent-substrate/workshop/app
 go 1.27.0
 
 require (
-	github.com/agent-substrate/substrate v0.2.0
+	github.com/agent-substrate/substrate v0.3.0
 	github.com/prometheus/client_golang v1.24.1
 	google.golang.org/genai v1.71.0
 	google.golang.org/grpc v1.84.0

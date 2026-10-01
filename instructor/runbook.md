@@ -1,11 +1,12 @@
 # Instructor runbook
 
-**Last validated:** 2026-09-27, `SUBSTRATE_REF=v0.2.0`, GKE `1.37.0-gke.3503000` (Rapid, zonal, 2× `c3-standard-4`),
-source install mode. `make e2e` passed with real Vertex (14.5 min on a fresh cluster, install included) and with
-`MOCK_LLM=true` (7 min, install already done). Optional lab B passed by hand. Not run: published-image mode
-(the v0.2.0 release notes name no image repo), and the other optional labs. Lab A's `ENV_REF` patch was checked at the
-compile/unit-test level only. Lab G's agent-swarm commit (`7f22bb5`) pins v0.2.0, which matches the node label
-`make install` writes, but it hasn't been deployed on a workshop cluster.
+**Last validated:** 2026-10-01, `SUBSTRATE_REF=v0.3.0`, GKE `1.37.0-gke.3503000` (Rapid, zonal, 2× `c3-standard-4`),
+source install mode. `make e2e` passed with real Vertex (17.5 min on a fresh cluster, install included) and with
+`MOCK_LLM=true` (10 min, install already done). Optional labs A (including step 5's `egress-pypi.yaml`), C, and I
+(reinstall with `--experimental-use-sdsmint --atenet-dataplane=envoy --experimental-egress-credential-injection`,
+`egress-fetch.yaml` `replaceHeaders`, and `agent-fetch`) passed end-to-end on the cluster; lab G (`agent-swarm` @
+`401a366`, pinning `v0.3.0`) passed build and unit tests (`go test ./...`, including `hack/checkmanifests`). Not run:
+published-image mode (the v0.3.0 release notes name no image repo).
 
 ## One week before
 

@@ -17,5 +17,5 @@
 # so without this, `pip install` (and everything else) fails closed.
 # Applied with: egressctl -a ate-env apply -f optional/A-env/egress-pypi.yaml --all
 rules:
-- hostnames:
-    patterns: ["pypi.org", "files.pythonhosted.org"]
+- https:
+    hostnames: ["pypi.org", "files.pythonhosted.org"]

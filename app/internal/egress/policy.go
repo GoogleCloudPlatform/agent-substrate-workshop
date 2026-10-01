@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package egress manages actor EgressPolicies. Substrate has no kubectl verb for them yet,
-// so the workshop ships this small client. Policy files are the EgressPolicy protojson
+// Package egress manages actor EgressPolicies with idempotent create-or-update (apply)
+// and --all fan-out across an atespace. Policy files are the EgressPolicy protojson
 // shape written as YAML, rules only; the tool fills in metadata.
 package egress
 

@@ -3,21 +3,21 @@
 > **Cluster impact:** Changes the cluster: **reinstalls substrate** with the experimental egress dataplane. Do it last. The workshop keeps working afterwards, provided you re-apply the router patch (step 2); on a shared or long-lived cluster, use a fresh one instead.
 
 **Goal:** let an actor call an authenticated external API without ever holding the credential.
-`EgressRuleEffects.inject_static_headers` lets a matching hostname rule inject a header whose value comes
+`HttpRuleEffects.replace_headers` lets a matching `https` rule replace a placeholder request header with a value that comes
 from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
-(`pkg/proto/ateapipb/ateapi.proto`, `CredentialHeaderInjection`), resolved at request time by dialing a
+(`pkg/proto/ateapipb/ateapi.proto`, `CredentialHeader`), resolved at request time by dialing a
 **credential provider**, a small gRPC service (`pkg/proto/credproviderpb/credprovider.proto`).
 
-> **Fact-checked against the substrate checkout at `SUBSTRATE_REF` (v0.2.0):** substrate now ships a
+> **Fact-checked against the substrate checkout at `SUBSTRATE_REF` (v0.3.0):** substrate ships a
 > reference provider, `cmd/credential-provider/kubernetes-secrets`, with manifests in
-> `manifests/egress-credential-injection/`. It resolves
+> `manifests/egress-credential-injection/` and a guide in `docs/egress-credential-injection.md`. It resolves
 > `ate-secret://k8s.io/default/<namespace>/<secret>/<key>` from a Kubernetes Secret, and it denies by default:
 > a ConfigMap (`namespace-policy.yaml`) lists which atespace may read which namespaces. The injection runs on
 > the **egress gateway's** decrypted MITM leg, not on atenet-router, so it's **experimental and off by default**.
 > `ate-setup deploy` needs `--experimental-egress-credential-injection`, which in turn requires
 > `--experimental-use-sdsmint` and `--atenet-dataplane=envoy` (`cmd/ate-setup/internal/cmd/root.go`;
 > `hack/experimental-egress-credential-injection.sh` explains the wiring). The workshop's `make install` sets
-> none of these; step 2 adds them. Run end to end on a GKE cluster on 2026-09-28.
+> none of these; step 2 adds them. Run end to end on a GKE cluster on 2026-10-01.
 
 **You'll need:**
 - **Everything else done first.** This is the last lab because step 2 reinstalls substrate. Finish or clean up
@@ -28,7 +28,7 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
 - `ko`, and an API key for any HTTPS API. The steps use `https://httpbin.org`, which needs no real key and
   echoes the headers it received back to you, so you can see the injected header.
 
-1. Read `pkg/proto/credproviderpb/credprovider.proto` (the one-RPC plugin contract), then the reference
+1. Read `docs/egress-credential-injection.md`, `pkg/proto/credproviderpb/credprovider.proto` (the one-RPC plugin contract), and the reference
    provider in `cmd/credential-provider/kubernetes-secrets` and its three manifests.
 2. **Reinstall substrate** from the checkout with the three flags above, then **re-apply the workshop's router
    settings**. `ate-setup deploy` re-renders `atenet-router` with substrate's defaults (a 5s parked-request
@@ -68,11 +68,11 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
    kubectl -n ate-system rollout status deploy/k8s-credential-provider
    ```
    (The manifests also create a sample `ns1` namespace and Secret for atespace `team-a`. You don't need them.)
-4. Extend `egress-gateway.yaml` with a hostname rule whose `effects.injectStaticHeaders` adds an
-   `Authorization` header (`prefix: "Bearer "`) sourced from
-   `ate-secret://k8s.io/default/workshop-secrets/example-api/token`. `effects` belongs to the *hostname rule*,
-   next to `patterns`; [`egress-fetch.yaml`](egress-fetch.yaml) has the finished shape.
-5. Add a `/fetch` route to a copy of the agent that calls the API without setting any auth header itself
+4. Extend `egress-gateway.yaml` with an `https` rule whose `effects.replaceHeaders` replaces the
+   `Authorization` header (`prefix: "Bearer "`) with the credential from
+   `ate-secret://k8s.io/default/workshop-secrets/example-api/token`. `effects` belongs to the `https` rule,
+   next to `hostnames`; [`egress-fetch.yaml`](egress-fetch.yaml) has the finished shape.
+5. Add a `/fetch` route to a copy of the agent that calls the API with a placeholder `Authorization: Bearer placeholder` header
    ([`app/cmd/agent-fetch`](../../app/cmd/agent-fetch/main.go) is a finished version). The actor also needs to
    trust the egress gateway's CA: under sdsmint the gateway terminates every HTTPS connection with a certificate
    it minted. [`template.yaml.tmpl`](template.yaml.tmpl) is agent-v3 plus a `systemInfo` trust-bundle volume and
@@ -86,7 +86,7 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
    curl -s -H 'ate-target-actor: workshop/fetch1' 'localhost:8080/fetch?url=https://httpbin.org/headers'
    curl -s -H 'ate-target-actor: workshop/fetch1' 'localhost:8080/fetch?url=https://example.com/'   # egress denied
    ```
-   httpbin's reply shows `"Authorization": "Bearer my-demo-token"`, although the agent never set it. Now show
+   httpbin's reply shows `"Authorization": "Bearer my-demo-token"`, replacing the agent's placeholder. Now show
    the key is nowhere the actor's owner can see: `kubectl ate get actor-template agent-fetch-v1 -a workshop -o yaml`,
    `kubectl ate get actor fetch1 -a workshop -o yaml`, `scripts/egress.sh get --actor=fetch1`, and the actor's
    logs in Logs Explorer all hold only the `ate-secret://` URI. Only the provider and the egress gateway ever saw

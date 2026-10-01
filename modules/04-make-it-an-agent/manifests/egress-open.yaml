@@ -12,6 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# DO NOT USE for real agents. This opens ALL egress. It's here only to compare with egress-gateway.yaml.
+# DO NOT USE for real agents. This opens ALL HTTP and HTTPS egress. It's here only to compare with egress-gateway.yaml.
 rules:
-- all: {}
+- http:
+    hostnames: ["*"]
+    ports:
+      all: {}
+- https:
+    hostnames: ["*"]

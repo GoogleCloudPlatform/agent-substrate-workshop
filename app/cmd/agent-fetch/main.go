@@ -13,8 +13,9 @@
 // limitations under the License.
 
 // Command agent-fetch is optional lab I's copy of the workshop agent with one extra route,
-// GET /fetch?url=..., which calls an external HTTPS API without setting any auth header.
-// Under the sdsmint egress gateway, a matching EgressPolicy rule injects the credential.
+// GET /fetch?url=..., which calls an external HTTPS API with a placeholder Authorization header.
+// Under the sdsmint egress gateway, a matching EgressPolicy replaceHeaders rule replaces the
+// placeholder with the real credential from the provider.
 package main
 
 import (
@@ -49,8 +50,15 @@ func main() {
 			http.Error(w, "url must be https://", http.StatusBadRequest)
 			return
 		}
-		// No Authorization header here: the egress gateway adds it.
-		resp, err := client.Get(target)
+		req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, target, nil)
+		if err != nil {
+			http.Error(w, "fetch: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		// Placeholder only: the actor holds no secret, and the egress gateway's
+		// replaceHeaders effect overwrites this with the real credential.
+		req.Header.Set("Authorization", "Bearer placeholder")
+		resp, err := client.Do(req)
 		if err != nil {
 			http.Error(w, "fetch: "+err.Error(), http.StatusBadGateway)
 			return

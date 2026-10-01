@@ -29,8 +29,8 @@ import (
 const gatewayPolicy = `
 # Allow only the workshop gateway.
 rules:
-- hostnames:
-    patterns: ["gateway.workshop.svc.cluster.local"]
+- http:
+    hostnames: ["gateway.workshop.svc.cluster.local"]
 `
 
 func dial(t *testing.T, f *testutil.FakeControl) ateapipb.ControlClient {
@@ -49,17 +49,17 @@ func TestParsePolicyHostnames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := p.GetRules()[0].GetHostnames().GetPatterns(); len(got) != 1 || got[0] != "gateway.workshop.svc.cluster.local" {
-		t.Fatalf("patterns = %v", got)
+	if got := p.GetRules()[0].GetHttp().GetHostnames(); len(got) != 1 || got[0] != "gateway.workshop.svc.cluster.local" {
+		t.Fatalf("hostnames = %v", got)
 	}
 }
 
-func TestParsePolicyAllAndCIDR(t *testing.T) {
-	p, err := ParsePolicy([]byte("rules:\n- cidrs:\n    cidrs: [\"10.0.0.0/8\"]\n- all: {}\n"))
+func TestParsePolicyProtocols(t *testing.T) {
+	p, err := ParsePolicy([]byte("rules:\n- http:\n    hostnames: [\"*\"]\n    ports:\n      all: {}\n- https:\n    hostnames: [\"*\"]\n- tlsPassthrough:\n    hostnames: [\"*.example.com\"]\n    ports:\n      numbers: [443]\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.GetRules()[0].GetCidrs() == nil || p.GetRules()[1].GetAll() == nil {
+	if p.GetRules()[0].GetHttp().GetPorts().GetAll() == nil || p.GetRules()[1].GetHttps() == nil || p.GetRules()[2].GetTlsPassthrough() == nil {
 		t.Fatalf("rules = %v", p.GetRules())
 	}
 }
@@ -68,7 +68,7 @@ func TestParsePolicyErrors(t *testing.T) {
 	for name, in := range map[string]string{
 		"empty":    "rules: []\n",
 		"unknown":  "rules:\n- hostname: {patterns: [x]}\n",
-		"metadata": "metadata: {name: x}\nrules:\n- all: {}\n",
+		"metadata": "metadata: {name: x}\nrules:\n- http: {hostnames: [\"*\"]}\n",
 		"not yaml": ":\n  - [",
 	} {
 		if _, err := ParsePolicy([]byte(in)); err == nil {
@@ -99,12 +99,12 @@ func TestApplyUpdatesExistingPolicy(t *testing.T) {
 	if _, err := Apply(context.Background(), c, ref, p1); err != nil {
 		t.Fatal(err)
 	}
-	p2, _ := ParsePolicy([]byte("rules:\n- all: {}\n"))
+	p2, _ := ParsePolicy([]byte("rules:\n- https:\n    hostnames: [\"*\"]\n"))
 	created, err := Apply(context.Background(), c, ref, p2)
 	if err != nil || created {
 		t.Fatalf("second apply = %v, %v", created, err)
 	}
-	if f.Policy("workshop", "buddy").GetRules()[0].GetAll() == nil {
+	if f.Policy("workshop", "buddy").GetRules()[0].GetHttps() == nil {
 		t.Fatal("policy not updated")
 	}
 }
@@ -138,12 +138,13 @@ func TestDeleteIsIdempotent(t *testing.T) {
 	}
 }
 
-// The policy files attendees apply in Module 4 must parse.
+// The policy files attendees apply in Module 4 and optional lab I must parse.
 func TestWorkshopPolicyFilesParse(t *testing.T) {
 	files, err := filepath.Glob("../../../modules/04-make-it-an-agent/manifests/egress-*.yaml")
 	if err != nil || len(files) != 2 {
 		t.Fatalf("glob = %v, %v; want 2 files", files, err)
 	}
+	files = append(files, "../../../optional/I-credential-injection/egress-fetch.yaml")
 	for _, f := range files {
 		b, err := os.ReadFile(f)
 		if err != nil {
@@ -156,7 +157,7 @@ func TestWorkshopPolicyFilesParse(t *testing.T) {
 }
 
 // The policy file optional lab A applies to the ate-env atespace must parse too.
-func TestOptionalLabHPolicyFileParses(t *testing.T) {
+func TestOptionalLabAPolicyFileParses(t *testing.T) {
 	const f = "../../../optional/A-env/egress-pypi.yaml"
 	b, err := os.ReadFile(f)
 	if err != nil {
@@ -166,7 +167,7 @@ func TestOptionalLabHPolicyFileParses(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%s: %v", f, err)
 	}
-	if got := p.GetRules()[0].GetHostnames().GetPatterns(); len(got) != 2 || got[0] != "pypi.org" || got[1] != "files.pythonhosted.org" {
-		t.Fatalf("patterns = %v", got)
+	if got := p.GetRules()[0].GetHttps().GetHostnames(); len(got) != 2 || got[0] != "pypi.org" || got[1] != "files.pythonhosted.org" {
+		t.Fatalf("hostnames = %v", got)
 	}
 }

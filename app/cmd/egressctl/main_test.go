@@ -33,7 +33,7 @@ func TestApplyAllThenGet(t *testing.T) {
 	}}
 	addr, ca := testutil.StartFake(t, f)
 	policy := filepath.Join(t.TempDir(), "p.yaml")
-	_ = os.WriteFile(policy, []byte("rules:\n- all: {}\n"), 0o600)
+	_ = os.WriteFile(policy, []byte("rules:\n- http:\n    hostnames: [\"*\"]\n"), 0o600)
 	common := []string{"-a", "workshop", "--addr", addr, "--ca-file", ca}
 
 	var out bytes.Buffer
@@ -47,7 +47,7 @@ func TestApplyAllThenGet(t *testing.T) {
 	if err := run(context.Background(), append(common, "get", "--actor", "a"), &out); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "all: {}") {
+	if !strings.Contains(out.String(), "hostnames:") {
 		t.Fatalf("get output = %q", out.String())
 	}
 }
