@@ -15,11 +15,12 @@ maximum of 5 workers, 20 of the 50 attendees run at once and the rest wait suspe
 on worker demand: workers that are `partial` or `at_capacity`, plus one worker for every
 `DEMO_CONF_ACTORS_PER_WORKER` requests parked at the router.
 
-> **Fact-checked against an agent-swarm checkout** (commit `401a366`, 2026-10-01) — its `README.md`,
+> **Fact-checked against an agent-swarm checkout** — its `README.md`,
 > `hack/deploy.sh`, `manifests/workerpool.yaml.tmpl`, `manifests/actortemplate.yaml.tmpl`, and `go.mod`:
-> - agent-swarm pins `github.com/agent-substrate/substrate v0.3.0`, the same as this workshop's
+> - agent-swarm must pin `github.com/agent-substrate/substrate v0.4.0`, the same as this workshop's
 >   `SUBSTRATE_REF`. `hack/deploy.sh` requires the nodes' `ate.dev/substrate-version` label to equal that
->   pin, and `make install` labels them `v0.3.0`, so it deploys onto your workshop cluster.
+>   pin, and `make install` labels them `v0.4.0`, so it deploys onto your workshop cluster once agent-swarm's
+>   `go.mod` and `manifests/actortemplate.yaml.tmpl` (no `onPause`) are on `v0.4.0`.
 > - The gateway image is built with **`docker buildx`**, not `ko` (`hack/deploy.sh`'s `conf_build_gateway`
 >   runs `docker buildx build --platform=linux/amd64 --push`). Only the *worker* image
 >   (`ko://github.com/agent-substrate/substrate/cmd/ateom-gvisor`, in `manifests/workerpool.yaml.tmpl`) is
@@ -39,15 +40,14 @@ agent-swarm refuses to deploy unless your cluster runs the substrate version pin
 `main` moves, so re-check the pin against `SUBSTRATE_REF` before each event:
 ```bash
 git clone https://github.com/moficodes/agent-swarm .workshop/agent-swarm
-git -C .workshop/agent-swarm checkout 401a366
-grep 'agent-substrate/substrate ' .workshop/agent-swarm/go.mod     # expect v0.3.0, the SUBSTRATE_REF in workshop.env
+grep 'agent-substrate/substrate ' .workshop/agent-swarm/go.mod     # expect v0.4.0, the SUBSTRATE_REF in workshop.env
 ```
 If they differ, `hack/deploy.sh up` stops and prints the pin and the cluster's version (agent-swarm's
 README has a "Bumping Substrate" section). Use an agent-swarm commit whose pin matches rather than bumping
 either side on the day.
 
 Skip agent-swarm's `hack/create-cluster.sh` and its one-time `setup-gcp` project setup. Your workshop
-cluster and `make gcp` already cover both: GKE 1.37 with the ClusterTrustBundle beta API, an upgrade freeze,
+cluster and `make gcp` already cover both: GKE 1.37, an upgrade freeze,
 the snapshot bucket, a registry, and the Workload Identity bindings.
 
 You'll also need `docker` with the `buildx` plugin, on top of the workshop's usual tools.
@@ -84,7 +84,7 @@ and `up`, run the same `scripts/forward.sh` line again: the Service's pods chang
 Pick one of the two `hack/deploy.sh up` lines, not both.
 
 ## Things to find
-- `manifests/actortemplate.yaml.tmpl`: `onPause`/`onCommit` are both `SNAPSHOT_CONTENT_SCOPE_FULL`, and
+- `manifests/actortemplate.yaml.tmpl`: `onCommit` is `SNAPSHOT_CONTENT_SCOPE_FULL`, and
   there's no `durableDir` at all — conversation history lives only in the actor's checkpointed memory, so a
   suspend/resume (or a worker pod loss) has to bring it back through the FULL snapshot, not a file.
 - The stage header. It shows the pod count ("3 of 5", or "scaling N → M" while the HPA resizes the pool),

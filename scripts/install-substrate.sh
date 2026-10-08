@@ -51,12 +51,27 @@ state_put substrate-version "$version"
 ok "ate.dev/substrate-version=$version"
 
 step "Deploy ate-system"
+# Clusters that previously ran Substrate < v0.4.0 have a bundled Postgres PVC whose
+# "substrate" schema is owned by "postgres" instead of v0.4.0+'s "substrate_owner",
+# which causes ate-setup's setup_bundled_postgres step to fail. Reset it before deploying.
+if kubectl -n ate-system get pod postgres-0 >/dev/null 2>&1; then
+  pg_owner="$(kubectl -n ate-system exec postgres-0 -- psql -U postgres -d substrate -tAc \
+    "SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname = 'substrate'" 2>/dev/null | tr -d '[:space:]' || true)"
+  if [[ -n "$pg_owner" && "$pg_owner" != "substrate_owner" ]]; then
+    warn "bundled Postgres schema 'substrate' is owned by '$pg_owner' (pre-v0.4.0); resetting sts/postgres and pvc/data-postgres-0"
+    kubectl -n ate-system delete sts/postgres pvc/data-postgres-0 --ignore-not-found --wait=true
+  fi
+fi
+# v0.4.0+ requires an explicit --credential-provider selection on deploy ate-system / deploy atenet.
+# {"name":"k8s.io"} deploys the bundled Kubernetes Secrets provider (with a default-deny namespace policy)
+# so optional lab I works without reinstalling Substrate.
+CREDENTIAL_PROVIDER="${ATE_CREDENTIAL_PROVIDER:-{\"name\":\"k8s.io\"}}"
 if [[ -n "${SUBSTRATE_IMAGE_REPO:-}" ]]; then
-  (cd "$SRC" && go run ./cmd/ate-setup deploy ate-system --image-repo "$SUBSTRATE_IMAGE_REPO" --image-tag "$SUBSTRATE_IMAGE_TAG")
+  (cd "$SRC" && go run ./cmd/ate-setup deploy ate-system --credential-provider="$CREDENTIAL_PROVIDER" --image-repo "$SUBSTRATE_IMAGE_REPO" --image-tag "$SUBSTRATE_IMAGE_TAG")
   worker="$(cd "$SRC" && go run github.com/google/go-containerregistry/cmd/crane@latest digest "$SUBSTRATE_IMAGE_REPO/ateom-gvisor:$SUBSTRATE_IMAGE_TAG")"
   worker="$SUBSTRATE_IMAGE_REPO/ateom-gvisor:$SUBSTRATE_IMAGE_TAG@$worker"
 else
-  (cd "$SRC" && go run ./cmd/ate-setup deploy ate-system)
+  (cd "$SRC" && go run ./cmd/ate-setup deploy ate-system --credential-provider="$CREDENTIAL_PROVIDER")
   ldflags=(); while IFS= read -r l; do [[ -n "$l" ]] && ldflags+=("--ldflags=$l"); done < <(cd "$SRC" && make -s ldflags)
   worker="$(cd "$SRC" && ./hack/run-tool.sh ko build --base-import-paths "${ldflags[@]}" ./cmd/ateom-gvisor)"
 fi
@@ -67,6 +82,14 @@ ok "worker image $worker"
 step "Label nodes"
 # Every node, with --overwrite: after a SUBSTRATE_REF change the old version label must be replaced.
 kubectl label nodes --all "ate.dev/substrate-version=$version" --overwrite >/dev/null
+# Each SUBSTRATE_REF deploys a version-suffixed atelet DaemonSet (e.g. atelet-v0-4-0).
+# Remove any older atelet DaemonSets left behind by a previous SUBSTRATE_REF so
+# `rollout status ds` below doesn't block on pods whose nodeSelector no longer matches.
+for old_ds in $(kubectl -n ate-system get ds -l app=atelet -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null); do
+  if [[ "$old_ds" != "atelet-$version" ]]; then
+    kubectl -n ate-system delete ds "$old_ds" --ignore-not-found >/dev/null
+  fi
+done
 ok "nodes labeled"
 
 "$REPO_ROOT/scripts/patch-router.sh"

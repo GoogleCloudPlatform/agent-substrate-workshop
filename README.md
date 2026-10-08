@@ -29,12 +29,11 @@ can't break an earlier one (see [Module 7](modules/07-wrap-up/README.md#keep-goi
 [A — agent-substrate/env](optional/A-env/README.md) (start here), [B](optional/B-what-counts-as-idle/README.md),
 [C](optional/C-tags-clone-revert/README.md), [D](optional/D-grpc-client/README.md) stay in your namespace;
 [E](optional/E-observability-deep-dive/README.md), [F](optional/F-hpa-workerpool/README.md),
-[G](optional/G-agent-swarm/README.md) touch shared cluster pieces and have a clean-up;
-[H](optional/H-microvm/README.md) and [I](optional/I-credential-injection/README.md) change the cluster itself and go last.
+[G](optional/G-agent-swarm/README.md), [I](optional/I-credential-injection/README.md) touch shared cluster pieces and have a clean-up;
+[H](optional/H-microvm/README.md) adds a nested-virtualization node pool and a cluster-wide `SandboxConfig`.
 
 ## Prerequisites
-- A GCP project where you are **Owner**, with a GKE **1.37+** cluster that serves the `v1beta1`
-  `clustertrustbundles` and `podcertificaterequests` APIs (enabled at creation), Workload Identity, managed
+- A GCP project where you are **Owner**, with a GKE **1.37+** cluster that has Workload Identity, managed
   OpenTelemetry, Managed Prometheus, no node auto-upgrade, no spot nodes, 2× `c3-standard-4`. `make preflight`
   checks all of it.
 - Local tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst`, `nc`, `curl`, `git`, `python3`, and a running

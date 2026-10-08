@@ -61,6 +61,7 @@ flowchart LR
 | **atelet** | Runs on each worker. Starts actors in a gVisor sandbox, and snapshots and restores them to and from GCS. |
 | **atenet-router** | The front door. Routes HTTP by the `ate-target-actor` header. If the actor is suspended, it **parks the request, resumes the actor, then forwards**. |
 | **atenet-egress** | Every outbound connection from an actor goes through here. **Deny by default**; EgressPolicy opens holes. |
+| **k8s-credential-provider** | Resolves `ate-secret://k8s.io/…` references from Kubernetes Secrets for `atenet-egress` when an `https` EgressPolicy rule injects headers (optional lab I). Default-deny until granted namespaces. |
 | **podcertcontroller** | Issues certificates so actors and components have identities. Clients trust ateapi through a ClusterTrustBundle. |
 
 **CRDs vs records**

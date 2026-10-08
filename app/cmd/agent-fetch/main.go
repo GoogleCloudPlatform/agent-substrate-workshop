@@ -14,7 +14,7 @@
 
 // Command agent-fetch is optional lab I's copy of the workshop agent with one extra route,
 // GET /fetch?url=..., which calls an external HTTPS API with a placeholder Authorization header.
-// Under the sdsmint egress gateway, a matching EgressPolicy replaceHeaders rule replaces the
+// At the egress gateway, a matching EgressPolicy replaceHeaders rule replaces the
 // placeholder with the real credential from the provider.
 package main
 

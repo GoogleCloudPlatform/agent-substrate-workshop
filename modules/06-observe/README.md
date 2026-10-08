@@ -102,9 +102,10 @@ Both end up in Cloud Monitoring, so you can query them with PromQL from one plac
   Your gateway's metrics tell you about the **product**: turns, model latency, tokens, idle policy. You need both.
 - Every dashboard tile is a PromQL query you can read in `observability/dashboard.json` and reuse in alerts.
 - `make dashboards` is idempotent: edit the JSON and run it again.
-- **Actors can't export their own metrics yet** — they share hostname and IP inside the sandbox — so every
-  app-level signal you just saw came from the always-on gateway, not the actors themselves. Per-actor detail
-  lives in logs instead, which is why step 5 exists.
+- **Actors aren't scraped directly** — they share hostname and IP inside the sandbox, and an actor's own OTLP
+  push requires an `http` EgressPolicy rule to the collector (`docs/observability.md`) — so every app-level
+  metric you just saw came from the always-on gateway. Per-actor detail lives in logs instead, which is why
+  step 5 exists.
 - Metrics never carry actor identity (it would mean a time series per actor). Logs and traces do. A
   `trace_id` joins them: the CLI prints it, every Substrate record for that request carries it, and Cloud
   Trace shows the spans.

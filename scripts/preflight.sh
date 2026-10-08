@@ -84,10 +84,10 @@ step "kubectl context"
 gcloud container clusters get-credentials "$CLUSTER_NAME" --location "$CLUSTER_LOCATION" --project "$PROJECT_ID" >/dev/null 2>&1 || true
 CHECK="kubectl reaches the cluster" HINT="gcloud container clusters get-credentials $CLUSTER_NAME --location $CLUSTER_LOCATION"
 need bash -c "kubectl get nodes >/dev/null"
-# Substrate's ClusterTrustBundle code is v1beta1-only (PodCertificateRequest takes v1 or v1beta1, but its own
-# GCP setup enables both, so we do too). GKE 1.37 serves both at v1 and drops v1beta1 unless it's enabled.
-CHECK="certificates.k8s.io/v1beta1 ClusterTrustBundle + PodCertificateRequest served" HINT="gcloud container clusters update $CLUSTER_NAME --enable-kubernetes-unstable-apis=certificates.k8s.io/v1beta1/clustertrustbundles,certificates.k8s.io/v1beta1/podcertificaterequests"
-need bash -c 'r="$(kubectl get --raw /apis/certificates.k8s.io/v1beta1 2>/dev/null)"; [[ "$r" == *\"clustertrustbundles\"* && "$r" == *\"podcertificaterequests\"* ]]'
+# Substrate v0.4.0+ discovers ClusterTrustBundle and PodCertificateRequest at certificates.k8s.io/v1
+# (served by default on GKE 1.37+) and falls back to v1beta1 if v1 is not served.
+CHECK="certificates.k8s.io ClusterTrustBundle + PodCertificateRequest served" HINT="use GKE 1.37+ (serves v1 by default), or enable certificates.k8s.io/v1beta1/clustertrustbundles,certificates.k8s.io/v1beta1/podcertificaterequests at cluster creation"
+need bash -c 'r="$(kubectl get --raw /apis/certificates.k8s.io/v1 2>/dev/null; kubectl get --raw /apis/certificates.k8s.io/v1beta1 2>/dev/null)"; [[ "$r" == *\"clustertrustbundles\"* && "$r" == *\"podcertificaterequests\"* ]]'
 
 (( failures == 0 )) || die "$failures preflight check(s) failed"
 ok "preflight passed"

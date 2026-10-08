@@ -1,12 +1,8 @@
 # Instructor runbook
 
-**Last validated:** 2026-10-01, `SUBSTRATE_REF=v0.3.0`, GKE `1.37.0-gke.3503000` (Rapid, zonal, 2× `c3-standard-4`),
-source install mode. `make e2e` passed with real Vertex (17.5 min on a fresh cluster, install included) and with
-`MOCK_LLM=true` (10 min, install already done). Optional labs A (including step 5's `egress-pypi.yaml`), C, and I
-(reinstall with `--experimental-use-sdsmint --atenet-dataplane=envoy --experimental-egress-credential-injection`,
-`egress-fetch.yaml` `replaceHeaders`, and `agent-fetch`) passed end-to-end on the cluster; lab G (`agent-swarm` @
-`401a366`, pinning `v0.3.0`) passed build and unit tests (`go test ./...`, including `hack/checkmanifests`). Not run:
-published-image mode (the v0.3.0 release notes name no image repo).
+**Current target:** `SUBSTRATE_REF=v0.4.0` (2026-10-08). Last full cluster run: 2026-10-08 on `v0.4.0`, GKE `1.37.0-gke.3503000` (Rapid, zonal, 2× `c3-standard-4`),
+source install mode (`make e2e` passed with real Vertex; optional labs A and I passed end-to-end on the cluster). Not run:
+published-image mode (the release notes name no image repo).
 
 ## One week before
 
@@ -41,11 +37,9 @@ published-image mode (the v0.3.0 release notes name no image repo).
    exactly `SUBSTRATE_REF`. Its `hack/deploy.sh` refuses to deploy onto a cluster running any other version.
 6. **Provision attendee projects and clusters.** Each attendee is Owner on their own GCP project, with a
    bare GKE cluster that has, at creation:
-   - GKE **1.37+** (the minimum the workshop is validated on; `make preflight` rejects older) with `--enable-kubernetes-unstable-apis=certificates.k8s.io/v1beta1/clustertrustbundles,certificates.k8s.io/v1beta1/podcertificaterequests`.
-     Substrate at `SUBSTRATE_REF` still reads ClusterTrustBundles only at `v1beta1` (PodCertificateRequest works at
-     either version since v0.2.0, but substrate's own GCP setup still enables both, so we do too). 1.37 serves them at `v1` and
-     doesn't serve `v1beta1` unless you enable it; without it, `make install` hangs waiting for the
-     `primary-bundle` ClusterTrustBundle. `make preflight` asks the API server for `v1beta1` directly.
+   - GKE **1.37+** (the minimum the workshop is validated on; `make preflight` rejects older). GKE 1.37 serves
+     `certificates.k8s.io/v1` (`ClusterTrustBundle` and `PodCertificateRequest`) by default, which Substrate
+     `v0.4.0` uses directly (`make preflight` checks that `v1` or `v1beta1` is served).
    - **Workload Identity** and **managed OpenTelemetry** with `--managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS`.
    - **Managed Prometheus** enabled (`--enable-managed-prometheus`) — Module 6's Prometheus UI reads through it.
    - Machine type **`c3-standard-4`**, 2 nodes, **no node auto-upgrade**, **no spot/preemptible nodes** (an
@@ -67,8 +61,7 @@ published-image mode (the v0.3.0 release notes name no image repo).
      --release-channel rapid --cluster-version 1.37 \
      --machine-type c3-standard-4 --num-nodes 2 \
      --workload-pool "$PROJECT_ID.svc.id.goog" --enable-managed-prometheus \
-     --managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS \
-     --enable-kubernetes-unstable-apis=certificates.k8s.io/v1beta1/clustertrustbundles,certificates.k8s.io/v1beta1/podcertificaterequests
+     --managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS
    # Start must be in the past (or now) for preflight to count it; cover the workshop day with the end.
    gcloud container clusters update "$CLUSTER_NAME" --project "$PROJECT_ID" --location us-central1-a \
      --add-maintenance-exclusion-name workshop-freeze \
@@ -77,9 +70,7 @@ published-image mode (the v0.3.0 release notes name no image repo).
      --add-maintenance-exclusion-scope no_minor_or_node_upgrades
    ```
    Projects that still may create unenrolled clusters can use `--release-channel None --no-enable-autoupgrade`
-   instead and skip the exclusion. Adding the unstable APIs to an existing cluster with
-   `clusters update` works too, but takes 10+ minutes and needs `kubectl -n podcertificate-controller-system rollout restart deploy/podcertificate-controller`
-   afterwards if substrate is already installed.
+   instead and skip the exclusion.
    With a regional `--location`, `--num-nodes` is per zone (2 × 3 zones = 6 nodes). Put the cluster's
    location in each attendee's `workshop.env` as `CLUSTER_LOCATION`.
 

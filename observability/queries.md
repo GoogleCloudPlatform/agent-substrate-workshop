@@ -18,7 +18,7 @@ Never `kubectl port-forward` by hand for this — `make prometheus-ui`, `make fo
 | How many workers, in which state (`idle`, `partial`, `at_capacity`, `unschedulable`)? Every ateapi replica reports the whole pool, so take `max`, not `sum`. A worker running one of our actors is `partial` (actor slots, not CPU) | `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="agents", cluster="ate-cluster"})` |
 | Desired vs ready workers | `{"ate.workerpool.desired_workers", "ate.workerpool.name"="agents", cluster="ate-cluster"}` and `{"ate.workerpool.ready_workers", "ate.workerpool.name"="agents", cluster="ate-cluster"}` |
 | Lifecycle operations per second | `sum by ("ate.actor.operation.name") (rate({"ate.actor.lifecycle.operation.duration_count", cluster="ate-cluster"}[2m]))` |
-| Did the scheduler find a free worker? (`no_free_worker` = capacity starvation) | `sum by ("ate.scheduler.outcome") (rate({"ate.scheduler.assignment.duration_count", cluster="ate-cluster"}[2m]))` |
+| Did the scheduler find a free worker? (`no_capacity` = capacity starvation) | `sum by ("ate.scheduler.outcome") (rate({"ate.scheduler.assignment.duration_count", cluster="ate-cluster"}[2m]))` |
 | How slow is a resume? (P95) | `histogram_quantile(0.95, sum by (le, "ate.actor.operation.name") (rate({"ate.actor.lifecycle.operation.duration_bucket", cluster="ate-cluster"}[5m])))` |
 | Restore time by template | `histogram_quantile(0.95, sum by (le, "ate.template.name") (rate({"ate.actor.restore.duration_bucket", cluster="ate-cluster"}[5m])))` |
 | Where does cold start go? (by phase: download, oci_unpack, ateom_restore, ...) | `histogram_quantile(0.95, sum by (le, "ate.snapshot.phase") (rate({"ate.actor.restore.duration_bucket", cluster="ate-cluster"}[5m])))` |

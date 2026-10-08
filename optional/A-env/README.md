@@ -1,6 +1,6 @@
 # Optional lab A — Agent environments with `agent-substrate/env` (30–45 min)
 
-> **Cluster impact:** Namespace-scoped. Adds the `ate-env` namespace, atespace and WorkerPool next to the workshop; nothing in `workshop` changes. Step 5 (HTTPS egress rules) needs [lab I](../I-credential-injection/README.md)'s egress install, so skip it for now and come back after lab I.
+> **Cluster impact:** Namespace-scoped. Adds the `ate-env` namespace, atespace and WorkerPool next to the workshop; nothing in `workshop` changes.
 
 [`agent-substrate/env`](https://github.com/agent-substrate/env) gives an LLM (or you) a **sandboxed shell
 environment** that lives in a Substrate actor. You create it, run commands, read and write files, and let it
@@ -15,29 +15,28 @@ It's the pattern you built in Modules 4–5 (an always-on API in front of suspen
 
 ## Which env commit, and why
 
-Our `SUBSTRATE_REF` is `v0.3.0` (pinned in `app/go.mod` as `github.com/agent-substrate/substrate v0.3.0`,
-tagged 2026-10-01).
+Our `SUBSTRATE_REF` is `v0.4.0` (pinned in `app/go.mod` as `github.com/agent-substrate/substrate v0.4.0`).
 
 We checked every env tag and `main`:
 
 | env ref | substrate pin (`go.mod`) | age vs. our pin |
 |---|---|---|
 | `v0.0.7`–`v0.0.10` | `v0.0.0-20260717234919-a2d55e99e02e` (2026-07-17) | ~2.5 months older |
-| `main` @ `ab40c7b` | `v0.0.0-20260909202336-0b3d2d078f64` (2026-09-09) | ~3 weeks older, before v0.2.0 |
+| `main` @ `ab40c7b` | `v0.0.0-20260909202336-0b3d2d078f64` (2026-09-09) | ~1 month older, before v0.2.0 |
 
-No ref matches, and `main` hasn't moved since `ab40c7b` (checked 2026-10-01), so this lab pins:
+No ref matches, and `main` hasn't moved since `ab40c7b`, so this lab pins:
 
 ```
 ENV_REF=ab40c7bfb2049af1a7aade9e7bf9c6cac925b5ca   # env main, 2026-09-11
 ```
 
-**You patch it to v0.3.0 before building.** v0.2.0+ renamed two ActorTemplate fields env uses:
-`containers[].readyz` is now `wakeupProbe`, and `snapshotsConfig` is now `snapshotConfig`. The field numbers
-didn't change, so the gRPC wire format is the same. But `ate-env manifest template` prints YAML with the old
-names, and `kubectl ate create actor-template` rejects them. Step 1 bumps env's `go.mod` to v0.3.0
-and renames the two fields in `cmd/ate-env/manifest.go` (plus its test). We ran that patch on our workshop
-cluster: `go build`, `go vet`, and `go test ./...` all passed with no other changes. If your `SUBSTRATE_REF`
-has moved, or env's `main` has caught up to v0.3.0,
+**You patch it to v0.4.0 before building.** v0.2.0+ renamed two ActorTemplate fields env uses:
+`containers[].readyz` is now `wakeupProbe`, and `snapshotsConfig` is now `snapshotConfig`. And v0.4.0 changed
+`WorkerAssignment.worker_pod_ip` (`WorkerPodIp string`) to `worker_pod_ips` (`WorkerPodIps []string`), which
+env's fake control plane sets in tests. Step 1 bumps env's `go.mod` to v0.4.0 and updates those fields in
+`cmd/ate-env/manifest.go` (plus its test) and `internal/internaltest/fakecontrol/fakecontrol.go`. `go build`,
+`go vet`, and `go test ./...` all pass with no other changes. If your `SUBSTRATE_REF`
+has moved, or env's `main` has caught up to v0.4.0,
 redo this check (or drop the patch) before trusting the pin.
 
 ## Two things to know before you start
@@ -58,10 +57,12 @@ source scripts/env.sh   # workshop.env into this shell (bash or zsh): KO_DOCKER_
 ENV_REF=ab40c7bfb2049af1a7aade9e7bf9c6cac925b5ca
 git clone https://github.com/agent-substrate/env .workshop/env 2>/dev/null; git -C .workshop/env checkout "$ENV_REF"
 cd .workshop/env
-# Bring env up to v0.3.0 (see "Which env commit, and why"). Safe to rerun.
-go get github.com/agent-substrate/substrate@v0.3.0 && go mod tidy
+# Bring env up to v0.4.0 (see "Which env commit, and why"). Safe to rerun.
+go get github.com/agent-substrate/substrate@v0.4.0 && go mod tidy
 sed -i.bak -e 's/ContainerReadyz/ContainerWakeupProbe/g; s/Readyz:/WakeupProbe:/g; s/\.Readyz/.WakeupProbe/g' \
-  -e 's/SnapshotsConfig/SnapshotConfig/g' cmd/ate-env/manifest.go cmd/ate-env/manifest_test.go && rm cmd/ate-env/*.bak
+  -e 's/SnapshotsConfig/SnapshotConfig/g; s/WorkerPodIp: *"10.0.0.1"/WorkerPodIps: []string{"10.0.0.1"}/g' \
+  cmd/ate-env/manifest.go cmd/ate-env/manifest_test.go internal/internaltest/fakecontrol/fakecontrol.go && \
+  rm -f cmd/ate-env/*.bak internal/internaltest/fakecontrol/*.bak
 go build ./... && go test ./cmd/ate-env/
 export KO_DOCKER_REPO
 API_IMAGE=$(ko build --base-import-paths ./cmd/ate-env-api)
@@ -105,7 +106,7 @@ ate-env dev1 shell 'cat /note.txt'       # auto-resumes; verify the file is stil
 ```
 
 > **Verify on your cluster:** env's `ActorTemplate` (from `manifest template` above) sets no explicit
-> `durableDir` and no `snapshotConfig.onPause`/`onCommit` scope — on Substrate `v0.3.0` both default to
+> `durableDir` and no `snapshotConfig.onCommit` scope — on Substrate `v0.4.0` it defaults to
 > `SNAPSHOT_CONTENT_SCOPE_FULL`, so `/note.txt` survives the suspend. If the last command above comes back
 > empty on a newer Substrate build, check its default scope first (compare with module 3's explicit
 > `SNAPSHOT_CONTENT_SCOPE_FULL`).
@@ -148,19 +149,13 @@ curl -s -X POST localhost:7777/v1alpha/envs/dev1/mcp \
 Point any MCP client at that URL (`http://localhost:7777/v1alpha/envs/<id>/mcp`) and your LLM gets a
 persistent, sandboxed, suspendable shell plus file tools.
 
-## 5. Lock down egress (env sets no policy) — after lab I
-
-> **Do this step after [lab I](../I-credential-injection/README.md).** A hostname rule for an **HTTPS** host
-> only works when the egress gateway can read the TLS SNI, which takes lab I's `--experimental-use-sdsmint`
-> install. On the workshop's default install, pypi.org stays unreachable even with this policy in place. Go on
-> to step 6 now, and come back here once lab I is done.
+## 5. Lock down egress (env sets no policy)
 
 From the workshop you know an actor with no EgressPolicy has no outbound network at all. Give the sandboxes
 just PyPI, the way you'd lock down a real coding-agent sandbox:
 
 ```bash
 source scripts/ate-api.sh
-scripts/forward.sh ate-env-api ate-env svc/ate-env-api 7777 7777   # restart the forward if lab I's `make stop-forwards` stopped it
 egressctl -a ate-env apply -f optional/A-env/egress-pypi.yaml --all
 ate-env suspend dev1
 ate-env dev1 shell '
@@ -170,9 +165,10 @@ ate-env dev1 shell '
 ```
 
 `wget` stands in for `curl` here for the reason in "Two things to know before you start." Why
-`--no-check-certificate`? Under sdsmint the gateway terminates TLS and presents a certificate it minted for
-pypi.org, which chains to the gateway's own CA. The env template doesn't mount that CA (lab I's step 5 shows
-how, with a `systemInfo` trust-bundle volume), so a verifying client stops at `certificate verify failed`.
+`--no-check-certificate`? For `https` hostname rules, the egress gateway terminates TLS and presents a
+certificate it minted for `pypi.org`, which chains to the gateway's MITM CA (`egress-mitm.ate.dev`). The env
+template doesn't mount that CA ([lab I](../I-credential-injection/README.md)'s step 5 shows how, with a
+`systemInfo` trust-bundle volume), so a verifying client stops at `certificate verify failed`.
 Either way, what matters is the contrast between the two lines: pypi.org gets through the gateway, and
 example.com is refused.
 
@@ -222,8 +218,6 @@ not `ate-cluster`, replace `ate-cluster` in the queries above).
   `app/internal/ateclient`'s `fileToken`: same idea, independently written.
 
 ## Clean up
-
-If you plan to run [step 5](#5-lock-down-egress-env-sets-no-policy--after-lab-i) after [lab I](../I-credential-injection/README.md), wait to run this clean-up until after step 5:
 
 ```bash
 for e in dev1 $(seq -f 'env%g' 1 10); do ate-env delete "$e"; done

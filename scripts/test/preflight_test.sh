@@ -32,7 +32,10 @@ exit 0
 STUB
 cat >"$TMP/bin/kubectl" <<'STUB'
 #!/usr/bin/env bash
-case "$*" in *certificates.k8s.io/v1beta1*) [[ -n "${V1_ONLY:-}" ]] && exit 1; echo '{"resources":[{"name":"clustertrustbundles"},{"name":"podcertificaterequests"}]}' ;; esac
+case "$*" in
+  *certificates.k8s.io/v1beta1*) [[ -n "${V1_ONLY:-}" || -n "${NO_CERTS:-}" ]] && exit 1; echo '{"resources":[{"name":"clustertrustbundles"},{"name":"podcertificaterequests"}]}' ;;
+  *certificates.k8s.io/v1*)      [[ -n "${NO_CERTS:-}" ]] && exit 1; echo '{"resources":[{"name":"clustertrustbundles"},{"name":"podcertificaterequests"}]}' ;;
+esac
 exit 0
 STUB
 # Simulate a host go1.26 wrapper that resolves go1.27.1 via GOTOOLCHAIN=auto only inside a module with go.mod (app/).
@@ -76,7 +79,9 @@ check "an expired exclusion doesn't count" "[[ $rc != 0 && \"\$out\" == *'no nod
 out="$(run "$TMP/minor-only.json")"; rc=$?
 check "a minor-only exclusion doesn't count (nodes still upgrade)" "[[ $rc != 0 && \"\$out\" == *'no node auto-upgrade —'* ]]"
 out="$(V1_ONLY=1 run "$TMP/good.json")"; rc=$?
-check "1.37 serving only certificates.k8s.io/v1 fails the v1beta1 check" "[[ $rc != 0 && \"\$out\" == *'PodCertificateRequest served —'* ]]"
+check "1.37 serving only certificates.k8s.io/v1 passes the certificates check" "[[ $rc == 0 ]]"
+out="$(NO_CERTS=1 run "$TMP/good.json")"; rc=$?
+check "cluster serving neither v1 nor v1beta1 fails the certificates check" "[[ $rc != 0 && \"\$out\" == *'PodCertificateRequest served —'* ]]"
 jq '.currentMasterVersion = "1.36.4-gke.200" | .enableK8sBetaApis.enabledApis = ["certificates.k8s.io/v1beta1/clustertrustbundles", "certificates.k8s.io/v1beta1/podcertificaterequests"]' \
   "$TMP/good.json" >"$TMP/old.json"
 out="$(run "$TMP/old.json")"; rc=$?

@@ -24,6 +24,8 @@ import (
 	"github.com/agent-substrate/substrate/pkg/proto/ateapipb"
 	"github.com/agent-substrate/workshop/app/internal/ateclient"
 	"github.com/agent-substrate/workshop/app/internal/testutil"
+	"google.golang.org/protobuf/encoding/protojson"
+	"sigs.k8s.io/yaml"
 )
 
 const gatewayPolicy = `
@@ -169,5 +171,38 @@ func TestOptionalLabAPolicyFileParses(t *testing.T) {
 	}
 	if got := p.GetRules()[0].GetHttps().GetHostnames(); len(got) != 2 || got[0] != "pypi.org" || got[1] != "files.pythonhosted.org" {
 		t.Fatalf("hostnames = %v", got)
+	}
+}
+
+// Every ActorTemplate manifest in modules/ and optional/ must unmarshal cleanly into ateapipb.ActorTemplate.
+func TestWorkshopActorTemplateFilesParse(t *testing.T) {
+	modFiles, err := filepath.Glob("../../../modules/*/manifests/template.yaml.tmpl")
+	if err != nil || len(modFiles) != 3 {
+		t.Fatalf("modules glob = %v, %v; want 3 files", modFiles, err)
+	}
+	optFiles, err := filepath.Glob("../../../optional/*/template.yaml.tmpl")
+	if err != nil || len(optFiles) != 3 {
+		t.Fatalf("optional glob = %v, %v; want 3 files", optFiles, err)
+	}
+	replacer := strings.NewReplacer(
+		"${ATESPACE}", "workshop",
+		"${AGENT_IMAGE}", "us-central1-docker.pkg.dev/p/workshop/agent@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"${FETCH_IMAGE}", "us-central1-docker.pkg.dev/p/workshop/agent-fetch@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"${BUCKET_NAME}", "p-ate-snapshots",
+	)
+	for _, f := range append(modFiles, optFiles...) {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rendered := replacer.Replace(string(b))
+		j, err := yaml.YAMLToJSON([]byte(rendered))
+		if err != nil {
+			t.Fatalf("%s: YAMLToJSON: %v", f, err)
+		}
+		tmpl := &ateapipb.ActorTemplate{}
+		if err := protojson.Unmarshal(j, tmpl); err != nil {
+			t.Errorf("%s: protojson.Unmarshal ActorTemplate: %v", f, err)
+		}
 	}
 }
