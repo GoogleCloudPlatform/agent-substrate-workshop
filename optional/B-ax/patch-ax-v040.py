@@ -138,12 +138,22 @@ def patch_workspace_setup(ax_dir: str) -> None:
 
 
 def patch_ax_cli_timeout(ax_dir: str) -> None:
-    # Give `ax apply` 120s so it doesn't time out while Substrate takes the template's golden snapshot (~20s).
+    # Give `ax apply` 120s so it doesn't time out while Substrate takes the template's golden snapshot (~20s),
+    # and give `runResume` 60s so actor wakeup + workspace setup polling (15s) can finish before persisting status.
     path = os.path.join(ax_dir, "cmd", "ax", "main.go")
     with open(path, "r", encoding="utf-8") as fh:
         content = fh.read()
     content = content.replace("30*time.Second", "120*time.Second")
     content = content.replace("30 * time.Second", "120 * time.Second")
+    old_resume = """\tctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+\tdefer cancel()
+
+\tif _, err := client.ResumeTask("""
+    new_resume = """\tctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+\tdefer cancel()
+
+\tif _, err := client.ResumeTask("""
+    content = content.replace(old_resume, new_resume)
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(content)
 

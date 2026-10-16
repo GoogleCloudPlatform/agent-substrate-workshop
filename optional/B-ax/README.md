@@ -93,7 +93,7 @@ kubectl ate get actor-template "$TMPL" -a ax-workshop -o yaml
 
 Compare that generated `ActorTemplate` with the ones you wrote by hand in Modules 2–4:
 
-- **Name (`demo-task-tmpl-<hash>`)**: `TaskReconciler` (`internal/controller/reconciler.go`) hashes the image and environment variables into the template name. Because Substrate templates are immutable ([Module 3](../../modules/03-suspend-resume/README.md#templates-are-immutable)), any change to the task's spec produces a new template digest automatically.
+- **Name (`demo-task-tmpl-<hash>`)**: `TaskReconciler` (`internal/controller/reconciler.go`) hashes the image and environment variables into the template name. Because both AX `Task`s and Substrate `ActorTemplate`s are immutable ([Module 3](../../modules/03-suspend-resume/README.md#templates-are-immutable)), changing a task's spec requires either a new task name or deleting and recreating the task (`ax delete task …` then `ax apply -f …`, which discards the previous actor state and generates a fresh template digest).
 - **Entrypoint (`/ko-app/ax-task-runner`)**: AX never sets your `spec.command` as the container entrypoint. Instead, it injects the task and workspace YAML into `AX_TASK_YAML` and `AX_WORKSPACES_YAML` env vars and boots `ax-task-runner` as PID 1 on port 80 (`wakeupProbe: /healthz`, with `/readyz` reporting `200 OK` once `SetupWorkspace` finishes).
 - **Storage (`onCommit: SNAPSHOT_CONTENT_SCOPE_DATA`, `durableDir: /workspace`)**: AX uses the disk-only snapshot scope from Module 3 Part B. Only `/workspace` is saved to GCS on suspend; on resume, `ax-task-runner` cold-boots, sees `/workspace/.ax/initialized-workspace`, skips workspace setup, and starts your command against the restored files.
 
