@@ -33,7 +33,7 @@ Step 1 runs [`optional/B-ax/patch-ax-v040.py`](patch-ax-v040.py) to bring it up 
 
 1. **Substrate `v0.4.0` proto changes** (same as lab A): `ContainerReadyz` → `ContainerWakeupProbe` (pointed at `/healthz` so the actor transitions to `RUNNING` and activates its `EgressPolicy` as soon as the runner's HTTP server starts, while `TaskReconciler` polls `/readyz?check=workspace`), `SnapshotsConfig` (with `OnPause`/`OnResume`) → `SnapshotConfig` (`OnCommit: DATA`), `WorkerPodIp` → `WorkerPodIps`, and a retry in `EnsureActor` while the template's golden snapshot finishes (`FailedPrecondition`).
 2. **`ko`-built runner path**: AX's `.ko.yaml` already configures `cmd/ax-task-runner` to use `alpine/git:latest` (Alpine + `git`, `sh`, `wget`), which lets `ko build` produce a `@sha256:` digest-pinned runner image without Docker. The patch switches `DefaultGuestCommand` in `internal/substrate/client.go` from `/usr/local/bin/ax-task-runner` to `/ko-app/ax-task-runner` where `ko` places the binary.
-3. **`WorkerSelector` and `DATA`-scope marker path**: adds `workerSelector: {workload: ax-worker}` so AX tasks run on their own `ax-workers` pool instead of the workshop's `agents` pool, and moves AX's maiden-run marker directory (`DefaultAXDir` in `internal/workspace/setup.go`) from `/ax` to `/workspace/.ax` so it lives inside the `/workspace` `durableDir` and survives a `DATA`-scope suspend/resume ([Module 3 Part B](../../modules/03-suspend-resume/README.md#part-b-disk-only-suspend-template-agent-v2)).
+3. **`WorkerSelector`, `DATA`-scope marker path, and namespace-scoped RBAC**: adds `workerSelector: {workload: ax-worker}` so AX tasks run on their own `ax-workers` pool instead of the workshop's `agents` pool, moves AX's maiden-run marker directory (`DefaultAXDir` in `internal/workspace/setup.go`) from `/ax` to `/workspace/.ax` so it lives inside the `/workspace` `durableDir` and survives a `DATA`-scope suspend/resume ([Module 3 Part B](../../modules/03-suspend-resume/README.md#part-b-disk-only-suspend-template-agent-v2)), and removes the cluster-wide Secret `ClusterRole` and `ClusterRoleBinding` from `deploy/ax-server.yaml` so the deployment stays strictly namespace-scoped to `ax-system`.
 
 ## 1. Build and deploy AX (you build every image)
 
@@ -49,7 +49,10 @@ export KO_DOCKER_REPO
 export RUNNER_IMAGE=$(cd .workshop/ax && ko build --base-import-paths ./cmd/ax-task-runner)
 (cd .workshop/ax && go build -o "$REPO_ROOT/bin/ax" ./cmd/ax)
 
-# Deploy the ax-workers WorkerPool, Redis, and ax-server in ax-system:
+# Deploy the ax-workers WorkerPool, Redis, and ax-server in ax-system
+# (patch-ax-v040.py stripped the ClusterRole/ClusterRoleBinding from deploy/ax-server.yaml;
+# delete any leftover grant if you applied an unpatched manifest earlier):
+kubectl delete clusterrolebinding,clusterrole ax-server --ignore-not-found
 scripts/render.sh optional/B-ax/workerpool.yaml.tmpl | kubectl apply -f -
 kubectl apply -f .workshop/ax/deploy/redis.yaml
 kubectl -n ax-system rollout status deploy/ax-redis --timeout=180s
@@ -143,7 +146,8 @@ Because `ax apply` creates tasks in `Suspended` phase, you can apply the task, a
 ```bash
 ax suspend task demo-task -a ax-workshop
 scripts/render.sh optional/B-ax/git-task.yaml.tmpl | ax apply -f -
-ATESPACE=ax-workshop scripts/egress.sh apply optional/B-ax/egress-github.yaml --actor=repo-task
+source scripts/ate-api.sh
+egressctl -a ax-workshop apply -f optional/B-ax/egress-github.yaml --actor=repo-task
 ax resume task repo-task -a ax-workshop
 ax describe task repo-task -a ax-workshop
 ax ssh repo-task -a ax-workshop -- ls -la /workspace/env
@@ -201,8 +205,6 @@ ax delete workspace repo-workspace -a ax-workshop
 ax tunnel stop
 kubectl ate delete atespace ax-workshop
 kubectl delete namespace ax-system --ignore-not-found
-kubectl delete clusterrole ax-server --ignore-not-found
-kubectl delete clusterrolebinding ax-server --ignore-not-found
 ```
 
 ## Next

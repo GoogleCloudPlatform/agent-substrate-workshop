@@ -148,6 +148,40 @@ def patch_ax_cli_timeout(ax_dir: str) -> None:
         fh.write(content)
 
 
+def patch_deploy_manifest(ax_dir: str) -> None:
+    # Omit the cluster-wide Secret ClusterRole and ClusterRoleBinding from deploy/ax-server.yaml
+    # so the lab stays strictly namespace-scoped to ax-system.
+    path = os.path.join(ax_dir, "deploy", "ax-server.yaml")
+    with open(path, "r", encoding="utf-8") as fh:
+        content = fh.read()
+    rbac_docs = """---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ax-server
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ax-server
+subjects:
+  - kind: ServiceAccount
+    name: ax-server
+    namespace: ax-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ax-server
+"""
+    content = content.replace(rbac_docs, "")
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(content)
+
+
 def main() -> int:
     ax_dir = sys.argv[1] if len(sys.argv) > 1 else ".workshop/ax"
     ax_dir = os.path.abspath(ax_dir)
@@ -160,6 +194,7 @@ def main() -> int:
     patch_reconciler_test(ax_dir)
     patch_workspace_setup(ax_dir)
     patch_ax_cli_timeout(ax_dir)
+    patch_deploy_manifest(ax_dir)
     print(f"Patched AX at {ax_dir} for Agent Substrate v0.4.0.")
     return 0
 
