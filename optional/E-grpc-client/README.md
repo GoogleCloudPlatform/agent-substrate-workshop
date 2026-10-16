@@ -1,4 +1,4 @@
-# Optional lab D — Your own gRPC client (outline)
+# Optional lab E — Your own gRPC client (outline)
 
 > **Cluster impact:** Namespace-scoped. A client program that lists, creates, suspends and resumes your own actors.
 

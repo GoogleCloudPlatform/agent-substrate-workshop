@@ -140,13 +140,16 @@ func TestDeleteIsIdempotent(t *testing.T) {
 	}
 }
 
-// The policy files attendees apply in Module 4 and optional lab I must parse.
+// The policy files attendees apply in Module 4 and optional labs B and J must parse.
 func TestWorkshopPolicyFilesParse(t *testing.T) {
 	files, err := filepath.Glob("../../../modules/04-make-it-an-agent/manifests/egress-*.yaml")
 	if err != nil || len(files) != 2 {
 		t.Fatalf("glob = %v, %v; want 2 files", files, err)
 	}
-	files = append(files, "../../../optional/I-credential-injection/egress-fetch.yaml")
+	files = append(files,
+		"../../../optional/B-ax/egress-github.yaml",
+		"../../../optional/J-credential-injection/egress-fetch.yaml",
+	)
 	for _, f := range files {
 		b, err := os.ReadFile(f)
 		if err != nil {

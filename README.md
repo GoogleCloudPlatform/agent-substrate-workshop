@@ -26,11 +26,11 @@ Everything you deploy, you build: the agent, the gateway, and (in source mode) S
 
 Optional labs afterwards, in order: each one changes the cluster more than the one before, so a later lab
 can't break an earlier one (see [Module 7](modules/07-wrap-up/README.md#keep-going-optional-labs)).
-[A — agent-substrate/env](optional/A-env/README.md) (start here), [B](optional/B-what-counts-as-idle/README.md),
-[C](optional/C-tags-clone-revert/README.md), [D](optional/D-grpc-client/README.md) stay in your namespace;
-[E](optional/E-observability-deep-dive/README.md), [F](optional/F-hpa-workerpool/README.md),
-[G](optional/G-agent-swarm/README.md), [I](optional/I-credential-injection/README.md) touch shared cluster pieces and have a clean-up;
-[H](optional/H-microvm/README.md) adds a nested-virtualization node pool and a cluster-wide `SandboxConfig`.
+[A — agent-substrate/env](optional/A-env/README.md) (start here), [B — google/ax](optional/B-ax/README.md),
+[C](optional/C-what-counts-as-idle/README.md), [D](optional/D-tags-clone-revert/README.md), [E](optional/E-grpc-client/README.md) stay in their own namespace;
+[F](optional/F-observability-deep-dive/README.md), [G](optional/G-hpa-workerpool/README.md),
+[H](optional/H-agent-swarm/README.md), [J](optional/J-credential-injection/README.md) touch shared cluster pieces and have a clean-up;
+[I](optional/I-microvm/README.md) adds a nested-virtualization node pool and a cluster-wide `SandboxConfig`.
 
 ## Prerequisites
 - A GCP project where you are **Owner**, with a GKE **1.37+** cluster that has Workload Identity, managed

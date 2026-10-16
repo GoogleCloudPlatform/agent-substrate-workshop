@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# EgressPolicy for lab I's fetch1 actor: Module 4's gateway rule, plus one HTTPS host whose requests get their
+# EgressPolicy for lab J's fetch1 actor: Module 4's gateway rule, plus one HTTPS host whose requests get their
 # Authorization header replaced by the egress gateway. `effects` is a field of the https rule
 # (HTTPSRule.effects in ateapi.proto), so it sits under `https:`, next to `hostnames`.
-# Applied literally (not rendered): scripts/egress.sh apply optional/I-credential-injection/egress-fetch.yaml --actor=fetch1
+# Applied literally (not rendered): scripts/egress.sh apply optional/J-credential-injection/egress-fetch.yaml --actor=fetch1
 rules:
 - http:
     hostnames: ["gateway.workshop.svc.cluster.local"]

@@ -23,6 +23,14 @@ many actors.
 > | Suspend = delete the Pod | Suspend = checkpoint memory + disk to GCS | Resume on *any* worker |
 >
 > Watch for the naming clash: Substrate also has a `SandboxConfig` CRD, but it configures gVisor/microVM runtimes.
+>
+> **Where does [AX (`google/ax`)](https://github.com/google/ax) fit?**
+> Substrate is the **runtime and sandbox** layer: it knows how to isolate, snapshot, route to, and suspend/resume
+> actor processes across shared workers, without caring what runs inside them. **AX (Agent eXecutor)** is a higher-level,
+> `kubectl`-shaped **control plane** (`ax.io/v1alpha1`) built on top of Substrate: you declare a `Workspace` (Git repos,
+> files, MCP servers, skills), a `Task` (image, command, resources), and a `Model`, and AX compiles them into the
+> Substrate `ActorTemplate` and `Actor` records you'll build by hand in Modules 2–5 ([optional lab B](../../optional/B-ax/README.md)
+> runs AX on this cluster).
 
 ## The pieces
 
@@ -61,7 +69,7 @@ flowchart LR
 | **atelet** | Runs on each worker. Starts actors in a gVisor sandbox, and snapshots and restores them to and from GCS. |
 | **atenet-router** | The front door. Routes HTTP by the `ate-target-actor` header. If the actor is suspended, it **parks the request, resumes the actor, then forwards**. |
 | **atenet-egress** | Every outbound connection from an actor goes through here. **Deny by default**; EgressPolicy opens holes. |
-| **k8s-credential-provider** | Resolves `ate-secret://k8s.io/…` references from Kubernetes Secrets for `atenet-egress` when an `https` EgressPolicy rule injects headers (optional lab I). Default-deny until granted namespaces. |
+| **k8s-credential-provider** | Resolves `ate-secret://k8s.io/…` references from Kubernetes Secrets for `atenet-egress` when an `https` EgressPolicy rule injects headers (optional lab J). Default-deny until granted namespaces. |
 | **podcertcontroller** | Issues certificates so actors and components have identities. Clients trust ateapi through a ClusterTrustBundle. |
 
 **CRDs vs records**

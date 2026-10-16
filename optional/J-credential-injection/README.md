@@ -1,4 +1,4 @@
-# Optional lab I — Egress credential injection (60–90 min)
+# Optional lab J — Egress credential injection (60–90 min)
 
 > **Cluster impact:** Namespace-scoped (`workshop` and `workshop-secrets`), plus a one-line entry in `ate-system`'s `k8s-credential-provider-namespace-policy` `ConfigMap`. Safe to run alongside the rest of the workshop.
 
@@ -61,10 +61,10 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
    (substrate's `docs/egress-trust-bundle.md` explains both):
    ```bash
    export FETCH_IMAGE="$(cd app && ko build --base-import-paths ./cmd/agent-fetch)"
-   scripts/render.sh optional/I-credential-injection/template.yaml.tmpl | kubectl ate create actor-template -f -
+   scripts/render.sh optional/J-credential-injection/template.yaml.tmpl | kubectl ate create actor-template -f -
    kubectl ate get actor-template agent-fetch-v1 -a workshop                 # repeat until GOLDEN TAG is set (~20s)
    kubectl ate create actor fetch1 --template=agent-fetch-v1 -a workshop
-   scripts/egress.sh apply optional/I-credential-injection/egress-fetch.yaml --actor=fetch1
+   scripts/egress.sh apply optional/J-credential-injection/egress-fetch.yaml --actor=fetch1
    curl -s -H 'ate-target-actor: workshop/fetch1' 'localhost:8080/fetch?url=https://httpbin.org/headers'
    curl -s -H 'ate-target-actor: workshop/fetch1' 'localhost:8080/fetch?url=https://example.com/'   # egress denied
    ```

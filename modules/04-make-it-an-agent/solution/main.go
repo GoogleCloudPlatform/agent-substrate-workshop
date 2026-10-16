@@ -35,7 +35,7 @@ func main() {
 		DataDir: "/data",
 		// module-4: model calls go through the gateway.
 		ModelURL: os.Getenv("MODEL_URL"),
-		// WORKSHOP(lab-b): set Heartbeat to true so background jobs tell the gateway they're busy.
+		// WORKSHOP(lab-c): set Heartbeat to true so background jobs tell the gateway they're busy.
 		Heartbeat: false,
 	}
 
