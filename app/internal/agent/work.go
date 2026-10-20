@@ -87,7 +87,7 @@ func (s *Server) handleWork(w http.ResponseWriter, r *http.Request) {
 
 // handleJob serves POST /jobs?steps=N: it answers 202 right away and does the work in the
 // background, where no request is in flight to keep the actor awake. With Heartbeat on and a
-// Busy-URL header, the job POSTs that URL every heartbeatEvery until it finishes (optional lab B).
+// Busy-URL header, the job POSTs that URL every heartbeatEvery until it finishes (optional lab C).
 func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 	steps, busyURL := stepsParam(r), r.Header.Get(chatapi.BusyURLHeader)
 	heartbeat := s.cfg.Heartbeat && busyURL != ""

@@ -14,7 +14,7 @@
 
 # Autoscales the agents pool on worker demand: workers hosting actors plus the
 # workers parked turns would fill.
-# Ported from agent-swarm's manifests/autoscaling.yaml.tmpl (optional lab G), which adapts Substrate's
+# Ported from agent-swarm's manifests/autoscaling.yaml.tmpl (optional lab H), which adapts Substrate's
 # demos/autoscaled-workerpool: conf-workers -> agents, 4 seats per worker -> 1, 2..5 workers -> 2..4.
 #
 # Flow: atenet-router and ate-api-server :9090/metrics --5s scrape-->
@@ -177,7 +177,7 @@ metadata:
 # missing. The series query keys on
 # ate_workerpool_workers, which exists whenever the pool does, so the metric
 # stays listed while the router reports nothing. The router is shared with
-# other pools (lab A's ate-env, lab G's conf-workers): parked requests for them count here too.
+# other pools (lab A's ate-env, lab B's ax-workers, lab H's conf-workers): parked requests for them count here too.
 apiVersion: v1
 kind: ConfigMap
 metadata:

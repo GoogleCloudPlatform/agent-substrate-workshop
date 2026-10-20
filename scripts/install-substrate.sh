@@ -64,7 +64,7 @@ if kubectl -n ate-system get pod postgres-0 >/dev/null 2>&1; then
 fi
 # v0.4.0+ requires an explicit --credential-provider selection on deploy ate-system / deploy atenet.
 # {"name":"k8s.io"} deploys the bundled Kubernetes Secrets provider (with a default-deny namespace policy)
-# so optional lab I works without reinstalling Substrate.
+# so optional lab J works without reinstalling Substrate.
 CREDENTIAL_PROVIDER="${ATE_CREDENTIAL_PROVIDER:-{\"name\":\"k8s.io\"}}"
 if [[ -n "${SUBSTRATE_IMAGE_REPO:-}" ]]; then
   (cd "$SRC" && go run ./cmd/ate-setup deploy ate-system --credential-provider="$CREDENTIAL_PROVIDER" --image-repo "$SUBSTRATE_IMAGE_REPO" --image-tag "$SUBSTRATE_IMAGE_TAG")

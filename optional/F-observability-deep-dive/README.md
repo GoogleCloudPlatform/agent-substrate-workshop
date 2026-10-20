@@ -1,4 +1,4 @@
-# Optional lab E — Observability deep dive (30 min)
+# Optional lab F — Observability deep dive (30 min)
 
 > **Cluster impact:** Shared, with a revert. Creates alert policies in the project, deliberately crashes every actor on two workers (including [lab A](../A-env/README.md)'s, if they share them), and saturates the pool for 7 minutes. Step 1 ends with a revert loop and `make idle-on`; run them before moving on.
 
@@ -24,7 +24,7 @@ filter would page on theirs too.
 ```bash
 source scripts/env.sh   # workshop.env into this shell (bash or zsh)
 for f in alert-actor-crashes alert-workers-desired-vs-ready alert-resume-latency alert-router-503; do
-  scripts/render.sh "optional/E-observability-deep-dive/$f.json" > "/tmp/$f.json"
+  scripts/render.sh "optional/F-observability-deep-dive/$f.json" > "/tmp/$f.json"
   gcloud monitoring policies create --project "$PROJECT_ID" --policy-from-file="/tmp/$f.json"
 done
 ```
@@ -76,7 +76,7 @@ done
   make idle-on                             # IDLE_AFTER=3s again: step 5 needs a free worker
   ```
   (The default 180s load ends before a 5-minute condition can complete.) If you've already done
-  [lab F](../F-hpa-workerpool/README.md) (it comes after this one), its HPA grows the pool under this load and the errors may never
+  [lab G](../G-hpa-workerpool/README.md) (it comes after this one), its HPA grows the pool under this load and the errors may never
   reach 10%: delete the HPA first (`kubectl -n workshop delete hpa agents`) and re-apply it afterwards.
 
 ## 2. An SLO on chat success

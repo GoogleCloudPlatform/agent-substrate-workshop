@@ -16,7 +16,7 @@
 # Re-applies the workshop's atenet-router settings on top of whatever `ate-setup deploy` rendered: a 60s
 # parked-request budget and a 120s grace period, plus the router's GMP PodMonitoring. install-substrate.sh
 # runs it; run it again (make patch-router) after anything that re-deploys substrate outside `make install`,
-# such as optional lab I's reinstall with experimental flags. Safe to re-run.
+# such as optional lab J's reinstall with experimental flags. Safe to re-run.
 source "$(dirname "$0")/lib.sh"
 load_env
 SRC="$STATE_DIR/substrate"

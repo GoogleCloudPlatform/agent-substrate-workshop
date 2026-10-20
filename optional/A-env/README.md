@@ -167,7 +167,7 @@ ate-env dev1 shell '
 `wget` stands in for `curl` here for the reason in "Two things to know before you start." Why
 `--no-check-certificate`? For `https` hostname rules, the egress gateway terminates TLS and presents a
 certificate it minted for `pypi.org`, which chains to the gateway's MITM CA (`egress-mitm.ate.dev`). The env
-template doesn't mount that CA ([lab I](../I-credential-injection/README.md)'s step 5 shows how, with a
+template doesn't mount that CA ([lab J](../J-credential-injection/README.md)'s step 5 shows how, with a
 `systemInfo` trust-bundle volume), so a verifying client stops at `certificate verify failed`.
 Either way, what matters is the contrast between the two lines: pypi.org gets through the gateway, and
 example.com is refused.
@@ -229,4 +229,4 @@ make stop-forwards   # stops step 2's ate-env-api forward (and the workshop's ot
 
 ## Next
 
-Back to [Module 7 — Wrap-up](../../modules/07-wrap-up/README.md) for the rest of the optional labs.
+Continue to [Optional lab B — Declarative tasks and workspaces with `google/ax`](../B-ax/README.md) (which embeds `env`'s guest gRPC server inside `ax-task-runner` to power `ax ssh`), or back to [Module 7 — Wrap-up](../../modules/07-wrap-up/README.md) for the rest of the optional labs.

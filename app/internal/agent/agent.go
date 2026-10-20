@@ -52,7 +52,7 @@ type Config struct {
 	DataDir  string
 	ModelURL string
 	// Heartbeat makes background jobs (POST /jobs) report "still busy" to the URL the gateway
-	// sends in the Busy-URL header, so the idle suspender leaves the actor alone (optional lab B).
+	// sends in the Busy-URL header, so the idle suspender leaves the actor alone (optional lab C).
 	Heartbeat bool
 	Client    *http.Client
 	Now       func() time.Time

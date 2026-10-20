@@ -1,6 +1,6 @@
-# Optional lab F — Autoscale the WorkerPool (30 min)
+# Optional lab G — Autoscale the WorkerPool (30 min)
 
-> **Cluster impact:** Cluster-wide, with a clean-up. Claims the cluster's only `external.metrics.k8s.io` APIService and puts an HPA on `agents`. Run the clean-up before [lab G](../G-agent-swarm/README.md).
+> **Cluster impact:** Cluster-wide, with a clean-up. Claims the cluster's only `external.metrics.k8s.io` APIService and puts an HPA on `agents`. Run the clean-up before [lab H](../H-agent-swarm/README.md).
 
 **Goal:** grow and shrink the number of workers with demand, so idle-suspend (Module 5) and capacity work
 together instead of a fixed `replicas: 2`.
@@ -8,11 +8,11 @@ together instead of a fixed `replicas: 2`.
 **You'll need:** the Module 5 end state (the swarm, `IDLE_AFTER=3s`). This lab brings its own Prometheus,
 so it doesn't depend on Module 6's Managed Prometheus, but Module 6's dashboard is where you'll watch it.
 
-This is the same autoscaler [optional lab G](../G-agent-swarm/README.md)'s agent-swarm runs for its
+This is the same autoscaler [optional lab H](../H-agent-swarm/README.md)'s agent-swarm runs for its
 `conf-workers` pool (`manifests/autoscaling.yaml.tmpl` there), pointed at your `agents` pool.
 
 > **Only one adapter can serve `external.metrics.k8s.io` per cluster.** This lab registers its
-> prometheus-adapter there, and so does lab G's `hack/deploy.sh up` (it refuses to run if another adapter
+> prometheus-adapter there, and so does lab H's `hack/deploy.sh up` (it refuses to run if another adapter
 > holds it). Do one lab at a time: run the other lab's clean-up first.
 
 ## 1. The WorkerPool is already scalable
@@ -47,9 +47,9 @@ prometheus-adapter with one external rule (`workshop_worker_demand`, the formula
 APIService is a separate file and goes on last: an APIService with no ready backend breaks API discovery for
 the whole cluster.
 ```bash
-scripts/render.sh optional/F-hpa-workerpool/autoscaling.yaml.tmpl | kubectl apply -f -
+scripts/render.sh optional/G-hpa-workerpool/autoscaling.yaml.tmpl | kubectl apply -f -
 kubectl -n workshop rollout status deploy/workshop-prometheus deploy/workshop-prometheus-adapter --timeout=180s
-scripts/render.sh optional/F-hpa-workerpool/autoscaling-apiservice.yaml.tmpl | kubectl apply -f -
+scripts/render.sh optional/G-hpa-workerpool/autoscaling-apiservice.yaml.tmpl | kubectl apply -f -
 kubectl get apiservice v1beta1.external.metrics.k8s.io        # AVAILABLE True after ~30s
 kubectl get --raw /apis/external.metrics.k8s.io/v1beta1/namespaces/workshop/workshop_worker_demand | jq '.items[].value'
 kubectl -n workshop get hpa agents                           # TARGETS n/1, not <unknown>
@@ -80,13 +80,13 @@ idle-suspends every actor within 3s, demand drops to 0, and the pool shrinks bac
   too: 4 workers × 250m CPU / 1Gi requests fit on the workshop's two nodes; a bigger `maxReplicas` needs
   cluster autoscaling or a bigger node pool, or new workers sit `Pending`.
 - **The router is shared.** `atenet.router.parking.active` has no atespace label, so parked requests for other
-  pools (lab A's `ate-env`, lab G's `conf-workers`) count as demand here too.
+  pools (lab A's `ate-env`, lab B's `ax-workers`, lab H's `conf-workers`) count as demand here too.
 
 ## Clean up
 Delete the APIService first, for the same discovery reason as above:
 ```bash
-scripts/render.sh optional/F-hpa-workerpool/autoscaling-apiservice.yaml.tmpl | kubectl delete -f - --ignore-not-found
-scripts/render.sh optional/F-hpa-workerpool/autoscaling.yaml.tmpl | kubectl delete -f - --ignore-not-found
+scripts/render.sh optional/G-hpa-workerpool/autoscaling-apiservice.yaml.tmpl | kubectl delete -f - --ignore-not-found
+scripts/render.sh optional/G-hpa-workerpool/autoscaling.yaml.tmpl | kubectl delete -f - --ignore-not-found
 kubectl -n workshop patch workerpool agents --type merge -p '{"spec":{"replicas":2}}'
 ```
 

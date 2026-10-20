@@ -1,7 +1,7 @@
 # Instructor runbook
 
 **Current target:** `SUBSTRATE_REF=v0.4.0` (2026-10-08). Last full cluster run: 2026-10-08 on `v0.4.0`, GKE `1.37.0-gke.3503000` (Rapid, zonal, 2× `c3-standard-4`),
-source install mode (`make e2e` passed with real Vertex; optional labs A and I passed end-to-end on the cluster). Not run:
+source install mode (`make e2e` passed with real Vertex; optional labs A and J passed end-to-end on the cluster). Not run:
 published-image mode (the release notes name no image repo).
 
 ## One week before
@@ -30,10 +30,10 @@ published-image mode (the release notes name no image repo).
    gained auto suspend/resume or multi-sandbox-per-Pod, update the comparison table in
    [Module 1](../modules/01-architecture/README.md) and the wrap-up table in
    [Module 7](../modules/07-wrap-up/README.md).
-5. **For optional lab A** (`agent-substrate/env`): pick a tag whose `go.mod` substrate version matches
-   `SUBSTRATE_REF`, so the sandboxed-shell lab isn't running against a different substrate build than the core
-   workshop.
-   **For optional lab G** (`moficodes/agent-swarm`, which must be public before the event): pick a commit whose `go.mod` substrate version is
+5. **For optional lab A** (`agent-substrate/env`) and **optional lab B** (`google/ax`): verify that their pinned commits
+   (`ENV_REF` and `AX_REF`) and `v0.4.0` patches still build and pass unit tests against `SUBSTRATE_REF` (or drop the
+   patches once upstream `main` catches up to `SUBSTRATE_REF`).
+   **For optional lab H** (`moficodes/agent-swarm`, which must be public before the event): pick a commit whose `go.mod` substrate version is
    exactly `SUBSTRATE_REF`. Its `hack/deploy.sh` refuses to deploy onto a cluster running any other version.
 6. **Provision attendee projects and clusters.** Each attendee is Owner on their own GCP project, with a
    bare GKE cluster that has, at creation:
@@ -97,7 +97,7 @@ published-image mode (the release notes name no image repo).
 | 4 Agent | 13 | No secrets in actors. Egress is deny-by-default. Presence vs cognition. | The `egress-open` comparison |
 | 5 Density & idle | 10 | Substrate doesn't know when you're idle; your front door does. | Step 4 (the 60s 503 demo): describe it instead |
 | 6 Observe | 12 | Platform metrics + product metrics. The 1–3 min lag. | Logs Explorer step |
-| 7 Wrap-up | 3 | Point everyone at lab A. | — |
+| 7 Wrap-up | 3 | Point everyone at labs A (`env`) and B (`google/ax`). | — |
 
 That's 85 minutes with no slack. If a module runs long, take the "cut if behind" for that module rather than
 compressing the next one — Module 6 in particular needs its 1–3 minute Cloud Monitoring lag no matter how fast

@@ -1,4 +1,4 @@
-# Optional lab C — Tags, clone, revert (20 min)
+# Optional lab D — Tags, clone, revert (20 min)
 
 > **Cluster impact:** Namespace-scoped. Works on `buddy` and a clone. It switches the gateway's idle-suspend off (`make idle-off`) and back on (`make idle-on`) at the end.
 
@@ -74,7 +74,7 @@ suspends replaces the actor's one external snapshot, and only a tag keeps an old
 - Revert rolls back **everything in the snapshot's scope**, including `/data` for a `DATA`-scope template.
 - Use cases: checkpoints before risky tool calls, forking a conversation (clone), an "undo" for the last
   turn or tool call (revert), and warm-starting many actors from one prepared state (clone, at scale — see
-  optional lab G).
+  optional lab H).
 
 ## Clean up
 ```bash

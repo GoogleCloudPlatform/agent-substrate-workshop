@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Command agent-fetch is optional lab I's copy of the workshop agent with one extra route,
+// Command agent-fetch is optional lab J's copy of the workshop agent with one extra route,
 // GET /fetch?url=..., which calls an external HTTPS API with a placeholder Authorization header.
 // At the egress gateway, a matching EgressPolicy replaceHeaders rule replaces the
 // placeholder with the real credential from the provider.

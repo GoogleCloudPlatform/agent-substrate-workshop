@@ -1,4 +1,4 @@
-# Optional lab H — microVM sandbox class (45–60 min)
+# Optional lab I — microVM sandbox class (45–60 min)
 
 > **Cluster impact:** Changes the cluster. Adds a nested-virt node pool (one extra `c3-standard-4`, billed until you delete it) and a cluster-wide `SandboxConfig`. **Taint the pool** (step 1): without it, gVisor snapshots taken on that node crash when they restore anywhere else.
 
@@ -25,7 +25,7 @@ source scripts/env.sh    # workshop.env into this shell (bash or zsh): PROJECT_I
      --node-taints=ate.dev/sandboxClass=microvm:NoSchedule
    kubectl get nodes -l workshop-pool=microvm      # Ready about 15s after the command returns
    ```
-   **Why this taint:** the gVisor WorkerPools (`agents`, lab G's `conf-workers`, lab A's pool) select only
+   **Why this taint:** the gVisor WorkerPools (`agents`, lab H's `conf-workers`, lab A's and lab B's pools) select only
    `ate.dev/substrate-version` and tolerate only `ate.dev/sandboxClass=gvisor:NoSchedule`, so without this taint
    they land on this node too. A nested-virt CPU exposes the `vmx` feature, so a gVisor snapshot taken there
    fails to restore on an ordinary node (`runsc restore … incompatible FeatureSet: missing features: map[vmx:{}]`)
@@ -56,12 +56,12 @@ source scripts/env.sh    # workshop.env into this shell (bash or zsh): PROJECT_I
    export MICROVM_WORKER_IMAGE="$(cd .workshop/substrate && export GOWORK=off KO_DOCKER_REPO KO_DEFAULTPLATFORMS &&
      ldflags=(); while IFS= read -r l; do [[ -n "$l" ]] && ldflags+=("--ldflags=$l"); done < <(make -s ldflags) &&
      ./hack/run-tool.sh ko build --base-import-paths "${ldflags[@]}" ./cmd/ateom-microvm)"
-   scripts/render.sh optional/H-microvm/workerpool.yaml.tmpl | kubectl apply -f -
+   scripts/render.sh optional/I-microvm/workerpool.yaml.tmpl | kubectl apply -f -
    kubectl -n workshop get pods -l workload=workshop-agent-vm -o wide     # Running on the microvm node
-   scripts/render.sh optional/H-microvm/template.yaml.tmpl | kubectl ate create actor-template -f -
+   scripts/render.sh optional/I-microvm/template.yaml.tmpl | kubectl ate create actor-template -f -
    kubectl ate get actor-template agent-vm-v1 -a workshop -o yaml | grep -A2 goldenTag   # repeat until set (~20s)
    ```
-   `diff modules/04-make-it-an-agent/manifests/template.yaml.tmpl optional/H-microvm/template.yaml.tmpl`
+   `diff modules/04-make-it-an-agent/manifests/template.yaml.tmpl optional/I-microvm/template.yaml.tmpl`
    shows everything that changed. `.workshop/substrate/demos/counter/counter-microvm-template.yaml.tmpl` is
    substrate's own reference.
 4. Create an actor on `agent-vm-v1`, give it the same egress as `buddy`, and chat with it:

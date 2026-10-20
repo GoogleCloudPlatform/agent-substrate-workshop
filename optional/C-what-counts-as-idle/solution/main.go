@@ -35,7 +35,7 @@ func main() {
 		DataDir: "/data",
 		// module-4: model calls go through the gateway.
 		ModelURL: os.Getenv("MODEL_URL"),
-		// lab-b: background jobs report "still busy" to the gateway.
+		// lab-c: background jobs report "still busy" to the gateway.
 		Heartbeat: true,
 	}
 

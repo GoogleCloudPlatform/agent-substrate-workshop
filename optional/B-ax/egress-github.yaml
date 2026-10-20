@@ -1,0 +1,26 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# EgressPolicy for optional lab B step 5: allow git clone from GitHub over TLS passthrough.
+# Unlike an `https:` rule (which terminates TLS at the egress gateway using egress-mitm.ate.dev),
+# `tlsPassthrough:` forwards raw TLS on port 443 after checking the SNI hostname, so git/wget inside
+# the alpine/git runner verify GitHub's certificate against the container's standard root CAs.
+# Applied with: egressctl -a ax-workshop apply -f optional/B-ax/egress-github.yaml --actor=repo-task
+rules:
+- tlsPassthrough:
+    hostnames:
+    - "github.com"
+    - "*.githubusercontent.com"
+    ports:
+      numbers: [443]

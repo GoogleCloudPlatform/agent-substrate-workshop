@@ -1,6 +1,6 @@
-# Optional lab G — agent-swarm at 50:20 (30 min)
+# Optional lab H — agent-swarm at 50:20 (30 min)
 
-> **Cluster impact:** Cluster-wide, with a clean-up. Claims the `external.metrics.k8s.io` APIService (run [lab F](../F-hpa-workerpool/README.md)'s clean-up first), patches `atenet-router` flags that aren't restored, and needs ~11.5 GiB of node memory at full scale. Run its clean-up before lab H.
+> **Cluster impact:** Cluster-wide, with a clean-up. Claims the `external.metrics.k8s.io` APIService (run [lab G](../G-hpa-workerpool/README.md)'s clean-up first), patches `atenet-router` flags that aren't restored, and needs ~11.5 GiB of node memory at full scale. Run its clean-up before lab I.
 
 [agent-swarm](https://github.com/moficodes/agent-swarm) is the reference conference demo: 50 attendee
 actors (`attendee-01`…`attendee-50`) on an autoscaled WorkerPool (`conf-workers`, 2 to 5 pods), with a
@@ -54,8 +54,8 @@ You'll also need `docker` with the `buildx` plugin, on top of the workshop's usu
 
 Two things to know about sharing the cluster with the workshop:
 - agent-swarm installs prometheus-adapter as the cluster's `v1beta1.external.metrics.k8s.io` APIService, and
-  refuses to run if another adapter (the Stackdriver adapter, KEDA, or [lab F](../F-hpa-workerpool/README.md)'s
-  prometheus-adapter) already serves it. If you did lab F, run its clean-up first.
+  refuses to run if another adapter (the Stackdriver adapter, KEDA, or [lab G](../G-hpa-workerpool/README.md)'s
+  prometheus-adapter) already serves it. If you did lab G, run its clean-up first.
 - Its workers land on the same two nodes as the workshop's `agents` pool. At the default 4 seats, each
   `conf-workers` pod requests 500m CPU and 2304Mi memory (512Mi per seat plus 256Mi), so 5 of them take
   about 11.5 GiB. If pods stay `Pending`, run `make teardown` first or lower `DEMO_CONF_MAX_WORKERS`.
