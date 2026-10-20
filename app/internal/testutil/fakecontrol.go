@@ -129,8 +129,8 @@ func (f *FakeControl) ListActors(_ context.Context, req *ateapipb.ListActorsRequ
 			in = append(in, a)
 		}
 	}
-	start, _ := strconv.Atoi(req.GetPageToken())
-	size := int(req.GetPageSize())
+	start, _ := strconv.Atoi(req.GetOptions().GetPageToken())
+	size := int(req.GetOptions().GetPageSize())
 	if f.PageCap > 0 && (size == 0 || size > f.PageCap) {
 		size = f.PageCap
 	}
@@ -177,6 +177,9 @@ func (f *FakeControl) CreateActorEgressPolicy(_ context.Context, req *ateapipb.C
 }
 
 func (f *FakeControl) GetActorEgressPolicy(_ context.Context, req *ateapipb.GetActorEgressPolicyRequest) (*ateapipb.EgressPolicy, error) {
+	if req.GetName() != "default" {
+		return nil, status.Error(codes.InvalidArgument, "policy name must be default")
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	p, ok := f.policies[key(req.GetActor())]
@@ -203,6 +206,9 @@ func (f *FakeControl) UpdateActorEgressPolicy(_ context.Context, req *ateapipb.U
 }
 
 func (f *FakeControl) DeleteActorEgressPolicy(_ context.Context, req *ateapipb.DeleteActorEgressPolicyRequest) (*ateapipb.EgressPolicy, error) {
+	if req.GetName() != "default" {
+		return nil, status.Error(codes.InvalidArgument, "policy name must be default")
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	k := key(req.GetActor())

@@ -1,7 +1,7 @@
 # Instructor runbook
 
-**Current target:** `SUBSTRATE_REF=v0.4.0` (2026-10-08). Last full cluster run: 2026-10-08 on `v0.4.0`, GKE `1.37.0-gke.3503000` (Rapid, zonal, 2× `c3-standard-4`),
-source install mode (`make e2e` passed with real Vertex; optional labs A and J passed end-to-end on the cluster). Not run:
+**Current target:** `SUBSTRATE_REF=v0.5.0` (2026-10-20). Last full cluster run: 2026-10-20 on `v0.5.0`, GKE `1.37.0-gke.3503000` (Rapid, zonal, 2× `c3-standard-4`),
+source install mode (`make e2e` passed with real Vertex; optional labs A, B, and J passed end-to-end on the cluster). Not run:
 published-image mode (the release notes name no image repo).
 
 ## One week before
@@ -31,20 +31,19 @@ published-image mode (the release notes name no image repo).
    [Module 1](../modules/01-architecture/README.md) and the wrap-up table in
    [Module 7](../modules/07-wrap-up/README.md).
 5. **For optional lab A** (`agent-substrate/env`) and **optional lab B** (`google/ax`): verify that their pinned commits
-   (`ENV_REF` and `AX_REF`) and `v0.4.0` patches still build and pass unit tests against `SUBSTRATE_REF` (or drop the
-   patches once upstream `main` catches up to `SUBSTRATE_REF`).
+   (`ENV_REF` and `AX_REF`) and `v0.5.0` patch (`optional/B-ax/patch-ax-v040.py`) still build and pass unit tests against `SUBSTRATE_REF` (or drop the
+   patch once upstream `main` catches up to `SUBSTRATE_REF`).
    **For optional lab H** (`moficodes/agent-swarm`, which must be public before the event): pick a commit whose `go.mod` substrate version is
    exactly `SUBSTRATE_REF`. Its `hack/deploy.sh` refuses to deploy onto a cluster running any other version.
 6. **Provision attendee projects and clusters.** Each attendee is Owner on their own GCP project, with a
    bare GKE cluster that has, at creation:
    - GKE **1.37+** (the minimum the workshop is validated on; `make preflight` rejects older). GKE 1.37 serves
      `certificates.k8s.io/v1` (`ClusterTrustBundle` and `PodCertificateRequest`) by default, which Substrate
-     `v0.4.0` uses directly (`make preflight` checks that `v1` or `v1beta1` is served).
+     `v0.5.0` uses directly (`make preflight` checks that `v1` or `v1beta1` is served).
    - **Workload Identity** and **managed OpenTelemetry** with `--managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS`.
    - **Managed Prometheus** enabled (`--enable-managed-prometheus`) — Module 6's Prometheus UI reads through it.
    - Machine type **`c3-standard-4`**, 2 nodes, **no node auto-upgrade**, **no spot/preemptible nodes** (an
-     upgrade or a preempted node can silently swap in a worker image `ate.dev/substrate-version` doesn't match,
-     and a spot reclaim mid-workshop loses whatever wasn't already snapshotted).
+     upgrade or a spot reclaim mid-workshop disrupts running workers and loses whatever wasn't already snapshotted).
 
    `--managed-otel-scope` is a **beta** flag: plain `gcloud container clusters create` rejects it
    (`unrecognized arguments`). Use `gcloud beta` (`gcloud components install beta` first).

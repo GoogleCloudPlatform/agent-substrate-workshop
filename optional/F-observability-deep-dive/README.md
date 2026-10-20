@@ -5,7 +5,7 @@
 Starts from the end of Module 6 (`make catch-up MODULE=7`).
 
 > **Fact-checked against the substrate checkout at `SUBSTRATE_REF`** (`docs/metrics/registry/metrics.yaml`,
-> `internal/ateattr/ateattr.go`, `cmd/atelet/statsevents.go`) and this repo's own `observability/dashboard.json`
+> `internal/ateattr/ateattr.go`, `internal/ateom/stats.go`) and this repo's own `observability/dashboard.json`
 > and `observability/queries.md`. Two corrections from an earlier draft of this lab, called out inline below:
 > the resume operation's label value is lowercase `resume`, not `RESUME`; and a logs-based metric over
 > per-actor events must stay labeled by template/pool, never by actor name — see step 3.
@@ -85,8 +85,8 @@ good = `workshop_chat_turns_total{outcome="ok", cluster="ate-cluster"}`, total =
 Watch the error budget burn during step 1's `IDLE_AFTER=0s` run.
 
 ## 3. Usage events as a logs-based metric — labeled by template/pool, not actor
-Every worker emits an `"Actor usage sample"` log line per actor per poll tick (atelet's
-`cmd/atelet/statsevents.go`) — CPU, memory, and identity, but *as a log*, not a metric series, specifically
+Every worker emits an `"Actor usage sampled"` log line per actor per poll tick (`internal/ateom/stats.go`) —
+CPU, memory, and identity, but *as a log*, not a metric series, specifically
 **because** it carries actor identity. Module 6 already made this point for `ate.template.name`-labeled
 metrics; the same rule applies when you build your own logs-based metric from these events: keep actor
 identity in the log filter you eyeball, but never promote it to a metric label.
@@ -94,13 +94,13 @@ identity in the log filter you eyeball, but never promote it to a metric label.
 ```bash
 gcloud logging metrics create actor_usage_events --project "$PROJECT_ID" \
   --description="Actor usage samples, labeled only by template and pool (never actor — cardinality)" \
-  --log-filter='resource.type="k8s_container" AND jsonPayload.msg="Actor usage sample"'
+  --log-filter='resource.type="k8s_container" AND jsonPayload.msg="Actor usage sampled"'
 ```
 In the metric's settings (Logs Explorer → your new metric → "Convert to a metric" panel, or Metrics Explorer
-→ edit), add label extractors for `labels."ate.template.name"` and `labels."ate.workerpool.name"` — **not**
-`labels."ate.actor.name"`. (`gcloud logging metrics create` has no flag for label extractors, which is why
-this part is in the Console. Note the `labels.` prefix: atelet's usage samples carry `ate.*` in `labels`,
-while ateapi's records, such as `Actor state changed`, carry them in `jsonPayload`.) Chart it in Metrics
+→ edit), add label extractors for `jsonPayload."ate.template.name"` and `jsonPayload."ate.workerpool.name"` — **not**
+`jsonPayload."ate.actor.name"`. (`gcloud logging metrics create` has no flag for label extractors, which is why
+this part is in the Console. Note the `jsonPayload.` prefix: `ateom`'s usage samples and `ateapi`'s `Actor state changed`
+records both carry `ate.*` in `jsonPayload`.) Chart it in Metrics
 Explorer grouped by template: this tells you which *template*
 generates the most usage events under `make load`, without ever creating a per-actor time series.
 
@@ -108,8 +108,8 @@ To drill into one actor's own usage events (a log search, not a metric — no ca
 use Logs Explorer directly:
 ```
 resource.type="k8s_container"
-jsonPayload.msg="Actor usage sample"
-labels."ate.actor.name"="swarm-01"
+jsonPayload.msg="Actor usage sampled"
+jsonPayload."ate.actor.name"="swarm-01"
 ```
 
 ## 4. Extend the workshop dashboard

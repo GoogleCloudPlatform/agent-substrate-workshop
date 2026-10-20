@@ -6,7 +6,7 @@
 |---|---|---|
 | WorkerPool `agents` | generic, pre-started capacity | every deployment |
 | Templates v1 → v3 | immutable template + golden snapshot | **google/ax (`Task`)**: hashes image + env into `<task>-tmpl-<hash>` |
-| `hello`, `memo` | suspend/resume, FULL vs DATA scope | **google/ax (`Workspace`)**: `/workspace` `durableDir` with `DATA` scope |
+| `hello`, `memo` | suspend/resume, MEMORY vs VOLUMES fidelity | **google/ax (`Workspace`)**: `/workspace` `durableDir` with `VOLUMES` fidelity |
 | gateway `/v1/model` | presence vs cognition split | **always-on-agent**: presence service + suspendable cognition actor |
 | gateway-only EgressPolicy | deny-by-default egress | **agent-substrate/env**: sandboxed shells for LLM tools |
 | `swarm-01…20` + idle-suspend | density + parking | **agent-swarm**: 50 agents on 2–5 autoscaled workers, 4 per worker |

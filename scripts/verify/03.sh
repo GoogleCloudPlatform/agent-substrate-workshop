@@ -19,8 +19,8 @@ step "verify module 3 (suspend/resume)"
 check "template agent-v2 has a golden snapshot" _template_ready "$ATESPACE" agent-v2
 check "actor memo exists" actor_json "$ATESPACE" memo
 
-memo_state() { router_curl memo -f http://localhost:8080/state; }
-if before="$(router_curl memo -f http://localhost:8080/ >/dev/null && memo_state)"; then
+memo_state() { router_curl memo -f "http://localhost:${ROUTER_LOCAL_PORT:-8080}/state"; }
+if before="$(router_curl memo -f "http://localhost:${ROUTER_LOCAL_PORT:-8080}/" >/dev/null && memo_state)"; then
   w_before="$(actor_worker "$ATESPACE" memo)"
   suspend_actor "$ATESPACE" memo
   after="$(memo_state || echo '{}')"

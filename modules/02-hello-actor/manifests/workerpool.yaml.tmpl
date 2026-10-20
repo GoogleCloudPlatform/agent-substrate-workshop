@@ -3,6 +3,9 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: ${NAMESPACE}
+  # Required by the ate-system NetworkPolicy on ate-api-server:443 (workers and the gateway call it).
+  labels:
+    ate.dev/api-access: "true"
 ---
 apiVersion: ate.dev/v1alpha1
 kind: WorkerPool
@@ -17,14 +20,16 @@ spec:
   replicas: 2
   # Must come from the same substrate build as the control plane (recorded by make install).
   workerImage: ${WORKER_IMAGE}
+  sandboxClasses:
+  - name: gvisor
+    configRef:
+      name: gvisor-default
   # WorkerPoolPodTemplate is flat: there is no template.spec. Everything here lands on the
   # generated Deployment and its worker Pods, so `labels` is what makes
   # `kubectl get pods -l workload=workshop-agent` find them.
   template:
     labels:
       workload: workshop-agent
-    nodeSelector:
-      ate.dev/substrate-version: "${SUBSTRATE_VERSION}"
     resources:
       limits:
         cpu: "1"

@@ -11,9 +11,9 @@ back to its own last snapshot (**revert**).
 
 > **Fact-checked against the substrate source** (`cmd/kubectl-ate/internal/cmd/tag.go`,
 > `revert_actor.go`, `actor.go` at `SUBSTRATE_REF`): `create tag` takes `--actor` and `-a/--atespace`, not a
-> content scope — `--scope` here means the *tag's* visibility (`atespace` or `published`), not the
-> FULL/DATA snapshot content scope you set on a template. And `revert actor` takes **no `--tag` flag at
-> all**: it sends a crashed, running, or paused actor back to **its own last external snapshot**, discarding
+> snapshot fidelity — `--scope` here means the *tag's* visibility (`atespace` or `published`), not the
+> MEMORY/VOLUMES snapshot fidelity you set on a template. And `revert actor` takes **no `--tag` flag at
+> all**: it sends a crashed or running actor (or a paused actor with a node-local snapshot) back to **its own last external snapshot**, discarding
 > only the execution since then. See "What to notice" below for why that's actually the more useful demo.
 
 **First, turn off idle-suspend for this lab.** Module 5's gateway suspends any actor that's been idle
@@ -58,20 +58,20 @@ suspender would snapshot "mango" first. That's the lesson of this lab from the o
 suspends replaces the actor's one external snapshot, and only a tag keeps an older one.
 
 ## What to notice
-- **Tag scope vs. snapshot content scope are different knobs.** `--scope atespace|published` on a tag
+- **Tag scope vs. snapshot fidelity are different knobs.** `--scope atespace|published` on a tag
   controls who can read it (its own atespace, or any atespace via a published reference) — it does not
-  choose FULL vs. DATA. Content scope is set once, on the template, via `snapshotConfig.onCommit`
-  (`agent-v3` uses `SNAPSHOT_CONTENT_SCOPE_FULL`, from Module 4).
+  choose MEMORY vs. VOLUMES. Snapshot fidelity is set once, on the template, via `snapshotConfig.preferredFidelity`
+  (`agent-v3` uses `SNAPSHOT_FIDELITY_MEMORY`, from Module 4).
 - **A clone shares its past with the source** (same `bootID`, same conversation), exactly like the
   golden-snapshot callout in Module 5 — except here the shared point is whatever moment you tagged, not the
   template's golden snapshot. Anything that must be unique per actor (generated IDs, seeded randomness,
   fetched credentials) has to be regenerated on the first request after the clone starts, not at boot.
-- **Revert is not "go to this tag."** It has no target snapshot argument — it discards a crashed, running, or
-  paused actor's current execution and drops it back to SUSPENDED against whatever external snapshot it
+- **Revert is not "go to this tag."** It has no target snapshot argument — it discards a crashed or running
+  actor's current execution (or a paused actor's node-local snapshot) and drops it back to SUSPENDED against whatever external snapshot it
   already has. That's still a real "undo," just scoped to "since the last suspend," not to an arbitrary
   point in history. To revert to an arbitrary earlier point, delete the actor and clone a fresh one from a
   tag instead — which is exactly what the clone step above did.
-- Revert rolls back **everything in the snapshot's scope**, including `/data` for a `DATA`-scope template.
+- Revert rolls back **everything in the snapshot's fidelity**, including `/data` for a `VOLUMES`-fidelity template.
 - Use cases: checkpoints before risky tool calls, forking a conversation (clone), an "undo" for the last
   turn or tool call (revert), and warm-starting many actors from one prepared state (clone, at scale — see
   optional lab H).

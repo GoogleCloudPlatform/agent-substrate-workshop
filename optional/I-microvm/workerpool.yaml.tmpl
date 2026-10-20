@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # WorkerPool agents-vm (optional lab I): one microVM worker on the tainted nested-virt node pool.
-# Same shape as Module 2's `agents` pool, plus sandboxClass, the node pool's label, and a toleration for
+# Same shape as Module 2's `agents` pool, plus sandboxClasses=[microvm], the node pool's label, and a toleration for
 # its taint. MICROVM_WORKER_IMAGE comes from your shell (step 3 builds it); the gVisor WORKER_IMAGE can't
 # run microVMs.
 apiVersion: ate.dev/v1alpha1
@@ -25,13 +25,15 @@ metadata:
     workload: workshop-agent-vm
 spec:
   replicas: 1
-  sandboxClass: microvm
   workerImage: ${MICROVM_WORKER_IMAGE}
+  sandboxClasses:
+  - name: microvm
+    configRef:
+      name: microvm
   template:
     labels:
       workload: workshop-agent-vm
     nodeSelector:
-      ate.dev/substrate-version: "${SUBSTRATE_VERSION}"
       workshop-pool: microvm
     tolerations:
     - {key: ate.dev/sandboxClass, operator: Equal, value: microvm, effect: NoSchedule}

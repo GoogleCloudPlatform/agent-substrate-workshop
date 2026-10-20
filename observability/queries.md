@@ -48,9 +48,9 @@ Never `kubectl port-forward` by hand for this — `make prometheus-ui`, `make fo
 ## Logs (Cloud Console -> Logging -> Logs Explorer)
 
 Substrate writes actor identity in two places. Records it writes *on the actor's behalf* (your agent's
-stdout, ateom's `Actor restoring` / `Actor checkpointing`, atelet's `Actor usage sample`) carry it in the
+stdout, ateom's `Actor restoring` / `Actor checkpointing`) carry it in the
 label group, `labels."ate.*"`. Records a component writes *about* an actor (ateapi's `Actor state changed`
-and `Actor crashed`, atelet's `Restore timing breakdown`) carry the same keys flat in `jsonPayload`. A
+and `Actor crashed`, atelet's `Restore timing breakdown`, ateom's `Actor usage sampled`) carry the same keys flat in `jsonPayload`. A
 query for one actor's whole story needs both.
 
 One actor's history across workers and components, oldest first:

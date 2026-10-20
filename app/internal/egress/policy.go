@@ -63,7 +63,7 @@ func Apply(ctx context.Context, c ateapipb.ControlClient, actor *ateapipb.Object
 	if status.Code(err) != codes.AlreadyExists {
 		return false, fmt.Errorf("create policy for %s/%s: %w", actor.GetAtespace(), actor.GetName(), err)
 	}
-	cur, err := c.GetActorEgressPolicy(ctx, &ateapipb.GetActorEgressPolicyRequest{Actor: actor})
+	cur, err := c.GetActorEgressPolicy(ctx, &ateapipb.GetActorEgressPolicyRequest{Actor: actor, Name: PolicyName})
 	if err != nil {
 		return false, fmt.Errorf("get policy for %s/%s: %w", actor.GetAtespace(), actor.GetName(), err)
 	}
@@ -85,7 +85,10 @@ func Targets(ctx context.Context, c ateapipb.ControlClient, atespace, actor stri
 	var refs []*ateapipb.ObjectRef
 	token := ""
 	for {
-		resp, err := c.ListActors(ctx, &ateapipb.ListActorsRequest{Atespace: atespace, PageSize: 100, PageToken: token})
+		resp, err := c.ListActors(ctx, &ateapipb.ListActorsRequest{
+			Atespace: atespace,
+			Options:  &ateapipb.ListOptions{PageSize: 100, PageToken: token},
+		})
 		if err != nil {
 			return nil, fmt.Errorf("list actors in %s: %w", atespace, err)
 		}
@@ -100,12 +103,12 @@ func Targets(ctx context.Context, c ateapipb.ControlClient, atespace, actor stri
 
 // Get returns the actor's policy.
 func Get(ctx context.Context, c ateapipb.ControlClient, actor *ateapipb.ObjectRef) (*ateapipb.EgressPolicy, error) {
-	return c.GetActorEgressPolicy(ctx, &ateapipb.GetActorEgressPolicyRequest{Actor: actor})
+	return c.GetActorEgressPolicy(ctx, &ateapipb.GetActorEgressPolicyRequest{Actor: actor, Name: PolicyName})
 }
 
 // Delete removes the actor's policy; a missing policy is not an error.
 func Delete(ctx context.Context, c ateapipb.ControlClient, actor *ateapipb.ObjectRef) error {
-	_, err := c.DeleteActorEgressPolicy(ctx, &ateapipb.DeleteActorEgressPolicyRequest{Actor: actor})
+	_, err := c.DeleteActorEgressPolicy(ctx, &ateapipb.DeleteActorEgressPolicyRequest{Actor: actor, Name: PolicyName})
 	if status.Code(err) == codes.NotFound {
 		return nil
 	}

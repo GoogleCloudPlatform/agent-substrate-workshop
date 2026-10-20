@@ -23,10 +23,9 @@ tmpl="${1:?usage: render.sh <file.tmpl>}"
 # state_source <VAR>: "<state file>|<make target>" for variables that come from .workshop/.
 state_source() {
   case "$1" in
-    AGENT_IMAGE)       echo "agent-image|make build-agent" ;;
-    GATEWAY_IMAGE)     echo "gateway-image|make gateway" ;;
-    WORKER_IMAGE)      echo "worker-image|make install" ;;
-    SUBSTRATE_VERSION) echo "substrate-version|make install" ;;
+    AGENT_IMAGE)   echo "agent-image|make build-agent" ;;
+    GATEWAY_IMAGE) echo "gateway-image|make gateway" ;;
+    WORKER_IMAGE)  echo "worker-image|make install" ;;
     *) return 1 ;;
   esac
 }

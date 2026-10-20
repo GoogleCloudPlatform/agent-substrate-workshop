@@ -21,19 +21,19 @@ flowchart LR
 
 ## Which AX commit, and why
 
-Our `SUBSTRATE_REF` is `v0.4.0` (pinned in `app/go.mod` as `github.com/agent-substrate/substrate v0.4.0`).
+Our `SUBSTRATE_REF` is `v0.5.0` (pinned in `app/go.mod` as `github.com/agent-substrate/substrate v0.5.0`).
 
-Like `agent-substrate/env` in [lab A](../A-env/README.md), upstream `google/ax` pins a pre-`v0.2.0` Substrate commit (`v0.0.0-20260918201817-944abe3278b8` in `go.mod`). This lab pins AX at:
+Upstream `google/ax` pins an older Substrate commit (`v0.0.0-20260918201817-944abe3278b8` in `go.mod`). This lab pins AX at:
 
 ```
 AX_REF=ac2332829f22360ff97b0ba34d94dd0dd782f17e   # google/ax main, 2026-10-12
 ```
 
-Step 1 runs [`optional/B-ax/patch-ax-v040.py`](patch-ax-v040.py) to bring it up to `v0.4.0` before building:
+Step 1 runs [`optional/B-ax/patch-ax-v040.py`](patch-ax-v040.py) to bring it up to `v0.5.0` before building:
 
-1. **Substrate `v0.4.0` proto changes** (same as lab A): `ContainerReadyz` → `ContainerWakeupProbe` (pointed at `/healthz` so the actor transitions to `RUNNING` and activates its `EgressPolicy` as soon as the runner's HTTP server starts, while `TaskReconciler` polls `/readyz?check=workspace`), `SnapshotsConfig` (with `OnPause`/`OnResume`) → `SnapshotConfig` (`OnCommit: DATA`), `WorkerPodIp` → `WorkerPodIps`, and a retry in `EnsureActor` while the template's golden snapshot finishes (`FailedPrecondition`).
+1. **Substrate `v0.5.0` proto changes**: `ContainerReadyz` → `WakeupProbe` + `HttpGetAction` (pointed at `/healthz` so the actor transitions to `RUNNING` and activates its `EgressPolicy` as soon as the runner's HTTP server starts, while `TaskReconciler` polls `/readyz?check=workspace`), `SnapshotsConfig` (with `OnPause`/`OnResume`) → `SnapshotConfig` (`PreferredFidelity: SNAPSHOT_FIDELITY_VOLUMES`), `SandboxConfig.SandboxClass` enum → string `"gvisor"`, required `Resources.Limits` (`cpu: "1"`, `memory: "512Mi"`), `WorkerPodIp` → `WorkerPodIps`, and a retry in `EnsureActor` while the template's golden snapshot finishes (`FailedPrecondition`).
 2. **`ko`-built runner path**: AX's `.ko.yaml` already configures `cmd/ax-task-runner` to use `alpine/git:latest` (Alpine + `git`, `sh`, `wget`), which lets `ko build` produce a `@sha256:` digest-pinned runner image without Docker. The patch switches `DefaultGuestCommand` in `internal/substrate/client.go` from `/usr/local/bin/ax-task-runner` to `/ko-app/ax-task-runner` where `ko` places the binary.
-3. **`WorkerSelector`, `DATA`-scope marker path, and namespace-scoped RBAC**: adds `workerSelector: {workload: ax-worker}` so AX tasks run on their own `ax-workers` pool instead of the workshop's `agents` pool, moves AX's maiden-run marker directory (`DefaultAXDir` in `internal/workspace/setup.go`) from `/ax` to `/workspace/.ax` so it lives inside the `/workspace` `durableDir` and survives a `DATA`-scope suspend/resume ([Module 3 Part B](../../modules/03-suspend-resume/README.md#part-b-disk-only-suspend-template-agent-v2)), and removes the cluster-wide Secret `ClusterRole` and `ClusterRoleBinding` from `deploy/ax-server.yaml` so the deployment stays strictly namespace-scoped to `ax-system`.
+3. **`WorkerSelector`, `VOLUMES`-fidelity marker path, and namespace-scoped RBAC**: adds `workerSelector: {workload: ax-worker}` so AX tasks run on their own `ax-workers` pool instead of the workshop's `agents` pool, moves AX's maiden-run marker directory (`DefaultAXDir` in `internal/workspace/setup.go`) from `/ax` to `/workspace/.ax` so it lives inside the `/workspace` `durableDir` and survives a `SNAPSHOT_FIDELITY_VOLUMES` suspend/resume ([Module 3 Part B](../../modules/03-suspend-resume/README.md#part-b-disk-only-suspend-template-agent-v2)), labels `Namespace/ax-system` with `ate.dev/api-access: "true"`, and removes the cluster-wide Secret `ClusterRole` and `ClusterRoleBinding` from `deploy/ax-server.yaml` so the deployment stays strictly namespace-scoped to `ax-system`.
 
 ## 1. Build and deploy AX (you build every image)
 
@@ -95,7 +95,7 @@ Compare that generated `ActorTemplate` with the ones you wrote by hand in Module
 
 - **Name (`demo-task-tmpl-<hash>`)**: `TaskReconciler` (`internal/controller/reconciler.go`) hashes the image and environment variables into the template name. Because both AX `Task`s and Substrate `ActorTemplate`s are immutable ([Module 3](../../modules/03-suspend-resume/README.md#templates-are-immutable)), changing a task's spec requires either a new task name or deleting and recreating the task (`ax delete task …` then `ax apply -f …`, which discards the previous actor state and generates a fresh template digest).
 - **Entrypoint (`/ko-app/ax-task-runner`)**: AX never sets your `spec.command` as the container entrypoint. Instead, it injects the task and workspace YAML into `AX_TASK_YAML` and `AX_WORKSPACES_YAML` env vars and boots `ax-task-runner` as PID 1 on port 80 (`wakeupProbe: /healthz`, with `/readyz` reporting `200 OK` once `SetupWorkspace` finishes).
-- **Storage (`onCommit: SNAPSHOT_CONTENT_SCOPE_DATA`, `durableDir: /workspace`)**: AX uses the disk-only snapshot scope from Module 3 Part B. Only `/workspace` is saved to GCS on suspend; on resume, `ax-task-runner` cold-boots, sees `/workspace/.ax/initialized-workspace`, skips workspace setup, and starts your command against the restored files.
+- **Storage (`preferredFidelity: SNAPSHOT_FIDELITY_VOLUMES`, `durableDir: /workspace`)**: AX uses the disk-only snapshot fidelity from Module 3 Part B. Only `/workspace` is saved to GCS on suspend; on resume, `ax-task-runner` cold-boots, sees `/workspace/.ax/initialized-workspace`, skips workspace setup, and starts your command against the restored files.
 
 ## 4. Resume, inspect over `ax ssh`, and suspend
 
@@ -135,7 +135,7 @@ ax ssh demo-task -a ax-workshop -- cat /workspace/note.txt /workspace/run.log
 
 Notice two things in the output:
 1. `/workspace/note.txt` is intact (`saved before sleep`).
-2. `/workspace/run.log` now has **two** `booted task` lines — because AX uses `SNAPSHOT_CONTENT_SCOPE_DATA`, resuming cold-boots `ax-task-runner` and re-runs `spec.command` against the restored `/workspace` directory, while `/workspace/.ax/initialized-workspace` prevented `SetupWorkspace` from overwriting `AGENTS.md`.
+2. `/workspace/run.log` now has **two** `booted task` lines — because AX uses `SNAPSHOT_FIDELITY_VOLUMES`, resuming cold-boots `ax-task-runner` and re-runs `spec.command` against the restored `/workspace` directory, while `/workspace/.ax/initialized-workspace` prevented `SetupWorkspace` from overwriting `AGENTS.md`.
 
 ## 5. Clone a Git repository and lock down egress
 

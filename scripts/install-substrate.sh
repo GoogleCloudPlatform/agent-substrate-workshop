@@ -36,29 +36,31 @@ ok "$(git -C "$SRC" describe --tags --always)"
 
 step "kubectl-ate"
 mkdir -p "$REPO_ROOT/bin"
-(cd "$SRC" && go build -ldflags "$(make -s ldflags | tr '\n' ' ')" -o "$REPO_ROOT/bin/kubectl-ate" ./cmd/kubectl-ate)
+ver="$(git -C "$SRC" describe --tags --always --dirty)"
+(cd "$SRC" && go build -ldflags "-X=github.com/agent-substrate/substrate/internal/version.Version=$ver" -o "$REPO_ROOT/bin/kubectl-ate" ./cmd/kubectl-ate)
 ok "bin/kubectl-ate (kubectl ate …)"
 user_has_ate || path_hint
 
-step "Substrate version label"
-if [[ -n "${SUBSTRATE_IMAGE_TAG:-}" ]]; then
-  version="$(cd "$SRC" && go run ./internal/versionlabel/cmd "$SUBSTRATE_IMAGE_TAG" | awk '{print $1}')"
-else
-  raw="$(cd "$SRC" && make -s ldflags | grep 'internal/version\.Version=' | head -n1)"
-  version="$(cd "$SRC" && go run ./internal/versionlabel/cmd "${raw#*internal/version.Version=}" | awk '{print $1}')"
-fi
-state_put substrate-version "$version"
-ok "ate.dev/substrate-version=$version"
-
 step "Deploy ate-system"
-# Clusters that previously ran Substrate < v0.4.0 have a bundled Postgres PVC whose
-# "substrate" schema is owned by "postgres" instead of v0.4.0+'s "substrate_owner",
-# which causes ate-setup's setup_bundled_postgres step to fail. Reset it before deploying.
-if kubectl -n ate-system get pod postgres-0 >/dev/null 2>&1; then
-  pg_owner="$(kubectl -n ate-system exec postgres-0 -- psql -U postgres -d substrate -tAc \
-    "SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname = 'substrate'" 2>/dev/null | tr -d '[:space:]' || true)"
-  if [[ -n "$pg_owner" && "$pg_owner" != "substrate_owner" ]]; then
-    warn "bundled Postgres schema 'substrate' is owned by '$pg_owner' (pre-v0.4.0); resetting sts/postgres and pvc/data-postgres-0"
+# Clusters upgraded from Substrate < v0.5.0 may have a version-suffixed atelet DaemonSet
+# (e.g. atelet-v0-4-0) holding hostPort 8085 and an incompatible bundled Postgres PVC
+# (pre-v0.4.0 'postgres' schema owner, or pre-v0.5.0 password-auth / enum wire types).
+# Clean both up before ate-setup deploys and waits for ds/atelet and sts/postgres.
+for old_ds in $(kubectl -n ate-system get ds -l app=atelet -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null); do
+  if [[ "$old_ds" != "atelet" ]]; then
+    warn "removing legacy DaemonSet $old_ds before deploying ds/atelet"
+    kubectl -n ate-system delete ds "$old_ds" --ignore-not-found --wait=true >/dev/null
+  fi
+done
+kubectl label nodes --all ate.dev/substrate-version- >/dev/null 2>&1 || true
+if [[ -f "$SRC/manifests/ate-install/sandboxconfig-validation.yaml" ]]; then
+  kubectl apply -f "$SRC/manifests/ate-install/generated/ate.dev_sandboxconfigs.yaml" \
+    -f "$SRC/manifests/ate-install/sandboxconfig-validation.yaml" >/dev/null 2>&1 || true
+fi
+if kubectl -n ate-system get sts postgres >/dev/null 2>&1; then
+  pg_vols="$(kubectl -n ate-system get sts postgres -o jsonpath='{.spec.template.spec.volumes[*].name}' 2>/dev/null || true)"
+  if [[ " $pg_vols " != *" postgres-ca "* ]]; then
+    warn "bundled Postgres predates v0.5.0; resetting sts/postgres and pvc/data-postgres-0"
     kubectl -n ate-system delete sts/postgres pvc/data-postgres-0 --ignore-not-found --wait=true
   fi
 fi
@@ -72,34 +74,20 @@ if [[ -n "${SUBSTRATE_IMAGE_REPO:-}" ]]; then
   worker="$SUBSTRATE_IMAGE_REPO/ateom-gvisor:$SUBSTRATE_IMAGE_TAG@$worker"
 else
   (cd "$SRC" && go run ./cmd/ate-setup deploy ate-system --credential-provider="$CREDENTIAL_PROVIDER")
-  ldflags=(); while IFS= read -r l; do [[ -n "$l" ]] && ldflags+=("--ldflags=$l"); done < <(cd "$SRC" && make -s ldflags)
-  worker="$(cd "$SRC" && ./hack/run-tool.sh ko build --base-import-paths "${ldflags[@]}" ./cmd/ateom-gvisor)"
+  worker="$(cd "$SRC" && ./hack/run-tool.sh ko build --base-import-paths "--ldflags=-X=github.com/agent-substrate/substrate/internal/version.Version=$ver" ./cmd/ateom-gvisor)"
 fi
 [[ "$worker" == *@sha256:* ]] || die "worker image is not digest-pinned: $worker"
 state_put worker-image "$worker"
 ok "worker image $worker"
 
-step "Label nodes"
-# Every node, with --overwrite: after a SUBSTRATE_REF change the old version label must be replaced.
-kubectl label nodes --all "ate.dev/substrate-version=$version" --overwrite >/dev/null
-# Each SUBSTRATE_REF deploys a version-suffixed atelet DaemonSet (e.g. atelet-v0-4-0).
-# Remove any older atelet DaemonSets left behind by a previous SUBSTRATE_REF so
-# `rollout status ds` below doesn't block on pods whose nodeSelector no longer matches.
-for old_ds in $(kubectl -n ate-system get ds -l app=atelet -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null); do
-  if [[ "$old_ds" != "atelet-$version" ]]; then
-    kubectl -n ate-system delete ds "$old_ds" --ignore-not-found >/dev/null
-  fi
-done
-ok "nodes labeled"
-
 "$REPO_ROOT/scripts/patch-router.sh"
 
 step "Wait for ate-system"
 kubectl -n ate-system wait --for=condition=Available deploy --all --timeout=10m
-kubectl -n ate-system rollout status ds --timeout=10m
+kubectl -n ate-system rollout status ds/atelet --timeout=10m
 ok "Agent Substrate is ready"
 kubectl -n ate-system get pods
 
-# Written last, after node labeling and the router patch, so catch-up.sh can gate a skip on
+# Written last, after the router patch, so catch-up.sh can gate a skip on
 # this single marker instead of re-deriving "is the install actually done" from several checks.
 state_put install-complete "$(date -u +%Y-%m-%dT%H:%M:%SZ) SUBSTRATE_REF=$SUBSTRATE_REF"

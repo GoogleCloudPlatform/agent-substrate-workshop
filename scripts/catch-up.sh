@@ -109,12 +109,16 @@ make -s -C "$REPO_ROOT" tools
 
 if (( N >= 3 )); then
   step "module 2 end state: WorkerPool, atespace, agent-v1, hello"
+  if kubectl -n "$NAMESPACE" get workerpool agents >/dev/null 2>&1 &&
+     [[ -z "$(kubectl -n "$NAMESPACE" get workerpool agents -o jsonpath='{.spec.sandboxClasses[0].name}' 2>/dev/null)" ]]; then
+    kubectl -n "$NAMESPACE" delete workerpool agents --ignore-not-found
+  fi
   "$S/render.sh" "$M/02-hello-actor/manifests/workerpool.yaml.tmpl" | kubectl apply -f -
   wait_for 600 "2 running worker pods" _two_workers
   ensure_atespace "$ATESPACE"
   stage_template 02-hello-actor agent-v1
   ensure_actor "$ATESPACE" hello agent-v1
-  if (( N == 3 )); then router_curl hello -f http://localhost:8080/ >/dev/null; fi
+  if (( N == 3 )); then router_curl hello -f "http://localhost:${ROUTER_LOCAL_PORT:-8080}/" >/dev/null; fi
 fi
 
 if (( N >= 4 )); then
@@ -122,7 +126,7 @@ if (( N >= 4 )); then
   suspend_actor "$ATESPACE" hello       # the golden actor for agent-v2 needs a free worker
   stage_template 03-suspend-resume agent-v2
   ensure_actor "$ATESPACE" memo agent-v2
-  if (( N == 4 )); then router_curl memo -f http://localhost:8080/ >/dev/null; fi
+  if (( N == 4 )); then router_curl memo -f "http://localhost:${ROUTER_LOCAL_PORT:-8080}/" >/dev/null; fi
 fi
 
 if (( N >= 5 )); then

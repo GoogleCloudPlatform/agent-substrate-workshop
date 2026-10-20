@@ -40,12 +40,13 @@ fi
 gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet >/dev/null
 ok "registry ready: ${KO_DOCKER_REPO}"
 
-bind_bucket()  { gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" --member="$1" --role="$2" --condition=None >/dev/null; }
-bind_project() { gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="$1" --role="$2" --condition=None >/dev/null; }
+_retry_gcloud() { "$@" >/dev/null || { sleep 1; "$@" >/dev/null; }; }
+bind_bucket()  { _retry_gcloud gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" --member="$1" --role="$2" --condition=None; }
+bind_project() { _retry_gcloud gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="$1" --role="$2" --condition=None; }
 # Artifact Registry read access is granted on the workshop repo only, not the project: least privilege,
 # and deleting the repo (teardown --all) removes the binding with it, so nobody else's grant is touched.
 # (If you point KO_DOCKER_REPO at a different repo, grant the same readers on that one.)
-bind_repo()    { gcloud artifacts repositories add-iam-policy-binding "$AR_REPO" --location "$REGION" --project "$PROJECT_ID" --member="$1" --role="$2" >/dev/null; }
+bind_repo()    { _retry_gcloud gcloud artifacts repositories add-iam-policy-binding "$AR_REPO" --location "$REGION" --project "$PROJECT_ID" --member="$1" --role="$2"; }
 
 step "IAM for Substrate (Workload Identity principals in ate-system)"
 for sa in atelet ate-api-server; do

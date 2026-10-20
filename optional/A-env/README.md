@@ -15,29 +15,22 @@ It's the pattern you built in Modules 4–5 (an always-on API in front of suspen
 
 ## Which env commit, and why
 
-Our `SUBSTRATE_REF` is `v0.4.0` (pinned in `app/go.mod` as `github.com/agent-substrate/substrate v0.4.0`).
+Our `SUBSTRATE_REF` is `v0.5.0` (pinned in `app/go.mod` as `github.com/agent-substrate/substrate v0.5.0`).
 
 We checked every env tag and `main`:
 
-| env ref | substrate pin (`go.mod`) | age vs. our pin |
+| env ref | substrate pin (`go.mod`) | compatibility with `v0.5.0` |
 |---|---|---|
-| `v0.0.7`–`v0.0.10` | `v0.0.0-20260717234919-a2d55e99e02e` (2026-07-17) | ~2.5 months older |
-| `main` @ `ab40c7b` | `v0.0.0-20260909202336-0b3d2d078f64` (2026-09-09) | ~1 month older, before v0.2.0 |
+| `v0.0.7`–`v0.0.10` | `v0.0.0-20260717234919-a2d55e99e02e` (2026-07-17) | Pre-`v0.2.0` (`readyz`, `snapshotsConfig`) |
+| `main` @ `fccd920` | `go.ate.dev/substrate v0.5.1-0.20261016164544-3a2ca6235748` (2026-10-16) | Wire-compatible with `v0.5.0` (`preferredFidelity: SNAPSHOT_FIDELITY_MEMORY`, string `sandboxClass: gvisor`, required `resources.limits`, and `ate.dev/api-access: "true"` on `Namespace/ate-env`) |
 
-No ref matches, and `main` hasn't moved since `ab40c7b`, so this lab pins:
+This lab pins `env` `main` at:
 
 ```
-ENV_REF=ab40c7bfb2049af1a7aade9e7bf9c6cac925b5ca   # env main, 2026-09-11
+ENV_REF=fccd920ae90a8d5ce1b7c2fb57162e99e45f942a   # env main, 2026-10-16
 ```
 
-**You patch it to v0.4.0 before building.** v0.2.0+ renamed two ActorTemplate fields env uses:
-`containers[].readyz` is now `wakeupProbe`, and `snapshotsConfig` is now `snapshotConfig`. And v0.4.0 changed
-`WorkerAssignment.worker_pod_ip` (`WorkerPodIp string`) to `worker_pod_ips` (`WorkerPodIps []string`), which
-env's fake control plane sets in tests. Step 1 bumps env's `go.mod` to v0.4.0 and updates those fields in
-`cmd/ate-env/manifest.go` (plus its test) and `internal/internaltest/fakecontrol/fakecontrol.go`. `go build`,
-`go vet`, and `go test ./...` all pass with no other changes. If your `SUBSTRATE_REF`
-has moved, or env's `main` has caught up to v0.4.0,
-redo this check (or drop the patch) before trusting the pin.
+No source patch is needed: `go build`, `go vet`, and `go test ./cmd/ate-env/` pass directly at `ENV_REF`.
 
 ## Two things to know before you start
 
@@ -54,19 +47,13 @@ redo this check (or drop the patch) before trusting the pin.
 
 ```bash
 source scripts/env.sh   # workshop.env into this shell (bash or zsh): KO_DOCKER_REPO, BUCKET_NAME, REPO_ROOT, …
-ENV_REF=ab40c7bfb2049af1a7aade9e7bf9c6cac925b5ca
+ENV_REF=fccd920ae90a8d5ce1b7c2fb57162e99e45f942a
 git clone https://github.com/agent-substrate/env .workshop/env 2>/dev/null; git -C .workshop/env checkout "$ENV_REF"
 cd .workshop/env
-# Bring env up to v0.4.0 (see "Which env commit, and why"). Safe to rerun.
-go get github.com/agent-substrate/substrate@v0.4.0 && go mod tidy
-sed -i.bak -e 's/ContainerReadyz/ContainerWakeupProbe/g; s/Readyz:/WakeupProbe:/g; s/\.Readyz/.WakeupProbe/g' \
-  -e 's/SnapshotsConfig/SnapshotConfig/g; s/WorkerPodIp: *"10.0.0.1"/WorkerPodIps: []string{"10.0.0.1"}/g' \
-  cmd/ate-env/manifest.go cmd/ate-env/manifest_test.go internal/internaltest/fakecontrol/fakecontrol.go && \
-  rm -f cmd/ate-env/*.bak internal/internaltest/fakecontrol/*.bak
 go build ./... && go test ./cmd/ate-env/
 export KO_DOCKER_REPO
 API_IMAGE=$(ko build --base-import-paths ./cmd/ate-env-api)
-GUEST_IMAGE=$(ko build --base-import-paths ./cmd/ate-env-guest)   # ko's "git is in a dirty state" warning is the patch above; ignore it
+GUEST_IMAGE=$(ko build --base-import-paths ./cmd/ate-env-guest)
 go build -o "$REPO_ROOT/bin/ate-env" ./cmd/ate-env
 cd "$REPO_ROOT"
 
@@ -78,16 +65,16 @@ ate-env manifest --api-image "$API_IMAGE" --worker-image "$(cat .workshop/worker
   | awk '/^kind: WorkerPool$/ {wp=1} wp && /^metadata:$/ {print; print "  labels:"; print "    workload: ate-env"; wp=0; next} {print}' \
   | kubectl apply -f -
 kubectl -n ate-env rollout status deploy/ate-env-api
-kubectl ate create atespace ate-env   # the template below lives in it, and env only creates it on first use
-{ ate-env manifest template --guest-image "$GUEST_IMAGE" --snapshots-bucket "gs://$BUCKET_NAME/ate-env/"
+kubectl ate create atespace ate-env 2>/dev/null || true   # ate-env-api also ensures the atespace on startup
+{ ate-env manifest template --guest-image "$GUEST_IMAGE" --snapshots-bucket "gs://$BUCKET_NAME/ate-env/" --cpu 1 --memory 512Mi
   printf 'workerSelector:\n  matchLabels:\n    workload: ate-env\n'; } \
   | kubectl ate create actor-template -f -
 kubectl ate get atespaces                                      # "ate-env" is listed next to "workshop"
 kubectl ate get actor-template default-template -a ate-env     # repeat until GOLDEN TAG is set (~20s)
 ```
 
-This creates a Kubernetes namespace `ate-env` with its own WorkerPool (`default-template-workerpool`, 2
-workers; it sets no CPU or memory limits, so `kubectl ate get workers -n ate-env` shows each worker offering
+This creates a Kubernetes namespace `ate-env` (labeled `ate.dev/api-access: "true"`) with its own WorkerPool (`default-template-workerpool`, 2
+workers; it sets no Pod CPU or memory limits, so `kubectl ate get workers -n ate-env` shows each worker offering
 the whole node, unlike the workshop's 1-CPU workers from Module 5) and the `ate-env-api` Deployment, which plays the role of your gateway: it's the one always-on piece
 that proxies to the (suspendable) environment actors. `ate-env` itself is a plain Go binary — no image to
 build, no cluster access needed to run it, just an address to the API service.
@@ -105,11 +92,10 @@ kubectl ate get actors -a ate-env            # dev1 SUSPENDED
 ate-env dev1 shell 'cat /note.txt'       # auto-resumes; verify the file is still there
 ```
 
-> **Verify on your cluster:** env's `ActorTemplate` (from `manifest template` above) sets no explicit
-> `durableDir` and no `snapshotConfig.onCommit` scope — on Substrate `v0.4.0` it defaults to
-> `SNAPSHOT_CONTENT_SCOPE_FULL`, so `/note.txt` survives the suspend. If the last command above comes back
-> empty on a newer Substrate build, check its default scope first (compare with module 3's explicit
-> `SNAPSHOT_CONTENT_SCOPE_FULL`).
+> **Verify on your cluster:** env's `ActorTemplate` (from `manifest template` above) sets
+> `snapshotConfig.preferredFidelity: SNAPSHOT_FIDELITY_MEMORY`, so `/note.txt` (in the rootfs overlay) and
+> in-memory state survive the suspend even without an explicit `durableDir` volume (compare with Module 3's
+> `SNAPSHOT_FIDELITY_MEMORY` vs. `SNAPSHOT_FIDELITY_VOLUMES`).
 
 ## 3. Multiplexing
 

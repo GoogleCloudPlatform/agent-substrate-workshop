@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Idempotently patches google/ax (.workshop/ax) for Agent Substrate v0.4.0 compatibility."""
+"""Idempotently patches google/ax (.workshop/ax) for Agent Substrate v0.5.0 compatibility."""
 
 import os
 import subprocess
@@ -24,7 +24,7 @@ def patch_go_mod(ax_dir: str) -> None:
     env = os.environ.copy()
     env["GOWORK"] = "off"
     subprocess.run(
-        ["go", "get", "github.com/agent-substrate/substrate@v0.4.0"],
+        ["go", "get", "github.com/agent-substrate/substrate@v0.5.0"],
         cwd=ax_dir,
         env=env,
         check=True,
@@ -48,7 +48,7 @@ def patch_substrate_client(ax_dir: str) -> None:
         'DefaultGuestCommand    = "/ko-app/ax-task-runner"',
     )
 
-    # 2. v0.2.0+ renamed ContainerReadyz -> ContainerWakeupProbe.
+    # 2. v0.5.0 uses WakeupProbe and HttpGetAction.
     #    Probe /healthz so AteomHerder/Run finishes as soon as the runner's HTTP server is up (which
     #    transitions the actor to RUNNING and activates its EgressPolicy), while TaskReconciler polls
     #    /readyz?check=workspace until SetupWorkspace finishes cloning Git repos.
@@ -58,8 +58,8 @@ def patch_substrate_client(ax_dir: str) -> None:
 \t\t\t\t\tPort: 80,
 \t\t\t\t},
 \t\t\t},"""
-    new_wakeup = """\t\t\tWakeupProbe: &ateapipb.ContainerWakeupProbe{
-\t\t\t\tHttpGet: &ateapipb.HTTPGetAction{
+    new_wakeup = """\t\t\tWakeupProbe: &ateapipb.WakeupProbe{
+\t\t\t\tHttpGet: &ateapipb.HttpGetAction{
 \t\t\t\t\tPath: "/healthz",
 \t\t\t\t\tPort: 80,
 \t\t\t\t},
@@ -68,7 +68,8 @@ def patch_substrate_client(ax_dir: str) -> None:
     content = content.replace(old_readyz, new_wakeup)
     content = content.replace(new_wakeup.replace('"/healthz"', '"/readyz"'), new_wakeup)
 
-    # 3. v0.2.0+ renamed SnapshotsConfig -> SnapshotConfig; v0.4.0 removed OnPause and OnResume.
+    # 3. v0.5.0 replaced SnapshotConfig.onCommit with preferredFidelity, made SandboxConfig.sandboxClass
+    #    a string ("gvisor"), and requires cpu and memory limits on every ActorTemplate.
     #    Also select the lab's `workload: ax-worker` WorkerPool so AX tasks don't land on `agents`.
     old_snapshots = """\t\tSnapshotsConfig: &ateapipb.SnapshotsConfig{
 \t\t\tStorageLocation: snapshotsBucket,
@@ -77,10 +78,24 @@ def patch_substrate_client(ax_dir: str) -> None:
 \t\t\tOnResume: &ateapipb.OnResumeConfig{
 \t\t\t\tFromData: ateapipb.ResumeSource_RESUME_SOURCE_GOLDEN,
 \t\t\t},
+\t\t},
+\t\tSandboxConfig: &ateapipb.SandboxConfig{
+\t\t\tSandboxClass: ateapipb.SandboxClass_SANDBOX_CLASS_GVISOR,
+\t\t\tConfigName:   "gvisor-default",
 \t\t},"""
     new_snapshots = """\t\tSnapshotConfig: &ateapipb.SnapshotConfig{
-\t\t\tStorageLocation: snapshotsBucket,
-\t\t\tOnCommit:        ateapipb.SnapshotContentScope_SNAPSHOT_CONTENT_SCOPE_DATA,
+\t\t\tStorageLocation:   snapshotsBucket,
+\t\t\tPreferredFidelity: ateapipb.SnapshotFidelity_SNAPSHOT_FIDELITY_VOLUMES,
+\t\t},
+\t\tSandboxConfig: &ateapipb.SandboxConfig{
+\t\t\tSandboxClass: "gvisor",
+\t\t\tConfigName:   "gvisor-default",
+\t\t},
+\t\tResources: &ateapipb.Resources{
+\t\t\tLimits: []*ateapipb.Limits{
+\t\t\t\t{Name: "cpu", Quantity: "1"},
+\t\t\t\t{Name: "memory", Quantity: "512Mi"},
+\t\t\t},
 \t\t},
 \t\tWorkerSelector: &ateapipb.Selector{
 \t\t\tMatchLabels: map[string]string{
@@ -159,11 +174,25 @@ def patch_ax_cli_timeout(ax_dir: str) -> None:
 
 
 def patch_deploy_manifest(ax_dir: str) -> None:
-    # Omit the cluster-wide Secret ClusterRole and ClusterRoleBinding from deploy/ax-server.yaml
+    # Label Namespace/ax-system with ate.dev/api-access: "true" (required by ate-system NetworkPolicy in v0.5.0)
+    # and omit the cluster-wide Secret ClusterRole and ClusterRoleBinding from deploy/ax-server.yaml
     # so the lab stays strictly namespace-scoped to ax-system.
     path = os.path.join(ax_dir, "deploy", "ax-server.yaml")
     with open(path, "r", encoding="utf-8") as fh:
         content = fh.read()
+    old_ns = """apiVersion: v1
+kind: Namespace
+metadata:
+  name: ax-system
+---"""
+    new_ns = """apiVersion: v1
+kind: Namespace
+metadata:
+  name: ax-system
+  labels:
+    ate.dev/api-access: "true"
+---"""
+    content = content.replace(old_ns, new_ns)
     rbac_docs = """---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -205,7 +234,7 @@ def main() -> int:
     patch_workspace_setup(ax_dir)
     patch_ax_cli_timeout(ax_dir)
     patch_deploy_manifest(ax_dir)
-    print(f"Patched AX at {ax_dir} for Agent Substrate v0.4.0.")
+    print(f"Patched AX at {ax_dir} for Agent Substrate v0.5.0.")
     return 0
 
 

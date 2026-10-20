@@ -18,7 +18,7 @@ Everything you deploy, you build: the agent, the gateway, and (in source mode) S
 | 0 | [Setup](modules/00-setup/README.md) | 10 | GCP prerequisites; the install starts in the background |
 | 1 | [Architecture tour](modules/01-architecture/README.md) | 10 | Actors vs Pods; ateapi, atelet, router, egress; CRDs vs records |
 | 2 | [Hello actor](modules/02-hello-actor/README.md) | 15 | WorkerPool, ActorTemplate + golden snapshot, Actor, routing header |
-| 3 | [Suspend and resume](modules/03-suspend-resume/README.md) | 12 | FULL vs DATA snapshots, durable dirs, template immutability |
+| 3 | [Suspend and resume](modules/03-suspend-resume/README.md) | 12 | MEMORY vs VOLUMES snapshots, durable dirs, template immutability |
 | 4 | [Make it an agent](modules/04-make-it-an-agent/README.md) | 13 | Gateway pattern, Workload Identity, deny-by-default egress |
 | 5 | [Density and idle](modules/05-density-idle/README.md) | 10 | Oversubscription, parking, building an idle-suspender |
 | 6 | [Observe the fleet](modules/06-observe/README.md) | 12 | Substrate OTel + app metrics, PromQL, dashboards, per-actor logs |

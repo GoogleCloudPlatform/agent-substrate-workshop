@@ -37,7 +37,7 @@ flowchart LR
 ## Part B: disk-only suspend (template agent-v2)
 
 A full-memory snapshot is powerful but large. Many agents only need their files. `agent-v2` suspends
-with **DATA** scope: only the durable directory is saved, and resume cold-boots the process.
+with **VOLUMES** fidelity (`SNAPSHOT_FIDELITY_VOLUMES`): only the durable directory is saved, and resume cold-boots the process.
 
 4. Point the agent at its durable directory. In `app/cmd/agent/main.go`, find `WORKSHOP(module-3)` and set
    `DataDir: "/data"`. Then:
@@ -76,7 +76,7 @@ template version. Existing actors keep their template, so `hello` still runs `ag
 
 ## What just happened
 
-| | `onCommit: FULL` (hello) | `onCommit: DATA` (memo) |
+| | `preferredFidelity: MEMORY` (hello) | `preferredFidelity: VOLUMES` (memo) |
 |---|---|---|
 | Saved on suspend | memory + durableDir | durableDir only |
 | Resume | restore process (same bootID) | cold boot (new bootID) |

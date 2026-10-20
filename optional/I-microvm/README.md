@@ -15,18 +15,17 @@ source scripts/env.sh    # workshop.env into this shell (bash or zsh): PROJECT_I
 ```
 
 1. **A nested-virtualization node pool, tainted.** `--enable-nested-virtualization` exposes `/dev/kvm` to
-   the node. The `ate.dev/substrate-version` label is the one `make install` puts on every node (atelet
-   only schedules onto labeled nodes), and `workshop-pool=microvm` is what step 3's WorkerPool selects:
+   the node, and `workshop-pool=microvm` is what step 3's WorkerPool selects:
    ```bash
    gcloud beta container node-pools create microvm --project "$PROJECT_ID" \
      --cluster "$CLUSTER_NAME" --location "$CLUSTER_LOCATION" \
      --machine-type c3-standard-4 --num-nodes 1 --enable-nested-virtualization \
-     --node-labels="ate.dev/substrate-version=$(cat .workshop/substrate-version),workshop-pool=microvm" \
+     --node-labels=workshop-pool=microvm \
      --node-taints=ate.dev/sandboxClass=microvm:NoSchedule
    kubectl get nodes -l workshop-pool=microvm      # Ready about 15s after the command returns
    ```
-   **Why this taint:** the gVisor WorkerPools (`agents`, lab H's `conf-workers`, lab A's and lab B's pools) select only
-   `ate.dev/substrate-version` and tolerate only `ate.dev/sandboxClass=gvisor:NoSchedule`, so without this taint
+   **Why this taint:** the gVisor WorkerPools (`agents`, lab H's `conf-workers`, lab A's and lab B's pools) have no
+   nodeSelector and tolerate only `ate.dev/sandboxClass=gvisor:NoSchedule`, so without this taint
    they land on this node too. A nested-virt CPU exposes the `vmx` feature, so a gVisor snapshot taken there
    fails to restore on an ordinary node (`runsc restore … incompatible FeatureSet: missing features: map[vmx:{}]`)
    and the actor goes CRASHED. Use `ate.dev/sandboxClass=microvm:NoSchedule` (not an arbitrary key): the `atelet`
@@ -49,13 +48,13 @@ source scripts/env.sh    # workshop.env into this shell (bash or zsh): PROJECT_I
 3. **A microVM worker pool and template.** The WorkerPool needs substrate's `ateom-microvm` worker image:
    `make install` built only `ateom-gvisor`. Build it the way `scripts/install-substrate.sh` builds the
    gVisor one, then apply [`workerpool.yaml.tmpl`](workerpool.yaml.tmpl) (Module 2's pool plus
-   `sandboxClass: microvm`, the node pool's label, and a toleration for its taint) and
+   `sandboxClasses: [{name: microvm, configRef: {name: microvm}}]`, the node pool's label, and a toleration for its taint) and
    [`template.yaml.tmpl`](template.yaml.tmpl) (`agent-v3` with
-   `sandboxConfig: {sandboxClass: SANDBOX_CLASS_MICROVM, configName: microvm}`):
+   `sandboxConfig: {sandboxClass: microvm, configName: microvm}`):
    ```bash
    export MICROVM_WORKER_IMAGE="$(cd .workshop/substrate && export GOWORK=off KO_DOCKER_REPO KO_DEFAULTPLATFORMS &&
-     ldflags=(); while IFS= read -r l; do [[ -n "$l" ]] && ldflags+=("--ldflags=$l"); done < <(make -s ldflags) &&
-     ./hack/run-tool.sh ko build --base-import-paths "${ldflags[@]}" ./cmd/ateom-microvm)"
+     ver="$(git describe --tags --always --dirty)" &&
+     ./hack/run-tool.sh ko build --base-import-paths "--ldflags=-X=github.com/agent-substrate/substrate/internal/version.Version=$ver" ./cmd/ateom-microvm)"
    scripts/render.sh optional/I-microvm/workerpool.yaml.tmpl | kubectl apply -f -
    kubectl -n workshop get pods -l workload=workshop-agent-vm -o wide     # Running on the microvm node
    scripts/render.sh optional/I-microvm/template.yaml.tmpl | kubectl ate create actor-template -f -

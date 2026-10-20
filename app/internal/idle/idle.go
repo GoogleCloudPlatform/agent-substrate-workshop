@@ -109,7 +109,10 @@ func (g GRPC) ListActors(ctx context.Context, atespace string) ([]ActorInfo, err
 	var out []ActorInfo
 	token := ""
 	for {
-		resp, err := g.C.ListActors(ctx, &ateapipb.ListActorsRequest{Atespace: atespace, PageSize: 100, PageToken: token})
+		resp, err := g.C.ListActors(ctx, &ateapipb.ListActorsRequest{
+			Atespace: atespace,
+			Options:  &ateapipb.ListOptions{PageSize: 100, PageToken: token},
+		})
 		if err != nil {
 			return nil, err
 		}

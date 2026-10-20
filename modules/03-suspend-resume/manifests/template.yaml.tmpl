@@ -1,4 +1,4 @@
-# ActorTemplate agent-v2 — agent-v1 with a DATA-scope suspend: same image, same shape, so
+# ActorTemplate agent-v2 — agent-v1 with a VOLUMES-fidelity suspend: same image, same shape, so
 # `diff` against agent-v1 shows only what changed. Templates are immutable, so a behavior change
 # means a new template version.
 metadata:
@@ -27,10 +27,10 @@ resources:
   - name: memory
     quantity: 512Mi
 snapshotConfig:
-  onCommit: SNAPSHOT_CONTENT_SCOPE_DATA    # pause and suspend: durableDir only; memory is discarded and resume cold-boots the process
+  preferredFidelity: SNAPSHOT_FIDELITY_VOLUMES  # suspend: durableDir only; memory is discarded and resume cold-boots the process
   storageLocation: gs://${BUCKET_NAME}/${ATESPACE}/agent-v2/
 sandboxConfig:
-  sandboxClass: SANDBOX_CLASS_GVISOR
+  sandboxClass: gvisor
   configName: gvisor-default
 volumes:
 - name: data

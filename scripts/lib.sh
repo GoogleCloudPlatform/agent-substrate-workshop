@@ -187,8 +187,8 @@ actor_worker() { actor_json "$1" "$2" | jq -r '.status.workerAssignment.workerPo
 
 # router_curl <actor> [curl args...]: talk to an actor through a port-forwarded atenet-router.
 router_curl() {
-  local actor="$1"; shift
-  port_forward router ate-system svc/atenet-router 8080 80
+  local actor="$1" port="${ROUTER_LOCAL_PORT:-8080}"; shift
+  port_forward router ate-system svc/atenet-router "$port" 80
   curl -sS --max-time 90 -H "ate-target-actor: ${ATESPACE}/${actor}" "$@"
 }
 
