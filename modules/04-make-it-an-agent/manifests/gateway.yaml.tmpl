@@ -42,6 +42,7 @@ spec:
         volumeMounts:
         - {name: ate-token, mountPath: /var/run/ate/token, readOnly: true}
         - {name: ate-trust, mountPath: /var/run/ate/trust, readOnly: true}
+        - {name: ate-identity, mountPath: /var/run/ate/identity, readOnly: true}
       volumes:
       # A token ateapi accepts: audience api.ate-system.svc, rotated by the kubelet.
       - name: ate-token
@@ -51,7 +52,7 @@ spec:
               audience: api.ate-system.svc
               expirationSeconds: 3600
               path: token
-      # The CA that signs ateapi's serving certificate, published as a ClusterTrustBundle.
+      # The CA that signs ateapi's and atenet-router's serving certificates, published as a ClusterTrustBundle.
       - name: ate-trust
         projected:
           sources:
@@ -60,6 +61,15 @@ spec:
               labelSelector:
                 matchLabels: {podcert.ate.dev/canarying: live}
               path: trust-bundle.pem
+      # The SPIFFE client certificate (spiffe://cluster.local/ns/${NAMESPACE}/sa/gateway)
+      # presented to atenet-router:443 over mTLS.
+      - name: ate-identity
+        projected:
+          sources:
+          - podCertificate:
+              signerName: podidentity.podcert.ate.dev/identity
+              keyType: ECDSAP256
+              credentialBundlePath: credential-bundle.pem
 ---
 apiVersion: v1
 kind: Service

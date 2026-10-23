@@ -162,6 +162,21 @@ stop_port_forwards() {
 
 ensure_atespace() {
   kubectl ate get atespace "$1" >/dev/null 2>&1 || kubectl ate create atespace "$1"
+  ensure_gateway_access "$1" "${NAMESPACE:-workshop}"
+}
+
+# ensure_gateway_access <atespace> [namespace]: grant the gateway's ServiceAccount editor on the atespace
+# once the atespace exists (v0.6.0+ enforces OpenFGA authorization by default).
+ensure_gateway_access() {
+  local as="${1:-$ATESPACE}" ns="${2:-${NAMESPACE:-workshop}}"
+  kubectl ate get atespace "$as" >/dev/null 2>&1 || return 0
+  kubectl ate get access-policy -a "$as" -o json 2>/dev/null | grep -q "user:system:serviceaccount:${ns}:gateway" && return 0
+  kubectl ate create access-policy -a "$as" -f - >/dev/null 2>&1 <<EOF || true
+bindings:
+  - role: editor
+    members:
+      - user:system:serviceaccount:${ns}:gateway
+EOF
 }
 
 # ensure_template <atespace> <name> <rendered-yaml-file>: create once, then wait for the golden snapshot.
@@ -225,7 +240,7 @@ _delete_template() {
 reset_template() {
   local as="$1" t="$2" a
   for a in $(template_actors "$as" "$t"); do
-    kubectl ate delete actor "$a" -a "$as" --any-state >/dev/null || warn "could not delete actor $as/$a"
+    kubectl ate delete actor "$a" -a "$as" >/dev/null || warn "could not delete actor $as/$a"
   done
   wait_for 180 "actors of template $as/$t to finish deleting" _no_template_actors "$as" "$t"
   wait_for 120 "template $as/$t to be deleted" _delete_template "$as" "$t"

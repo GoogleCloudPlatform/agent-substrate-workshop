@@ -51,7 +51,10 @@ func main() {
 	}
 	defer closer.Close()
 
-	fd, suspender := buildComponents(cfg, ate, m)
+	fd, suspender, err := buildComponents(cfg, ate, m)
+	if err != nil {
+		log.Fatalf("router client: %v", err)
+	}
 	go suspender.Run(ctx, cfg.IdleCheckEvery)
 
 	mux := http.NewServeMux()

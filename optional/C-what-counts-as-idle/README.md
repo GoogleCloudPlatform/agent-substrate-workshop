@@ -108,7 +108,7 @@ twice as long and you'll count about twice the heartbeats.
 
 ## Clean up
 ```bash
-kubectl ate delete actor cruncher -a workshop --any-state
+kubectl ate delete actor cruncher -a workshop
 scripts/egress.sh delete --actor=cruncher
 kubectl ate delete actor-template agent-v4 -a workshop
 ```

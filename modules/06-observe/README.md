@@ -88,13 +88,13 @@ Both end up in Cloud Monitoring, so you can query them with PromQL from one plac
    resource.labels.cluster_name="ate-cluster"
    (labels."ate.actor.name"="buddy" OR jsonPayload."ate.actor.name"="buddy")
    ```
-   One timeline, from three components and two workers: ateom's `Actor restoring`, atelet's
+   One timeline, from three components and two workers: ateworker's `Actor restoring`, atelet's
    `Restore timing breakdown`, ateapi's `Actor state changed` (`resuming`, `running`, `suspended`), and
    your agent's own lines. The `OR` matters. ateapi and atelet put actor identity in `jsonPayload`, not in
    `labels`, so a labels-only filter misses the state changes.
 
    Now replace the filter with `jsonPayload.trace_id="<id>"`, using the ID from the `--trace` resume. That
-   one request, across ateapi, atelet, and ateom. Paste the same ID into Cloud Trace → Trace Explorer to
+   one request, across ateapi, atelet, and ateworker. Paste the same ID into Cloud Trace → Trace Explorer to
    see it as spans.
 
 ## What just happened

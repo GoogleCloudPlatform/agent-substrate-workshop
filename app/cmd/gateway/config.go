@@ -24,17 +24,19 @@ import (
 )
 
 type config struct {
-	ListenAddr     string
-	Atespace       string
-	RouterURL      string
-	SelfURL        string
-	MockLLM        bool
-	GeminiModel    string
-	Project        string
-	VertexLocation string
-	ATE            ateclient.Options
-	IdleAfter      time.Duration
-	IdleCheckEvery time.Duration
+	ListenAddr       string
+	Atespace         string
+	RouterURL        string
+	RouterServerName string
+	RouterClientCert string
+	SelfURL          string
+	MockLLM          bool
+	GeminiModel      string
+	Project          string
+	VertexLocation   string
+	ATE              ateclient.Options
+	IdleAfter        time.Duration
+	IdleCheckEvery   time.Duration
 }
 
 func loadConfig(getenv func(string) string) (config, error) {
@@ -62,10 +64,12 @@ func loadConfig(getenv func(string) string) (config, error) {
 		return dur
 	}
 	c := config{
-		ListenAddr:     or("LISTEN_ADDR", ":8080"),
-		Atespace:       getenv("ATESPACE"),
-		RouterURL:      or("ROUTER_URL", "http://atenet-router.ate-system.svc.cluster.local"),
-		SelfURL:        getenv("SELF_URL"),
+		ListenAddr:       or("LISTEN_ADDR", ":8080"),
+		Atespace:         getenv("ATESPACE"),
+		RouterURL:        or("ROUTER_URL", "https://atenet-router.ate-system.svc.cluster.local"),
+		RouterServerName: or("ROUTER_SERVER_NAME", "atenet-router.ate-system.svc"),
+		RouterClientCert: or("ROUTER_CLIENT_CERT_FILE", "/var/run/ate/identity/credential-bundle.pem"),
+		SelfURL:          getenv("SELF_URL"),
 		MockLLM:        boolean("MOCK_LLM"),
 		GeminiModel:    or("GEMINI_MODEL", "gemini-2.5-flash"),
 		Project:        getenv("GOOGLE_CLOUD_PROJECT"),

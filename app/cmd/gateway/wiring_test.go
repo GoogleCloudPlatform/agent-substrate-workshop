@@ -27,7 +27,10 @@ import (
 // an actor busy would not stop the suspender from suspending it mid-turn.
 func TestBuildComponentsShareOneTracker(t *testing.T) {
 	cfg := config{RouterURL: "http://router.invalid", Atespace: "workshop", IdleAfter: 20 * time.Second}
-	fd, suspender := buildComponents(cfg, nil, metrics.New())
+	fd, suspender, err := buildComponents(cfg, nil, metrics.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if fd.Client == nil {
 		t.Fatal("front door Client is nil")
@@ -51,5 +54,21 @@ func TestBuildComponentsShareOneTracker(t *testing.T) {
 	}
 	if activity != suspender.Tracker {
 		t.Fatal("front door Activity and suspender Tracker are different *idle.Tracker instances")
+	}
+}
+
+func TestBuildComponentsConfiguresHTTPSRouterClient(t *testing.T) {
+	cfg := config{
+		RouterURL:        "https://atenet-router.ate-system.svc.cluster.local",
+		RouterServerName: "atenet-router.ate-system.svc",
+		RouterClientCert: "/var/run/ate/identity/credential-bundle.pem",
+		Atespace:         "workshop",
+	}
+	fd, _, err := buildComponents(cfg, nil, metrics.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fd.Client == nil || fd.Client.Transport == nil {
+		t.Fatal("expected custom Transport on HTTPS router Client")
 	}
 }

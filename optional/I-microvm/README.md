@@ -2,7 +2,7 @@
 
 > **Cluster impact:** Changes the cluster. Adds a nested-virt node pool (one extra `c3-standard-4`, billed until you delete it) and a cluster-wide `SandboxConfig`. **Taint the pool** (step 1): without it, gVisor snapshots taken on that node crash when they restore anywhere else.
 
-**Goal:** run the same agent under substrate's microVM sandbox class (`ateom-microvm`: a Kata guest on Cloud
+**Goal:** run the same agent under substrate's microVM sandbox class (`ateworker-microvm`: a Kata guest on Cloud
 Hypervisor) instead of gVisor, and compare isolation, cold start, and snapshot size.
 
 **You'll need:** Module 5 done (`agent-v3`, `buddy`, the gateway), and the substrate checkout at
@@ -45,23 +45,22 @@ source scripts/env.sh    # workshop.env into this shell (bash or zsh): PROJECT_I
    i.e. your nodes, not your laptop: on an Apple Silicon Mac the host-arch fallback would stage arm64 assets
    for amd64 nodes. The comments at the top of
    `.workshop/substrate/manifests/microvm/sandboxconfig-microvm.yaml.tmpl` explain each field.
-3. **A microVM worker pool and template.** The WorkerPool needs substrate's `ateom-microvm` worker image:
-   `make install` built only `ateom-gvisor`. Build it the way `scripts/install-substrate.sh` builds the
+3. **A microVM worker pool and template.** The WorkerPool needs substrate's `ateworker-microvm` worker image:
+   `make install` built only `ateworker-gvisor`. Build it the way `scripts/install-substrate.sh` builds the
    gVisor one, then apply [`workerpool.yaml.tmpl`](workerpool.yaml.tmpl) (Module 2's pool plus
    `sandboxClasses: [{name: microvm, configRef: {name: microvm}}]`, the node pool's label, and a toleration for its taint) and
-   [`template.yaml.tmpl`](template.yaml.tmpl) (`agent-v3` with
-   `sandboxConfig: {sandboxClass: microvm, configName: microvm}`):
+   [`template.yaml.tmpl`](template.yaml.tmpl) (`agent-v3` with `workerSelector` matching `workshop-agent-vm`):
    ```bash
    export MICROVM_WORKER_IMAGE="$(cd .workshop/substrate && export GOWORK=off KO_DOCKER_REPO KO_DEFAULTPLATFORMS &&
      ver="$(git describe --tags --always --dirty)" &&
-     ./hack/run-tool.sh ko build --base-import-paths "--ldflags=-X=github.com/agent-substrate/substrate/internal/version.Version=$ver" ./cmd/ateom-microvm)"
+     ./hack/run-tool.sh ko build --base-import-paths "--ldflags=-X=go.ate.dev/substrate/internal/version.Version=$ver" ./cmd/ateworker-microvm)"
    scripts/render.sh optional/I-microvm/workerpool.yaml.tmpl | kubectl apply -f -
    kubectl -n workshop get pods -l workload=workshop-agent-vm -o wide     # Running on the microvm node
    scripts/render.sh optional/I-microvm/template.yaml.tmpl | kubectl ate create actor-template -f -
    kubectl ate get actor-template agent-vm-v1 -a workshop -o yaml | grep -A2 goldenTag   # repeat until set (~20s)
    ```
    `diff modules/04-make-it-an-agent/manifests/template.yaml.tmpl optional/I-microvm/template.yaml.tmpl`
-   shows everything that changed. `.workshop/substrate/demos/counter/counter-microvm-template.yaml.tmpl` is
+   shows everything that changed: in `v0.6.0`, the sandbox class is chosen on the `WorkerPool` (`sandboxClasses`), not on the `ActorTemplate`, so `template.yaml.tmpl` simply selects the microVM pool via `workerSelector`. `.workshop/substrate/demos/counter/counter-microvm-template.yaml.tmpl` is
    substrate's own reference.
 4. Create an actor on `agent-vm-v1`, give it the same egress as `buddy`, and chat with it:
    ```bash

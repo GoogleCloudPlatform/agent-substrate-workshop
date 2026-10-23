@@ -26,7 +26,8 @@ func TestLoadConfigDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.ListenAddr != ":8080" || c.RouterURL != "http://atenet-router.ate-system.svc.cluster.local" ||
+	if c.ListenAddr != ":8080" || c.RouterURL != "https://atenet-router.ate-system.svc.cluster.local" ||
+		c.RouterServerName != "atenet-router.ate-system.svc" || c.RouterClientCert != "/var/run/ate/identity/credential-bundle.pem" ||
 		c.ATE.Addr != "api.ate-system.svc.cluster.local:443" || c.ATE.TokenFile != "/var/run/ate/token/token" ||
 		c.ATE.CAFile != "/var/run/ate/trust/trust-bundle.pem" || c.IdleAfter != 0 || c.IdleCheckEvery != time.Second ||
 		c.MockLLM || c.GeminiModel != "gemini-2.5-flash" {

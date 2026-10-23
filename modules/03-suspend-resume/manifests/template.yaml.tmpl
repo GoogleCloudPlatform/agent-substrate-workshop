@@ -22,16 +22,11 @@ containers:
     mountPath: /data
 resources:
   limits:
-  - name: cpu
-    quantity: "1"
-  - name: memory
-    quantity: 512Mi
+    cpuMillicores: 1000
+    memoryBytes: 536870912 # 512Mi
 snapshotConfig:
   preferredFidelity: SNAPSHOT_FIDELITY_VOLUMES  # suspend: durableDir only; memory is discarded and resume cold-boots the process
   storageLocation: gs://${BUCKET_NAME}/${ATESPACE}/agent-v2/
-sandboxConfig:
-  sandboxClass: gvisor
-  configName: gvisor-default
 volumes:
 - name: data
   durableDir: {}                           # per-actor directory that survives suspend/resume

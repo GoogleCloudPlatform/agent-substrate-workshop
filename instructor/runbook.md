@@ -1,6 +1,6 @@
 # Instructor runbook
 
-**Current target:** `SUBSTRATE_REF=v0.5.0` (2026-10-20). Last full cluster run: 2026-10-20 on `v0.5.0`, GKE `1.37.0-gke.3503000` (Rapid, zonal, 2× `c3-standard-4`),
+**Current target:** `SUBSTRATE_REF=v0.6.0` (2026-10-22). Last full cluster run: 2026-10-22 on `v0.6.0`, GKE `1.37.0-gke.3503000` (Rapid, zonal, 2× `c3-standard-4`),
 source install mode (`make e2e` passed with real Vertex; optional labs A, B, and J passed end-to-end on the cluster). Not run:
 published-image mode (the release notes name no image repo).
 
@@ -9,15 +9,15 @@ published-image mode (the release notes name no image repo).
 1. **Pick `SUBSTRATE_REF`**: the newest tag or commit that passes `make e2e` in **both** install modes,
    against a scratch GCP project (not an attendee's).
    - Source mode: leave `SUBSTRATE_IMAGE_REPO`/`SUBSTRATE_IMAGE_TAG` empty in `workshop.env` — `install-substrate.sh`
-     clones `SUBSTRATE_REF` and ko-builds `ate-setup`, `kubectl-ate`, and `ateom-gvisor` from source.
+     clones `SUBSTRATE_REF` and ko-builds `ate-setup`, `kubectl-ate`, and `ateworker-gvisor` from source.
    - Published mode: set both `SUBSTRATE_IMAGE_REPO` and `SUBSTRATE_IMAGE_TAG` if images exist for that ref, so
      `install-substrate.sh` runs `ate-setup deploy ate-system --image-repo … --image-tag …` instead of building.
    - `make e2e` drives every module through `catch-up` + `verify` (`scripts/catch-up.sh $n && scripts/verify/$((n-1)).sh`
      for n = 1..7). Run it start to finish in **each** mode; a pass in one mode does not imply a pass in the other,
-     since the worker image (`ateom-gvisor`) comes from a different path in each. Run it with `bin/` on your
+     since the worker image (`ateworker-gvisor`) comes from a different path in each. Run it with `bin/` on your
      PATH (`export PATH="$PWD/bin:$PATH"`, as attendees do in Module 0), or `verify/00` fails its PATH check.
    - Put the validated ref in `workshop.env.example`'s `SUBSTRATE_REF` and in `app/go.mod`
-     (`cd app && go get github.com/agent-substrate/substrate@<ref> && go mod tidy`), since `ateapipb` (used by the
+     (`cd app && go get go.ate.dev/substrate@<ref> && go mod tidy`), since `ateapipb` (used by the
      gateway, `egressctl`, and the idle-suspender) must speak the same protocol as the control plane you install.
 2. **Run the mock path too**: `MOCK_LLM=true make e2e`, so you know the whole workshop still works when Vertex is
    unreachable (quota, a locked-down project, a flaky network) — the fallback attendees are told about in Module 4.
@@ -31,7 +31,7 @@ published-image mode (the release notes name no image repo).
    [Module 1](../modules/01-architecture/README.md) and the wrap-up table in
    [Module 7](../modules/07-wrap-up/README.md).
 5. **For optional lab A** (`agent-substrate/env`) and **optional lab B** (`google/ax`): verify that their pinned commits
-   (`ENV_REF` and `AX_REF`) and `v0.5.0` patch (`optional/B-ax/patch-ax-v040.py`) still build and pass unit tests against `SUBSTRATE_REF` (or drop the
+   (`ENV_REF` and `AX_REF`) and `v0.6.0` patch (`optional/B-ax/patch-ax-v040.py`) still build and pass unit tests against `SUBSTRATE_REF` (or drop the
    patch once upstream `main` catches up to `SUBSTRATE_REF`).
    **For optional lab H** (`moficodes/agent-swarm`, which must be public before the event): pick a commit whose `go.mod` substrate version is
    exactly `SUBSTRATE_REF`. Its `hack/deploy.sh` refuses to deploy onto a cluster running any other version.
@@ -39,7 +39,7 @@ published-image mode (the release notes name no image repo).
    bare GKE cluster that has, at creation:
    - GKE **1.37+** (the minimum the workshop is validated on; `make preflight` rejects older). GKE 1.37 serves
      `certificates.k8s.io/v1` (`ClusterTrustBundle` and `PodCertificateRequest`) by default, which Substrate
-     `v0.5.0` uses directly (`make preflight` checks that `v1` or `v1beta1` is served).
+     `v0.6.0` uses directly (`make preflight` checks that `v1` or `v1beta1` is served).
    - **Workload Identity** and **managed OpenTelemetry** with `--managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS`.
    - **Managed Prometheus** enabled (`--enable-managed-prometheus`) — Module 6's Prometheus UI reads through it.
    - Machine type **`c3-standard-4`**, 2 nodes, **no node auto-upgrade**, **no spot/preemptible nodes** (an

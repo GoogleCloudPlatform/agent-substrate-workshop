@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agent-substrate/substrate/pkg/proto/ateapipb"
+	"go.ate.dev/substrate/pkg/proto/ateapipb"
 	"github.com/agent-substrate/workshop/app/internal/testutil"
 )
 
@@ -38,6 +38,16 @@ func TestTLSConfigDefaultsServerName(t *testing.T) {
 	c, err := TLSConfig(Options{})
 	if err != nil || c.ServerName != DefaultServerName {
 		t.Fatalf("TLSConfig = %v, %v", c, err)
+	}
+}
+
+func TestTLSConfigClientCertCallback(t *testing.T) {
+	c, err := TLSConfig(Options{ClientCertFile: "/nonexistent/client.pem"})
+	if err != nil || c.GetClientCertificate == nil {
+		t.Fatalf("TLSConfig = %v, %v", c, err)
+	}
+	if _, err := c.GetClientCertificate(nil); err == nil {
+		t.Fatal("want error loading missing client cert on handshake")
 	}
 }
 

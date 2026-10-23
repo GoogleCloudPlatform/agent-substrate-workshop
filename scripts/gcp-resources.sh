@@ -24,6 +24,7 @@ COMPUTE_SA="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.c
 step "Enable APIs"
 gcloud services enable --project "$PROJECT_ID" \
   container.googleapis.com storage.googleapis.com artifactregistry.googleapis.com \
+  iam.googleapis.com iamcredentials.googleapis.com \
   aiplatform.googleapis.com monitoring.googleapis.com logging.googleapis.com cloudtrace.googleapis.com
 ok "APIs enabled"
 
@@ -40,20 +41,39 @@ fi
 gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet >/dev/null
 ok "registry ready: ${KO_DOCKER_REPO}"
 
-_retry_gcloud() { "$@" >/dev/null || { sleep 1; "$@" >/dev/null; }; }
+_retry_gcloud() {
+  local i
+  for ((i = 1; i <= 6; i++)); do
+    "$@" >/dev/null 2>&1 && return 0
+    (( i < 6 )) && sleep 5
+  done
+  "$@" >/dev/null
+}
 bind_bucket()  { _retry_gcloud gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" --member="$1" --role="$2" --condition=None; }
 bind_project() { _retry_gcloud gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="$1" --role="$2" --condition=None; }
+bind_gsa()     { _retry_gcloud gcloud iam service-accounts add-iam-policy-binding "$1" --project "$PROJECT_ID" --member="$2" --role="$3" --condition=None; }
 # Artifact Registry read access is granted on the workshop repo only, not the project: least privilege,
 # and deleting the repo (teardown --all) removes the binding with it, so nobody else's grant is touched.
 # (If you point KO_DOCKER_REPO at a different repo, grant the same readers on that one.)
 bind_repo()    { _retry_gcloud gcloud artifacts repositories add-iam-policy-binding "$AR_REPO" --location "$REGION" --project "$PROJECT_ID" --member="$1" --role="$2"; }
 
-step "IAM for Substrate (Workload Identity principals in ate-system)"
+TRANSFER_GSA_NAME="${SNAPSHOT_TRANSFER_GSA_NAME:-ate-snapshot-transfer}"
+TRANSFER_GSA_EMAIL="${TRANSFER_GSA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+step "Snapshot transfer GSA (${TRANSFER_GSA_EMAIL})"
+if ! gcloud iam service-accounts describe "$TRANSFER_GSA_EMAIL" --project "$PROJECT_ID" >/dev/null 2>&1; then
+  gcloud iam service-accounts create "$TRANSFER_GSA_NAME" --project "$PROJECT_ID" --display-name "Substrate snapshot transfers" >/dev/null
+fi
+ok "snapshot transfer GSA ready"
+
+step "IAM for Substrate (Workload Identity principals in ate-system + snapshot transfer GSA)"
 for sa in atelet ate-api-server; do
   bind_bucket  "${WI}/ns/ate-system/sa/${sa}" roles/storage.objectAdmin
   bind_bucket  "${WI}/ns/ate-system/sa/${sa}" roles/storage.bucketViewer
   bind_repo    "${WI}/ns/ate-system/sa/${sa}" roles/artifactregistry.reader
 done
+bind_bucket  "serviceAccount:${TRANSFER_GSA_EMAIL}" roles/storage.objectAdmin
+bind_bucket  "serviceAccount:${TRANSFER_GSA_EMAIL}" roles/storage.bucketViewer
+bind_gsa     "$TRANSFER_GSA_EMAIL" "${WI}/ns/ate-system/sa/ate-api-server" roles/iam.serviceAccountTokenCreator
 bind_bucket  "$COMPUTE_SA" roles/storage.objectViewer
 bind_repo    "$COMPUTE_SA" roles/artifactregistry.reader
 ok "substrate IAM bound"

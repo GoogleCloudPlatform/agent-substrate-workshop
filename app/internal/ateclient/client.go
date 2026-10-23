@@ -27,7 +27,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/agent-substrate/substrate/pkg/proto/ateapipb"
+	"go.ate.dev/substrate/pkg/proto/ateapipb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -35,13 +35,14 @@ import (
 // DefaultServerName is the name ateapi's serving certificate is issued for.
 const DefaultServerName = "api.ate-system.svc"
 
-// Options says where ateapi is and how to trust and authenticate to it.
+// Options says where ateapi (or atenet-router) is and how to trust and authenticate to it.
 type Options struct {
-	Addr       string // host:port, e.g. api.ate-system.svc.cluster.local:443 or localhost:8443
-	ServerName string // TLS name to verify; defaults to DefaultServerName
-	CAFile     string // PEM trust bundle; empty uses system roots
-	TokenFile  string // bearer token file, re-read on every call because projected tokens rotate
-	Insecure   bool   // skip TLS verification (port-forward fallback only)
+	Addr           string // host:port, e.g. api.ate-system.svc.cluster.local:443 or localhost:8443
+	ServerName     string // TLS name to verify; defaults to DefaultServerName
+	CAFile         string // PEM trust bundle; empty uses system roots
+	TokenFile      string // bearer token file, re-read on every call because projected tokens rotate
+	ClientCertFile string // PEM bundle (cert + key) for mTLS, re-read on every handshake because podCertificates rotate
+	Insecure       bool   // skip TLS verification (port-forward fallback only)
 }
 
 // TLSConfig builds the client TLS config for o.
@@ -51,6 +52,15 @@ func TLSConfig(o Options) (*tls.Config, error) {
 		name = DefaultServerName
 	}
 	cfg := &tls.Config{ServerName: name, MinVersion: tls.VersionTLS12}
+	if o.ClientCertFile != "" {
+		cfg.GetClientCertificate = func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			cert, err := tls.LoadX509KeyPair(o.ClientCertFile, o.ClientCertFile)
+			if err != nil {
+				return nil, fmt.Errorf("ateclient: load client cert %s: %w", o.ClientCertFile, err)
+			}
+			return &cert, nil
+		}
+	}
 	if o.Insecure {
 		cfg.InsecureSkipVerify = true //nolint:gosec // explicit opt-in for port-forward debugging
 		return cfg, nil
