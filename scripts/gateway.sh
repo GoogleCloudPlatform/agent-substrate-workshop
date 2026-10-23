@@ -38,6 +38,7 @@ fi
 export MOCK_LLM
 kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 kubectl label namespace "$NAMESPACE" ate.dev/api-access=true --overwrite >/dev/null
+ensure_gateway_access "$ATESPACE" "$NAMESPACE"
 step "deploying gateway ($GATEWAY_IMAGE, MOCK_LLM=$MOCK_LLM, IDLE_AFTER=$IDLE_AFTER)"
 render "$REPO_ROOT/modules/04-make-it-an-agent/manifests/gateway.yaml.tmpl" \
   NAMESPACE GATEWAY_IMAGE ATESPACE MOCK_LLM GEMINI_MODEL PROJECT_ID VERTEX_LOCATION IDLE_AFTER | kubectl apply -f -

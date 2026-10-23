@@ -21,7 +21,7 @@ flowchart LR
 
 ## Which AX commit, and why
 
-Our `SUBSTRATE_REF` is `v0.5.0` (pinned in `app/go.mod` as `github.com/agent-substrate/substrate v0.5.0`).
+Our `SUBSTRATE_REF` is `v0.6.0` (pinned in `app/go.mod` as `go.ate.dev/substrate v0.6.0`).
 
 Upstream `google/ax` pins an older Substrate commit (`v0.0.0-20260918201817-944abe3278b8` in `go.mod`). This lab pins AX at:
 
@@ -29,9 +29,9 @@ Upstream `google/ax` pins an older Substrate commit (`v0.0.0-20260918201817-944a
 AX_REF=ac2332829f22360ff97b0ba34d94dd0dd782f17e   # google/ax main, 2026-10-12
 ```
 
-Step 1 runs [`optional/B-ax/patch-ax-v040.py`](patch-ax-v040.py) to bring it up to `v0.5.0` before building:
+Step 1 runs [`optional/B-ax/patch-ax-v040.py`](patch-ax-v040.py) to bring it up to `v0.6.0` before building:
 
-1. **Substrate `v0.5.0` proto changes**: `ContainerReadyz` → `WakeupProbe` + `HttpGetAction` (pointed at `/healthz` so the actor transitions to `RUNNING` and activates its `EgressPolicy` as soon as the runner's HTTP server starts, while `TaskReconciler` polls `/readyz?check=workspace`), `SnapshotsConfig` (with `OnPause`/`OnResume`) → `SnapshotConfig` (`PreferredFidelity: SNAPSHOT_FIDELITY_VOLUMES`), `SandboxConfig.SandboxClass` enum → string `"gvisor"`, required `Resources.Limits` (`cpu: "1"`, `memory: "512Mi"`), `WorkerPodIp` → `WorkerPodIps`, and a retry in `EnsureActor` while the template's golden snapshot finishes (`FailedPrecondition`).
+1. **Substrate `v0.6.0` proto and module path changes**: `github.com/agent-substrate/substrate` → `go.ate.dev/substrate v0.6.0`, `ContainerReadyz` → `WakeupProbe` + `HttpGetAction` (pointed at `/healthz` so the actor transitions to `RUNNING` and activates its `EgressPolicy` as soon as the runner's HTTP server starts, while `TaskReconciler` polls `/readyz?check=workspace`), `SnapshotsConfig` (with `OnPause`/`OnResume`) → `SnapshotConfig` (`PreferredFidelity: SNAPSHOT_FIDELITY_VOLUMES`), `SandboxConfig` removed from `ActorTemplate` (the `WorkerPool` determines the sandbox class), `ResourceRequirements.Limits` (`CpuMillicores: 1000`, `MemoryBytes: 536870912`), `WorkerPodIp` → `WorkerPodIps`, `DeleteActorRequest.AnyState` removed, `GetAtespace` checked before `CreateAtespace` (so an `editor` on a pre-created atespace does not need `can_create_atespace` on `global:root`), and a retry in `EnsureActor` while the template's golden snapshot finishes (`FailedPrecondition`).
 2. **`ko`-built runner path**: AX's `.ko.yaml` already configures `cmd/ax-task-runner` to use `alpine/git:latest` (Alpine + `git`, `sh`, `wget`), which lets `ko build` produce a `@sha256:` digest-pinned runner image without Docker. The patch switches `DefaultGuestCommand` in `internal/substrate/client.go` from `/usr/local/bin/ax-task-runner` to `/ko-app/ax-task-runner` where `ko` places the binary.
 3. **`WorkerSelector`, `VOLUMES`-fidelity marker path, and namespace-scoped RBAC**: adds `workerSelector: {workload: ax-worker}` so AX tasks run on their own `ax-workers` pool instead of the workshop's `agents` pool, moves AX's maiden-run marker directory (`DefaultAXDir` in `internal/workspace/setup.go`) from `/ax` to `/workspace/.ax` so it lives inside the `/workspace` `durableDir` and survives a `SNAPSHOT_FIDELITY_VOLUMES` suspend/resume ([Module 3 Part B](../../modules/03-suspend-resume/README.md#part-b-disk-only-suspend-template-agent-v2)), labels `Namespace/ax-system` with `ate.dev/api-access: "true"`, and removes the cluster-wide Secret `ClusterRole` and `ClusterRoleBinding` from `deploy/ax-server.yaml` so the deployment stays strictly namespace-scoped to `ax-system`.
 
@@ -59,11 +59,20 @@ kubectl -n ax-system rollout status deploy/ax-redis --timeout=180s
 sed "s|gs://dberkov-gke-dev3/ate-env/|gs://$BUCKET_NAME/ax/|g" .workshop/ax/deploy/ax-server.yaml \
   | (cd .workshop/ax && ko apply -f -)
 kubectl -n ax-system rollout status deploy/ax-server --timeout=180s
+# Pre-create the ax-workshop atespace and grant ax-server's ServiceAccount editor on it
+# (v0.6.0+ enforces OpenFGA authorization by default):
+kubectl ate create atespace ax-workshop 2>/dev/null || true
+kubectl ate create access-policy -a ax-workshop -f - 2>/dev/null <<'EOF' || true
+bindings:
+  - role: editor
+    members:
+      - user:system:serviceaccount:ax-system:ax-server
+EOF
 kubectl -n ax-system get pods -l workload=ax-worker     # 2 worker pods Running
 kubectl ate get workers -n ax-system                    # 2 Ready workers registered with ateapi
 ```
 
-Look at `.workshop/ax/deploy/ax-server.yaml`: `ax-server` mounts the same two projected volumes you saw in the workshop — a `serviceAccountToken` audienced to `api.ate-system.svc` and the `servicedns.podcert.ate.dev/identity` `ClusterTrustBundle` — so it can call `ateapi` over mTLS/TLS and route readiness checks through `atenet-router.ate-system.svc.cluster.local:80`.
+Look at `.workshop/ax/deploy/ax-server.yaml`: `ax-server` mounts the same `serviceAccountToken` (audienced to `api.ate-system.svc`) and `servicedns.podcert.ate.dev/identity` `ClusterTrustBundle` projected volumes you saw on the workshop gateway — so it can call `ateapi` over TLS and route readiness checks through `atenet-router`.
 
 ## 2. Declare a Workspace and a Task
 

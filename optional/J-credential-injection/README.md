@@ -8,7 +8,7 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
 (`pkg/proto/ateapipb/ateapi.proto`, `CredentialHeader`), resolved at request time by dialing a
 **credential provider**, a small gRPC service (`pkg/proto/credproviderpb/credprovider.proto`).
 
-> **Fact-checked against the substrate checkout at `SUBSTRATE_REF` (v0.5.0):** substrate ships the built-in
+> **Fact-checked against the substrate checkout at `SUBSTRATE_REF` (v0.6.0):** substrate ships the built-in
 > `k8s.io` provider (`cmd/credential-provider/kubernetes-secrets`) with manifests in
 > `manifests/egress-credential-injection/` and a guide in `docs/egress-credential-injection.md`. It resolves
 > `ate-secret://k8s.io/default/<namespace>/<secret>/<key>` from a Kubernetes Secret, and it denies by default:
@@ -81,7 +81,7 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
 ## Clean up
 
 ```bash
-kubectl ate delete actor fetch1 -a workshop --any-state
+kubectl ate delete actor fetch1 -a workshop
 kubectl ate delete actor-template agent-fetch-v1 -a workshop
 kubectl delete namespace workshop-secrets --ignore-not-found
 ```

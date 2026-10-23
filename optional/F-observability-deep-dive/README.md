@@ -5,7 +5,7 @@
 Starts from the end of Module 6 (`make catch-up MODULE=7`).
 
 > **Fact-checked against the substrate checkout at `SUBSTRATE_REF`** (`docs/metrics/registry/metrics.yaml`,
-> `internal/ateattr/ateattr.go`, `internal/ateom/stats.go`) and this repo's own `observability/dashboard.json`
+> `internal/ateattr/ateattr.go`, `internal/ateworker/stats.go`) and this repo's own `observability/dashboard.json`
 > and `observability/queries.md`. Two corrections from an earlier draft of this lab, called out inline below:
 > the resume operation's label value is lowercase `resume`, not `RESUME`; and a logs-based metric over
 > per-actor events must stay labeled by template/pool, never by actor name — see step 3.
@@ -85,7 +85,7 @@ good = `workshop_chat_turns_total{outcome="ok", cluster="ate-cluster"}`, total =
 Watch the error budget burn during step 1's `IDLE_AFTER=0s` run.
 
 ## 3. Usage events as a logs-based metric — labeled by template/pool, not actor
-Every worker emits an `"Actor usage sampled"` log line per actor per poll tick (`internal/ateom/stats.go`) —
+Every worker emits an `"Actor usage sampled"` log line per actor per poll tick (`internal/ateworker/stats.go`) —
 CPU, memory, and identity, but *as a log*, not a metric series, specifically
 **because** it carries actor identity. Module 6 already made this point for `ate.template.name`-labeled
 metrics; the same rule applies when you build your own logs-based metric from these events: keep actor
@@ -99,7 +99,7 @@ gcloud logging metrics create actor_usage_events --project "$PROJECT_ID" \
 In the metric's settings (Logs Explorer → your new metric → "Convert to a metric" panel, or Metrics Explorer
 → edit), add label extractors for `jsonPayload."ate.template.name"` and `jsonPayload."ate.workerpool.name"` — **not**
 `jsonPayload."ate.actor.name"`. (`gcloud logging metrics create` has no flag for label extractors, which is why
-this part is in the Console. Note the `jsonPayload.` prefix: `ateom`'s usage samples and `ateapi`'s `Actor state changed`
+this part is in the Console. Note the `jsonPayload.` prefix: `ateworker`'s usage samples and `ateapi`'s `Actor state changed`
 records both carry `ate.*` in `jsonPayload`.) Chart it in Metrics
 Explorer grouped by template: this tells you which *template*
 generates the most usage events under `make load`, without ever creating a per-actor time series.
@@ -151,8 +151,8 @@ kubectl ate --trace resume actor buddy -a workshop
 
 Open Cloud Trace → Trace Explorer, paste the printed trace ID into "Find a specific trace", and look at the
 span breakdown for that one resume: ateapi's steps (`step.AssignWorker`, `step.CallAteletRestore`, …),
-atelet's snapshot download and OCI prep, and an `ateom-gvisor` span. That last one is tagged
-`ate.otlp.relay=relay`: ateom runs inside the sandbox with no network of its own, so atelet relays its
+atelet's snapshot download and OCI prep, and an `ateworker-gvisor` span. That last one is tagged
+`ate.otlp.relay=relay`: ateworker runs inside the sandbox with no network of its own, so atelet relays its
 OTLP out for it. Data plane traffic (the router forwarding your actual chat request) is sampled at 1%, so
 this per-command trace ID is the reliable way to find *a specific* call rather than hoping a resume shows
 up in a random sample.
@@ -168,7 +168,7 @@ resource.type="k8s_container"
 jsonPayload.trace_id="<the ID the CLI printed>"
 ```
 You get the request across three components: ateapi (`Picked worker`, the lease, `Actor state changed`),
-atelet (`Image cache hit`, `Restore timing breakdown`), and ateom (`About to run runsc restore`, `Wakeup probe reached 200`).
+atelet (`Image cache hit`, `Restore timing breakdown`), and ateworker (`About to run runsc restore`, `Wakeup probe reached 200`).
 Records from untraced requests carry a `trace_id` too, with `trace_flags` `00`: not sampled, so no spans
 exist for it.
 

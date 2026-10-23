@@ -31,7 +31,7 @@ worker, and those are what more workers would fix. Substrate exports both halves
 
 - `ate.workerpool.workers` by `ate.worker.state` (ateapi): how many workers host at least one actor
   (`partial` or `at_capacity`). A busy workshop worker shows as `partial`, not `at_capacity`: the state counts
-  actor slots (1 of ateom's default 1000), not CPU, so count both.
+  actor slots (1 of ateworker's default 1000), not CPU, so count both.
 - `atenet.router.parking.active` (atenet-router): requests parked at the router waiting for a worker
   (Module 5's 60s parking budget). Each one needs a seat; a workshop worker has 1 seat (1 CPU limit, 1 CPU
   per actor).

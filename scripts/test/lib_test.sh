@@ -233,7 +233,7 @@ case "$*" in
     out=""; for f in "$KDIR"/actors/*; do [[ -f "$f" ]] || continue
       out+="${out:+,}{\"metadata\":{\"name\":\"${f##*/}\"},\"actorTemplate\":{\"atespace\":\"ws\",\"name\":\"$(cat "$f")\"},\"status\":{\"state\":\"ACTOR_STATE_CRASHED\"}}"
     done; echo "{\"actors\":[$out]}" ;;
-  "ate delete actor "*" -a ws --any-state") rm -f "$KDIR/actors/$4" ;;
+  "ate delete actor "*" -a ws") rm -f "$KDIR/actors/$4" ;;
   "ate get actor-template "*" -a ws") [[ -f "$KDIR/tmpl-$4" ]] ;;
   "ate delete actor-template "*" -a ws")
     grep -qx "$4" "$KDIR"/actors/* 2>/dev/null && exit 1
@@ -249,7 +249,7 @@ t_reset_template_deletes_its_actors_then_template() {
   ( export PATH="$d/bin:$PATH" KLOG="$d/log" KDIR="$d"; reset_template ws t && reset_template ws t ) &&
     [[ ! -e "$d/actors/a1" && ! -e "$d/actors/a2" && -e "$d/actors/b1" ]] &&
     [[ ! -e "$d/tmpl-t" && -e "$d/tmpl-other" ]] &&
-    grep -q 'delete actor a1 -a ws --any-state' "$d/log" && ! grep -q 'delete actor b1' "$d/log"
+    grep -q 'delete actor a1 -a ws' "$d/log" && ! grep -q 'delete actor b1' "$d/log"
 }
 t_catch_up_reset_needs_module_3() {
   local out; out="$(RESET=1 bash "$HERE/../catch-up.sh" 2 2>&1)" && return 1

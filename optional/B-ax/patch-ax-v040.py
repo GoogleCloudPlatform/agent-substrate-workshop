@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Idempotently patches google/ax (.workshop/ax) for Agent Substrate v0.5.0 compatibility."""
+"""Idempotently patches google/ax (.workshop/ax) for Agent Substrate v0.6.0 compatibility."""
 
 import os
 import subprocess
@@ -21,10 +21,24 @@ import sys
 
 
 def patch_go_mod(ax_dir: str) -> None:
+    for rel in (
+        os.path.join("internal", "substrate", "client.go"),
+        os.path.join("internal", "controller", "reconciler_test.go"),
+    ):
+        p = os.path.join(ax_dir, rel)
+        with open(p, "r", encoding="utf-8") as fh:
+            src = fh.read()
+        src = src.replace(
+            '"github.com/agent-substrate/substrate/pkg/proto/ateapipb"',
+            '"go.ate.dev/substrate/pkg/proto/ateapipb"',
+        )
+        with open(p, "w", encoding="utf-8") as fh:
+            fh.write(src)
+
     env = os.environ.copy()
     env["GOWORK"] = "off"
     subprocess.run(
-        ["go", "get", "github.com/agent-substrate/substrate@v0.5.0"],
+        ["go", "get", "go.ate.dev/substrate@v0.6.0"],
         cwd=ax_dir,
         env=env,
         check=True,
@@ -68,8 +82,9 @@ def patch_substrate_client(ax_dir: str) -> None:
     content = content.replace(old_readyz, new_wakeup)
     content = content.replace(new_wakeup.replace('"/healthz"', '"/readyz"'), new_wakeup)
 
-    # 3. v0.5.0 replaced SnapshotConfig.onCommit with preferredFidelity, made SandboxConfig.sandboxClass
-    #    a string ("gvisor"), and requires cpu and memory limits on every ActorTemplate.
+    # 3. v0.6.0 replaced SnapshotConfig.onCommit with preferredFidelity, removed SandboxConfig from
+    #    ActorTemplate (the WorkerPool determines the sandbox class), and uses ResourceRequirements
+    #    with integer CpuMillicores and MemoryBytes limits.
     #    Also select the lab's `workload: ax-worker` WorkerPool so AX tasks don't land on `agents`.
     old_snapshots = """\t\tSnapshotsConfig: &ateapipb.SnapshotsConfig{
 \t\t\tStorageLocation: snapshotsBucket,
@@ -87,14 +102,10 @@ def patch_substrate_client(ax_dir: str) -> None:
 \t\t\tStorageLocation:   snapshotsBucket,
 \t\t\tPreferredFidelity: ateapipb.SnapshotFidelity_SNAPSHOT_FIDELITY_VOLUMES,
 \t\t},
-\t\tSandboxConfig: &ateapipb.SandboxConfig{
-\t\t\tSandboxClass: "gvisor",
-\t\t\tConfigName:   "gvisor-default",
-\t\t},
-\t\tResources: &ateapipb.Resources{
-\t\t\tLimits: []*ateapipb.Limits{
-\t\t\t\t{Name: "cpu", Quantity: "1"},
-\t\t\t\t{Name: "memory", Quantity: "512Mi"},
+\t\tResources: &ateapipb.ResourceRequirements{
+\t\t\tLimits: &ateapipb.Resources{
+\t\t\t\tCpuMillicores: 1000,
+\t\t\t\tMemoryBytes:   536870912,
 \t\t\t},
 \t\t},
 \t\tWorkerSelector: &ateapipb.Selector{
@@ -127,6 +138,21 @@ def patch_substrate_client(ax_dir: str) -> None:
 \t\tworkerIP = resp.Actor.Status.WorkerAssignment.WorkerPodIps[0]
 \t}"""
     content = content.replace(old_worker_ip, new_worker_ip)
+
+    # 6. v0.6.0 removed AnyState from DeleteActorRequest (actors can be deleted in any state directly),
+    #    and enforces OpenFGA on CreateAtespace (global:root). Check GetAtespace first so pre-created
+    #    atespaces where ax-server is editor do not require global owner.
+    content = content.replace("\t\tAnyState: true,\n", "")
+    old_ensure_atespace = """func (c *Client) EnsureAtespace(ctx context.Context, atespace string) error {
+\treq := &ateapipb.CreateAtespaceRequest{"""
+    new_ensure_atespace = """func (c *Client) EnsureAtespace(ctx context.Context, atespace string) error {
+\tif _, err := c.control.GetAtespace(ctx, &ateapipb.GetAtespaceRequest{
+\t\tAtespace: &ateapipb.ObjectRef{Name: atespace},
+\t}); err == nil {
+\t\treturn nil
+\t}
+\treq := &ateapipb.CreateAtespaceRequest{"""
+    content = content.replace(old_ensure_atespace, new_ensure_atespace)
 
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(content)
@@ -234,7 +260,7 @@ def main() -> int:
     patch_workspace_setup(ax_dir)
     patch_ax_cli_timeout(ax_dir)
     patch_deploy_manifest(ax_dir)
-    print(f"Patched AX at {ax_dir} for Agent Substrate v0.5.0.")
+    print(f"Patched AX at {ax_dir} for Agent Substrate v0.6.0.")
     return 0
 
 

@@ -15,22 +15,22 @@ It's the pattern you built in Modules 4–5 (an always-on API in front of suspen
 
 ## Which env commit, and why
 
-Our `SUBSTRATE_REF` is `v0.5.0` (pinned in `app/go.mod` as `github.com/agent-substrate/substrate v0.5.0`).
+Our `SUBSTRATE_REF` is `v0.6.0` (pinned in `app/go.mod` as `go.ate.dev/substrate v0.6.0`).
 
 We checked every env tag and `main`:
 
-| env ref | substrate pin (`go.mod`) | compatibility with `v0.5.0` |
+| env ref | substrate pin (`go.mod`) | compatibility with `v0.6.0` |
 |---|---|---|
 | `v0.0.7`–`v0.0.10` | `v0.0.0-20260717234919-a2d55e99e02e` (2026-07-17) | Pre-`v0.2.0` (`readyz`, `snapshotsConfig`) |
-| `main` @ `fccd920` | `go.ate.dev/substrate v0.5.1-0.20261016164544-3a2ca6235748` (2026-10-16) | Wire-compatible with `v0.5.0` (`preferredFidelity: SNAPSHOT_FIDELITY_MEMORY`, string `sandboxClass: gvisor`, required `resources.limits`, and `ate.dev/api-access: "true"` on `Namespace/ate-env`) |
+| `2c780cd` | `go.ate.dev/substrate v0.5.1-0.20261018212731-ddb46651d605` (2026-10-18) | Matches `v0.6.0` (`ServiceAccount/ate-env-api`, `ate-env manifest access-policy`, `workerSelector` without `sandboxConfig` on `ActorTemplate`, `ate.dev/api-access: "true"` on `Namespace/ate-env`); [`patch-env-v060.py`](./patch-env-v060.py) bumps `go.ate.dev/substrate` to `v0.6.0` (`Actor.actor_template` proto tag `2` and integer `cpuMillicores`/`memoryBytes` limits) |
 
-This lab pins `env` `main` at:
+This lab pins `env` at:
 
 ```
-ENV_REF=fccd920ae90a8d5ce1b7c2fb57162e99e45f942a   # env main, 2026-10-16
+ENV_REF=2c780cd94891c134cd10375a30a5e1e662ee2c2d   # env, 2026-10-18
 ```
 
-No source patch is needed: `go build`, `go vet`, and `go test ./cmd/ate-env/` pass directly at `ENV_REF`.
+A small idempotent patch script ([`patch-env-v060.py`](./patch-env-v060.py)) updates the 3 Go files that construct `ateapipb.Limits` and bumps `go.ate.dev/substrate` to `v0.6.0`.
 
 ## Two things to know before you start
 
@@ -47,9 +47,10 @@ No source patch is needed: `go build`, `go vet`, and `go test ./cmd/ate-env/` pa
 
 ```bash
 source scripts/env.sh   # workshop.env into this shell (bash or zsh): KO_DOCKER_REPO, BUCKET_NAME, REPO_ROOT, …
-ENV_REF=fccd920ae90a8d5ce1b7c2fb57162e99e45f942a
-git clone https://github.com/agent-substrate/env .workshop/env 2>/dev/null; git -C .workshop/env checkout "$ENV_REF"
+ENV_REF=2c780cd94891c134cd10375a30a5e1e662ee2c2d
+git clone https://github.com/agent-substrate/env .workshop/env 2>/dev/null; git -C .workshop/env fetch origin "$ENV_REF" && git -C .workshop/env checkout "$ENV_REF"
 cd .workshop/env
+python3 "$REPO_ROOT/optional/A-env/patch-env-v060.py" .
 go build ./... && go test ./cmd/ate-env/
 export KO_DOCKER_REPO
 API_IMAGE=$(ko build --base-import-paths ./cmd/ate-env-api)
@@ -58,16 +59,14 @@ go build -o "$REPO_ROOT/bin/ate-env" ./cmd/ate-env
 cd "$REPO_ROOT"
 
 # --replicas 2 matches this workshop's WorkerPool size (module 2); env's own default is 5.
-# env's WorkerPool carries no labels and its template no workerSelector, so env's actors would run on any
-# worker, the workshop's `agents` included. The awk adds a `workload: ate-env` label to env's WorkerPool;
-# the printf adds the template's workerSelector for it. Same pairing as your Module 2 manifests.
+# Pre-create the ate-env atespace and grant ate-env-api's ServiceAccount editor on it (v0.6.0+ enforces
+# OpenFGA authorization by default):
+kubectl ate create atespace ate-env 2>/dev/null || true
+ate-env manifest access-policy | kubectl ate create access-policy -a ate-env -f - 2>/dev/null || true
 ate-env manifest --api-image "$API_IMAGE" --worker-image "$(cat .workshop/worker-image)" --replicas 2 \
-  | awk '/^kind: WorkerPool$/ {wp=1} wp && /^metadata:$/ {print; print "  labels:"; print "    workload: ate-env"; wp=0; next} {print}' \
   | kubectl apply -f -
 kubectl -n ate-env rollout status deploy/ate-env-api
-kubectl ate create atespace ate-env 2>/dev/null || true   # ate-env-api also ensures the atespace on startup
-{ ate-env manifest template --guest-image "$GUEST_IMAGE" --snapshots-bucket "gs://$BUCKET_NAME/ate-env/" --cpu 1 --memory 512Mi
-  printf 'workerSelector:\n  matchLabels:\n    workload: ate-env\n'; } \
+ate-env manifest template --guest-image "$GUEST_IMAGE" --snapshots-bucket "gs://$BUCKET_NAME/ate-env/" --cpu 1 --memory 512Mi \
   | kubectl ate create actor-template -f -
 kubectl ate get atespaces                                      # "ate-env" is listed next to "workshop"
 kubectl ate get actor-template default-template -a ate-env     # repeat until GOLDEN TAG is set (~20s)
@@ -193,12 +192,9 @@ not `ate-cluster`, replace `ate-cluster` in the queries above).
 
 ## Read the code
 
-- `cmd/ate-env/manifest.go`: how env generates its namespace, WorkerPool, and API Deployment/Service, plus
-  the separate `manifest template` subcommand that produces the ActorTemplate. Compare it with your own
-  Module 2 manifests — notably, it sets no `workerSelector` on the template and no labels on the WorkerPool,
-  relying on the default (unrestricted) match instead of the explicit `workload: workshop-agent` label pair
-  you wrote by hand. That's why step 1 adds a `workload: ate-env` pair: without it, env's actors run on the
-  workshop's `agents` workers, env's own pool sits idle, and step 6's pool queries show nothing.
+- `cmd/ate-env/manifest.go`: how env generates its namespace, WorkerPool, `ServiceAccount/ate-env-api`, and API Deployment/Service, plus
+  the separate `manifest access-policy` and `manifest template` subcommands. Compare it with your own
+  Module 2 manifests — `buildWorkerPool` labels the WorkerPool `ate-env/workerpool: default-template-workerpool`, and `buildActorTemplate` sets the matching `workerSelector` so env's actors run on `default-template-workerpool` rather than the workshop's `agents` pool.
 - `internal/ate/client.go`: a second production ateapi client — TLS, a re-read-on-every-call bearer token
   file, and the same `ate-target-actor` router header your gateway sets. Compare its `fileTokenCreds` with
   `app/internal/ateclient`'s `fileToken`: same idea, independently written.

@@ -42,7 +42,7 @@ sequenceDiagram
    kubectl ate create atespace workshop
    ```
 4. **A template.** Read `modules/02-hello-actor/manifests/template.yaml.tmpl`: it has the image, a readiness
-   probe, the snapshot fidelity (`preferredFidelity`), the GCS location, the gVisor sandbox, and one durable directory.
+   probe, the snapshot fidelity (`preferredFidelity`), the GCS location, resource limits (`cpuMillicores`, `memoryBytes`), and one durable directory.
    ```bash
    scripts/render.sh modules/02-hello-actor/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
    kubectl ate get actor-template agent-v1 -a workshop            # repeat until GOLDEN TAG is filled in

@@ -37,7 +37,11 @@ stop_port_forwards
 
 if kubectl ate get atespace "$ATESPACE" >/dev/null 2>&1; then
   step "actors and templates in atespace $ATESPACE"
-  for a in $(actor_names "$ATESPACE"); do kubectl ate delete actor "$a" -a "$ATESPACE" --any-state || warn "actor $a"; done
+  for a in $(actor_names "$ATESPACE"); do kubectl ate delete actor "$a" -a "$ATESPACE" || warn "actor $a"; done
+  # Actor deletion is asynchronous (an actor moves to DELETING before it's actually gone), so
+  # wait for actors to finish deleting before removing their templates and the atespace.
+  no_actors_left() { [[ -z "$(actor_names "$ATESPACE")" ]]; }
+  ( wait_for 60 "actors in $ATESPACE to finish deleting" no_actors_left ) || warn "some actors in $ATESPACE may still be deleting"
   # List templates instead of hardcoding agent-v1/v2/v3, so a template made outside the guided
   # modules (or a future module) still gets cleaned up. `actor-templates` is a real alias for
   # `actor-template` (kubectl-ate); with no name given it lists every template in the atespace.
@@ -45,10 +49,6 @@ if kubectl ate get atespace "$ATESPACE" >/dev/null 2>&1; then
   for t in $(kubectl ate get actor-templates -a "$ATESPACE" -o json | jq -r '(.actorTemplates // [])[].metadata.name'); do
     kubectl ate delete actor-template "$t" -a "$ATESPACE" 2>/dev/null || true
   done
-  # Actor deletion is asynchronous (an actor moves to DELETING before it's actually gone), so
-  # give it a bounded window before deleting the atespace out from under it.
-  no_actors_left() { [[ -z "$(actor_names "$ATESPACE")" ]]; }
-  ( wait_for 60 "actors in $ATESPACE to finish deleting" no_actors_left ) || warn "some actors in $ATESPACE may still be deleting"
   kubectl ate delete atespace "$ATESPACE" || warn "atespace $ATESPACE (delete remaining records and retry)"
 else
   warn "atespace $ATESPACE not found — skipping actor/template cleanup"

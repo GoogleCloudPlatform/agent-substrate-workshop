@@ -27,8 +27,7 @@ actor suspend checkpoints memory onto any worker. They're not related projects; 
 just useful (Module 1 has the full table).
 
 ## Limits to know before you build
-- **Authz inside an atespace is off by default.** Unless `--experimental-enable-authz` (OpenFGA `AccessPolicy`)
-  is enabled, anyone who can call ateapi for an atespace can act on all of its actors.
+- **Authz inside an atespace is role-based (`AccessPolicy`).** Anyone granted `editor` or `admin` on an atespace can act on all of its actors (not per-actor ACLs).
 - **CRASHED** actors need a human (or your code): resume refuses them, so `kubectl ate revert actor X -a Y`
   (back to `SUSPENDED` with its last snapshot), then resume, or `kubectl ate delete actor X -a Y`.
 - **Idle is your job** (Module 5), and so is WorkerPool sizing (optional lab G).

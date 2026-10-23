@@ -21,8 +21,8 @@ Never `kubectl port-forward` by hand for this — `make prometheus-ui`, `make fo
 | Did the scheduler find a free worker? (`no_capacity` = capacity starvation) | `sum by ("ate.scheduler.outcome") (rate({"ate.scheduler.assignment.duration_count", cluster="ate-cluster"}[2m]))` |
 | How slow is a resume? (P95) | `histogram_quantile(0.95, sum by (le, "ate.actor.operation.name") (rate({"ate.actor.lifecycle.operation.duration_bucket", cluster="ate-cluster"}[5m])))` |
 | Restore time by template | `histogram_quantile(0.95, sum by (le, "ate.template.name") (rate({"ate.actor.restore.duration_bucket", cluster="ate-cluster"}[5m])))` |
-| Where does cold start go? (by phase: download, oci_unpack, ateom_restore, ...) | `histogram_quantile(0.95, sum by (le, "ate.snapshot.phase") (rate({"ate.actor.restore.duration_bucket", cluster="ate-cluster"}[5m])))` |
-| Where does a suspend go? (by phase: ateom_checkpoint, persist, ...) | `histogram_quantile(0.95, sum by (le, "ate.snapshot.phase") (rate({"ate.actor.checkpoint.duration_bucket", cluster="ate-cluster"}[5m])))` |
+| Where does cold start go? (by phase: download, oci_unpack, worker_restore, ...) | `histogram_quantile(0.95, sum by (le, "ate.snapshot.phase") (rate({"ate.actor.restore.duration_bucket", cluster="ate-cluster"}[5m])))` |
+| Where does a suspend go? (by phase: worker_checkpoint, persist, ...) | `histogram_quantile(0.95, sum by (le, "ate.snapshot.phase") (rate({"ate.actor.checkpoint.duration_bucket", cluster="ate-cluster"}[5m])))` |
 | Image cache hit ratio (a miss pays for the pull and unpack) | `sum(rate({"ate.imagecache.requests", "ate.imagecache.outcome"="hit", cluster="ate-cluster"}[10m])) / sum(rate({"ate.imagecache.requests", "ate.imagecache.outcome"=~"hit\|miss", cluster="ate-cluster"}[10m]))` |
 | Which snapshot kind is being restored? (golden / latest / local) | `sum by ("ate.snapshot.kind") (rate({"ate.actor.restore.duration_count", cluster="ate-cluster"}[5m]))` |
 | Did requests hit a warm actor or trigger a resume? | `sum by ("ate.router.resume") (rate({"atenet.router.route.duration_count", top_level_controller_name="atenet-router", cluster="ate-cluster"}[2m]))` |
@@ -48,9 +48,9 @@ Never `kubectl port-forward` by hand for this — `make prometheus-ui`, `make fo
 ## Logs (Cloud Console -> Logging -> Logs Explorer)
 
 Substrate writes actor identity in two places. Records it writes *on the actor's behalf* (your agent's
-stdout, ateom's `Actor restoring` / `Actor checkpointing`) carry it in the
+stdout, ateworker's `Actor restoring` / `Actor checkpointing`) carry it in the
 label group, `labels."ate.*"`. Records a component writes *about* an actor (ateapi's `Actor state changed`
-and `Actor crashed`, atelet's `Restore timing breakdown`, ateom's `Actor usage sampled`) carry the same keys flat in `jsonPayload`. A
+and `Actor crashed`, atelet's `Restore timing breakdown`, ateworker's `Actor usage sampled`) carry the same keys flat in `jsonPayload`. A
 query for one actor's whole story needs both.
 
 One actor's history across workers and components, oldest first:
@@ -79,7 +79,7 @@ resource.type="k8s_container"
 resource.labels.cluster_name="ate-cluster"
 jsonPayload."ate.actor.state"="crashed"
 ```
-Everything one request did, across ateapi, atelet, and ateom. Use the ID `kubectl ate --trace …` prints:
+Everything one request did, across ateapi, atelet, and ateworker. Use the ID `kubectl ate --trace …` prints:
 ```
 resource.type="k8s_container"
 resource.labels.cluster_name="ate-cluster"

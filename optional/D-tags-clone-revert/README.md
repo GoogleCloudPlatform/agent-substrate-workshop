@@ -78,7 +78,7 @@ suspends replaces the actor's one external snapshot, and only a tag keeps an old
 
 ## Clean up
 ```bash
-kubectl ate delete actor buddy-2 -a workshop --any-state   # if it says "another operation is in progress", wait ~3s for idle-suspend to finish and retry
+kubectl ate delete actor buddy-2 -a workshop   # if it says "another operation is in progress", wait ~3s for idle-suspend to finish and retry
 kubectl ate delete tag knows-pineapple -a workshop
 ```
 (Delete the actor before the tag — an actor created from a tag borrows its snapshot until its own first
