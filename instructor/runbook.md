@@ -23,7 +23,7 @@ published-image mode (the release notes name no image repo).
    unreachable (quota, a locked-down project, a flaky network) — the fallback attendees are told about in Module 4.
    The gateway keeps that live `MOCK_LLM=true` afterwards; run `MOCK_LLM=false make gateway` to go back to Vertex.
 3. **Check external dependencies that drift independently of substrate:**
-   - `GEMINI_MODEL` (`workshop.env.example`, currently `gemini-2.5-flash`) is still served in `VERTEX_LOCATION`
+   - `GEMINI_MODEL` (`workshop.env.example`, currently `gemini-3.8-flash`) is still served in `VERTEX_LOCATION`
      (currently `${REGION}`, i.e. `us-central1`).
    - `PROM_FRONTEND_IMAGE` (currently `gke.gcr.io/prometheus-engine/frontend:v0.15.3-gke.0`) is a current tag.
 4. **Re-check [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) releases.** If it has

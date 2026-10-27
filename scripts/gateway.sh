@@ -20,7 +20,7 @@ load_env
 require_state gateway-image "make gateway"
 GATEWAY_IMAGE="$(state_get gateway-image)"
 export GATEWAY_IMAGE
-: "${GEMINI_MODEL:=gemini-2.5-flash}" "${VERTEX_LOCATION:=${REGION:-us-central1}}"
+: "${GEMINI_MODEL:=gemini-3.8-flash}" "${VERTEX_LOCATION:=${REGION:-us-central1}}"
 if [[ -z "${IDLE_AFTER:-}" ]]; then
   IDLE_AFTER="$(kubectl -n "$NAMESPACE" get deploy gateway \
     -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="IDLE_AFTER")].value}' 2>/dev/null || true)"

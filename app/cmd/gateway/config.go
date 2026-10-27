@@ -71,7 +71,7 @@ func loadConfig(getenv func(string) string) (config, error) {
 		RouterClientCert: or("ROUTER_CLIENT_CERT_FILE", "/var/run/ate/identity/credential-bundle.pem"),
 		SelfURL:          getenv("SELF_URL"),
 		MockLLM:        boolean("MOCK_LLM"),
-		GeminiModel:    or("GEMINI_MODEL", "gemini-2.5-flash"),
+		GeminiModel:    or("GEMINI_MODEL", "gemini-3.8-flash"),
 		Project:        getenv("GOOGLE_CLOUD_PROJECT"),
 		VertexLocation: or("VERTEX_LOCATION", "us-central1"),
 		ATE: ateclient.Options{
