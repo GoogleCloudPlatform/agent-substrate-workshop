@@ -31,7 +31,6 @@ Whenever you add, edit, or remove instructions, commands, explanations, or diagr
   - Cross-references to optional labs inside [`codelabs/en.md`](codelabs/en.md) use the Codelab step anchor `(#9)` (the step index for `## Appendix: Optional content`) instead of relative links to `optional/*/README.md`.
 - **Intentional Codelabs-specific differences**:
   - `## Introduction` in [`codelabs/en.md`](codelabs/en.md) is a condensed version of [`README.md`](README.md) (it omits the agenda table, quick start, and teardown sections that duplicate Codelab navigation).
-  - `## Setup` in [`codelabs/en.md`](codelabs/en.md) includes **Step 1: Activate Cloud Shell**, shifting the numbering of the remaining setup steps from `1–7` (in `modules/00-setup/README.md`) to `2–8` (in `codelabs/en.md`).
 
 ---
 
