@@ -82,3 +82,13 @@ bucket, and Artifact Registry — it asks you to confirm unless you set `YES=1`.
 also removes the bucket and the Artifact Registry repo (with the grants `make gcp` put on them) and the
 project IAM bindings `make gcp` created for the workshop namespace, but never
 the GKE cluster; see [Module 7](modules/07-wrap-up/README.md#clean-up).
+
+## License and Disclaimers
+
+This project is licensed under the Apache License, Version 2.0 — see [LICENSE](LICENSE) for details and [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+
+This project is intended for demonstration purposes only. It is not intended for use in a production environment.
+
+Use of Google Cloud services in this workshop is subject to the [Google Cloud Terms of Service](https://cloud.google.com/terms) and the [Google Cloud Service Specific Terms](https://cloud.google.com/terms/service-terms).
+
+Eligibility for the [Google Open Source Software Vulnerability Rewards Program](https://bughunters.google.com/open-source-security) is determined by the [Google Open Source Software Vulnerability Reward Program Rules](https://bughunters.google.com/about/rules/open-source/google-open-source-software-vulnerability-reward-program-rules).
