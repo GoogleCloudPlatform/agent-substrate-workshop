@@ -39,8 +39,7 @@ resources:
     cpuMillicores: 1000
     memoryBytes: 536870912 # 512Mi
 snapshotConfig:
-  preferredFidelity: SNAPSHOT_FIDELITY_MEMORY  # suspend: memory + disk
-  storageLocation: gs://${BUCKET_NAME}/${ATESPACE}/agent-v1/
+  preferredFidelity: SNAPSHOT_FIDELITY_MEMORY  # suspend: memory + disk (stored under the cluster's --snapshot-location bucket)
 volumes:
 - name: data
   durableDir: {}                           # per-actor directory that survives suspend/resume

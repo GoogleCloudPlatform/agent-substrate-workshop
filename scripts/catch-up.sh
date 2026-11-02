@@ -101,7 +101,7 @@ fi
 # depend on having happened. A missing marker on an otherwise-installed cluster (e.g. .workshop/
 # predates this marker, or was partially cleaned up) just means we re-run it — install-substrate.sh
 # is safe to re-run (its own header says so, and every step in it is create-or-patch-if-missing).
-if [[ ! -s "$STATE_DIR/install-complete" ]]; then
+if [[ "$(state_get install-complete)" != *"SUBSTRATE_REF=$SUBSTRATE_REF" ]]; then
   "$S/install-substrate.sh"
 fi
 "$S/dashboards.sh"

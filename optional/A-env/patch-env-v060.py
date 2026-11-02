@@ -13,17 +13,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Idempotently patches agent-substrate/env (.workshop/env) for Agent Substrate v0.6.0 compatibility."""
+"""Idempotently patches agent-substrate/env (.workshop/env) for Agent Substrate v1.0.0-rc.1 compatibility."""
 
 import os
 import subprocess
 import sys
 
 
+def patch_imports(env_dir: str) -> None:
+    for root, _, files in os.walk(env_dir):
+        if ".git" in root.split(os.sep):
+            continue
+        for name in files:
+            if not name.endswith(".go"):
+                continue
+            path = os.path.join(root, name)
+            with open(path, "r", encoding="utf-8") as fh:
+                src = fh.read()
+            updated = src.replace(
+                '\t"go.ate.dev/substrate/pkg/proto/ateapipb"',
+                '\tateapipb "go.ate.dev/substrate/api/ateapi/v1"',
+            ).replace(
+                '\tatev1alpha1 "go.ate.dev/substrate/pkg/api/v1alpha1"',
+                '\tatev1alpha1 "go.ate.dev/substrate/api/infra/k8s/ate/v1"',
+            ).replace(
+                "Status: ateapipb.SnapshotStorageStatus_SNAPSHOT_STORAGE_STATUS_COMPLETED,",
+                "State:  ateapipb.SnapshotStorageState_SNAPSHOT_STORAGE_STATE_COMPLETED,",
+            )
+            if updated != src:
+                with open(path, "w", encoding="utf-8") as fh:
+                    fh.write(updated)
+
+
 def patch_manifest_go(env_dir: str) -> None:
     path = os.path.join(env_dir, "cmd", "ate-env", "manifest.go")
     with open(path, "r", encoding="utf-8") as fh:
         content = fh.read()
+
+    # v1.0.0-rc.1 rejects snapshotConfig.storageLocation unless PerTemplateSnapshotLocation preview gate is enabled.
+    content = content.replace("\t\t\tStorageLocation: cfg.snapshotsBucket,\n", "")
 
     old_resources = """\t\tResources: &ateapipb.Resources{Limits: []*ateapipb.Limits{
 \t\t\t{Name: "cpu", Quantity: orDefault(cfg.cpu, defaultActorCPU)},
@@ -83,6 +111,16 @@ def patch_manifest_test_go(env_dir: str) -> None:
         '[]string{"name: cpu\\n    quantity: \\"4\\"", "name: memory\\n    quantity: 8Gi"}',
         '[]string{"cpuMillicores: \\"4000\\"", "memoryBytes: \\"8589934592\\""}',
     )
+    old_storage_assert = """\tif template.GetSnapshotConfig().GetStorageLocation() != cfg.snapshotsBucket {
+\t\tt.Errorf("snapshots location = %q, want %q", template.GetSnapshotConfig().GetStorageLocation(), cfg.snapshotsBucket)
+\t}
+"""
+    content = content.replace(old_storage_assert, "")
+    content = content.replace('\t\t"storageLocation: gs://bucket/ate-env/",\n', "")
+    content = content.replace(
+        '!strings.Contains(out, "image: example.com/guest@sha256:aaaa") || !strings.Contains(out, "storageLocation: gs://bucket/prefix/")',
+        '!strings.Contains(out, "image: example.com/guest@sha256:aaaa")',
+    )
 
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(content)
@@ -109,7 +147,7 @@ def patch_go_mod(env_dir: str) -> None:
     env = os.environ.copy()
     env["GOWORK"] = "off"
     subprocess.run(
-        ["go", "get", "go.ate.dev/substrate@v0.6.0"],
+        ["go", "get", "go.ate.dev/substrate@v1.0.0-rc.1"],
         cwd=env_dir,
         env=env,
         check=True,
@@ -124,6 +162,7 @@ def patch_go_mod(env_dir: str) -> None:
 
 def main() -> None:
     env_dir = sys.argv[1] if len(sys.argv) > 1 else "."
+    patch_imports(env_dir)
     patch_manifest_go(env_dir)
     patch_manifest_test_go(env_dir)
     patch_imagetemplate_test_go(env_dir)

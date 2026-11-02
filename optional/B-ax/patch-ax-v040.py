@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Idempotently patches google/ax (.workshop/ax) for Agent Substrate v0.6.0 compatibility."""
+"""Idempotently patches google/ax (.workshop/ax) for Agent Substrate v1.0.0-rc.1 compatibility."""
 
 import os
 import subprocess
@@ -30,7 +30,10 @@ def patch_go_mod(ax_dir: str) -> None:
             src = fh.read()
         src = src.replace(
             '"github.com/agent-substrate/substrate/pkg/proto/ateapipb"',
+            'ateapipb "go.ate.dev/substrate/api/ateapi/v1"',
+        ).replace(
             '"go.ate.dev/substrate/pkg/proto/ateapipb"',
+            'ateapipb "go.ate.dev/substrate/api/ateapi/v1"',
         )
         with open(p, "w", encoding="utf-8") as fh:
             fh.write(src)
@@ -38,7 +41,7 @@ def patch_go_mod(ax_dir: str) -> None:
     env = os.environ.copy()
     env["GOWORK"] = "off"
     subprocess.run(
-        ["go", "get", "go.ate.dev/substrate@v0.6.0"],
+        ["go", "get", "go.ate.dev/substrate@v1.0.0-rc.1"],
         cwd=ax_dir,
         env=env,
         check=True,
@@ -82,9 +85,10 @@ def patch_substrate_client(ax_dir: str) -> None:
     content = content.replace(old_readyz, new_wakeup)
     content = content.replace(new_wakeup.replace('"/healthz"', '"/readyz"'), new_wakeup)
 
-    # 3. v0.6.0 replaced SnapshotConfig.onCommit with preferredFidelity, removed SandboxConfig from
+    # 3. v0.6.0+ replaced SnapshotConfig.onCommit with preferredFidelity, removed SandboxConfig from
     #    ActorTemplate (the WorkerPool determines the sandbox class), and uses ResourceRequirements
-    #    with integer CpuMillicores and MemoryBytes limits.
+    #    with integer CpuMillicores and MemoryBytes limits. v1.0.0-rc.1 rejects snapshotConfig.storageLocation
+    #    unless the PerTemplateSnapshotLocation preview gate is enabled.
     #    Also select the lab's `workload: ax-worker` WorkerPool so AX tasks don't land on `agents`.
     old_snapshots = """\t\tSnapshotsConfig: &ateapipb.SnapshotsConfig{
 \t\t\tStorageLocation: snapshotsBucket,
@@ -99,7 +103,6 @@ def patch_substrate_client(ax_dir: str) -> None:
 \t\t\tConfigName:   "gvisor-default",
 \t\t},"""
     new_snapshots = """\t\tSnapshotConfig: &ateapipb.SnapshotConfig{
-\t\t\tStorageLocation:   snapshotsBucket,
 \t\t\tPreferredFidelity: ateapipb.SnapshotFidelity_SNAPSHOT_FIDELITY_VOLUMES,
 \t\t},
 \t\tResources: &ateapipb.ResourceRequirements{
@@ -114,6 +117,7 @@ def patch_substrate_client(ax_dir: str) -> None:
 \t\t\t},
 \t\t},"""
     content = content.replace(old_snapshots, new_snapshots)
+    content = content.replace("\t\t\tStorageLocation:   snapshotsBucket,\n", "")
 
     # 4. Wait for the new template's golden snapshot before CreateActor (v0.4.0 returns FailedPrecondition
     #    until status.goldenSnapshotStatus.goldenTag is set).
@@ -260,7 +264,7 @@ def main() -> int:
     patch_workspace_setup(ax_dir)
     patch_ax_cli_timeout(ax_dir)
     patch_deploy_manifest(ax_dir)
-    print(f"Patched AX at {ax_dir} for Agent Substrate v0.6.0.")
+    print(f"Patched AX at {ax_dir} for Agent Substrate v1.0.0-rc.1.")
     return 0
 
 

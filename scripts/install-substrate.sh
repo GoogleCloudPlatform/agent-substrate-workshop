@@ -42,11 +42,12 @@ ok "bin/kubectl-ate (kubectl ate …)"
 user_has_ate || path_hint
 
 step "Deploy ate-system"
-# Clusters upgraded from Substrate < v0.6.0 may have a version-suffixed atelet DaemonSet
-# (e.g. atelet-v0-4-0) holding hostPort 8085 and an incompatible bundled Postgres PVC
-# (pre-v0.4.0 'postgres' schema owner, pre-v0.5.0 password-auth / enum wire types, or
-# pre-v0.6.0 ActorTemplate resource limits / sandboxConfig wire types).
-# Clean both up before ate-setup deploys and waits for ds/atelet and sts/postgres.
+# Clusters upgraded from Substrate < v1.0.0-rc.1 may have:
+# - a version-suffixed atelet DaemonSet (e.g. atelet-v0-4-0) holding hostPort 8085,
+# - pre-v1.0.0-rc.1 CRDs (ate.dev/v1alpha1 storedVersions on workerpools, sandboxconfigs, csidriverconfigs),
+# - an incompatible bundled Postgres PVC (pre-v0.4.0 'postgres' schema owner, pre-v0.5.0 password-auth,
+#   pre-v0.6.0 sandboxConfig wire types, or pre-v1.0.0-rc.1 squashed migrations / substrate.ateapi.v1 wire package).
+# Clean these up before ate-setup deploys and waits for ds/atelet and sts/postgres.
 for old_ds in $(kubectl -n ate-system get ds -l app=atelet -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null); do
   if [[ "$old_ds" != "atelet" ]]; then
     warn "removing legacy DaemonSet $old_ds before deploying ds/atelet"
@@ -54,6 +55,16 @@ for old_ds in $(kubectl -n ate-system get ds -l app=atelet -o jsonpath='{range .
   fi
 done
 kubectl label nodes --all ate.dev/substrate-version- >/dev/null 2>&1 || true
+crd_versions="$(kubectl get crd sandboxconfigs.ate.dev -o jsonpath='{.spec.versions[*].name}' 2>/dev/null || true)"
+if [[ " $crd_versions " == *" v1alpha1 "* ]]; then
+  warn "CRDs predate v1.0.0-rc.1 (ate.dev/v1alpha1); migrating CRDs and bundled Postgres to ate.dev/v1"
+  kubectl delete workerpools.ate.dev --all -A --ignore-not-found --wait=true >/dev/null 2>&1 || true
+  kubectl delete sandboxconfigs.ate.dev --all --ignore-not-found --wait=true >/dev/null 2>&1 || true
+  kubectl delete csidriverconfigs.ate.dev --all --ignore-not-found --wait=true >/dev/null 2>&1 || true
+  kubectl delete validatingadmissionpolicy/sandboxconfig-assets validatingadmissionpolicybinding/sandboxconfig-assets --ignore-not-found >/dev/null 2>&1 || true
+  kubectl delete crd/workerpools.ate.dev crd/sandboxconfigs.ate.dev crd/csidriverconfigs.ate.dev --ignore-not-found --wait=true >/dev/null 2>&1 || true
+  kubectl -n ate-system delete sts/postgres pvc/data-postgres-0 --ignore-not-found --wait=true >/dev/null 2>&1 || true
+fi
 if [[ -f "$SRC/manifests/ate-install/sandboxconfig-validation.yaml" ]]; then
   kubectl apply -f "$SRC/manifests/ate-install/generated/ate.dev_sandboxconfigs.yaml" \
     -f "$SRC/manifests/ate-install/sandboxconfig-validation.yaml" >/dev/null 2>&1 || true
@@ -65,8 +76,9 @@ if kubectl -n ate-system get configmap ate-api-authentication -o jsonpath='{.dat
 fi
 if kubectl -n ate-system get sts postgres >/dev/null 2>&1; then
   pg_vols="$(kubectl -n ate-system get sts postgres -o jsonpath='{.spec.template.spec.volumes[*].name}' 2>/dev/null || true)"
-  if [[ " $pg_vols " != *" postgres-ca "* ]] || ! kubectl -n ate-system get deploy ate-idp-server >/dev/null 2>&1; then
-    warn "bundled Postgres predates v0.6.0; resetting sts/postgres and pvc/data-postgres-0"
+  api_ver="$(kubectl -n ate-system exec deploy/ate-api-server -- /ko-app/ateapi --version 2>/dev/null || true)"
+  if [[ " $pg_vols " != *" postgres-ca "* ]] || ! kubectl -n ate-system get deploy ate-idp-server >/dev/null 2>&1 || [[ "$api_ver" == v0.* ]]; then
+    warn "bundled Postgres predates v1.0.0-rc.1; resetting sts/postgres and pvc/data-postgres-0"
     kubectl -n ate-system delete sts/postgres pvc/data-postgres-0 --ignore-not-found --wait=true
   fi
 fi
