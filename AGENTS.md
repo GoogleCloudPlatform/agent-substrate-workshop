@@ -2,9 +2,9 @@
 
 This file provides guidance for AI coding agents (such as Antigravity) working in the Agent Substrate Workshop repository.
 
-## Workshop Content & Dual-Source Synchronization
+## Workshop Content & Multi-Source Synchronization
 
-Workshop documentation is maintained in **two places** that must always be kept in sync whenever content changes:
+Workshop documentation is maintained in **three places** that must always be kept in sync whenever content changes:
 
 1. **Source of truth (`modules/`, `optional/`, and `README.md`)**:
    - [`README.md`](README.md): Root workshop overview, agenda, prerequisites, and quick start.
@@ -12,25 +12,28 @@ Workshop documentation is maintained in **two places** that must always be kept 
    - `optional/A-env/README.md` through `optional/J-credential-injection/README.md`: Individual READMEs and supporting files for the 10 optional post-workshop labs.
 2. **Codelabs edition ([`codelabs/en.md`](codelabs/en.md))**:
    - A single consolidated Markdown file formatted for Google Codelabs (`claat`), containing the introduction, all 8 core modules in order, and all 10 optional labs under a trailing `## Appendix: Optional content` section.
+3. **Qwiklabs edition ([`qwiklabs/en.md`](qwiklabs/en.md))**:
+   - A single consolidated Markdown file formatted identically to [`codelabs/en.md`](codelabs/en.md) for the introduction and all 8 core modules, **without** the trailing `## Appendix: Optional content` section or any references/links to optional labs.
 
 ### Rules when editing workshop content
 
-Whenever you add, edit, or remove instructions, commands, explanations, or diagrams in the lab, **apply the change to both the modular files (`modules/`, `optional/`, `README.md`) and [`codelabs/en.md`](codelabs/en.md)** while preserving the Codelabs-specific conventions below:
+Whenever you add, edit, or remove instructions, commands, explanations, or diagrams in the lab, **apply the change to the modular files (`modules/`, `optional/`, `README.md`), [`codelabs/en.md`](codelabs/en.md), and [`qwiklabs/en.md`](qwiklabs/en.md)** (for core module and introduction changes) while preserving the conventions below:
 
 - **Section headers & `Duration` metadata**:
   - In `modules/NN-*/README.md`, the title is an H1 with timing in parentheses, e.g. `# Setup (10 min)`, and subsections start at H2 (`##`).
-  - In [`codelabs/en.md`](codelabs/en.md), each core module is a top-level Codelab step using an H2 (`## Setup`) followed immediately by `Duration: MM:SS` (e.g. `Duration: 10:00`), and subsections shift down one level (`###`, `####`).
-  - All optional labs in [`codelabs/en.md`](codelabs/en.md) live inside a single Codelab step (`## Appendix: Optional content`). Inside the appendix, each optional lab's title is an H3 (`### Optional lab A — ...`) and its subsections shift down two levels (`####`, `#####`) compared to `optional/*-*/README.md`.
+  - In [`codelabs/en.md`](codelabs/en.md) and [`qwiklabs/en.md`](qwiklabs/en.md), each core module is a top-level step using an H2 (`## Setup`) followed immediately by `Duration: MM:SS` (e.g. `Duration: 10:00`), and subsections shift down one level (`###`, `####`).
+  - All optional labs in [`codelabs/en.md`](codelabs/en.md) live inside a single Codelab step (`## Appendix: Optional content`). Inside the appendix, each optional lab's title is an H3 (`### Optional lab A — ...`) and its subsections shift down two levels (`####`, `#####`) compared to `optional/*-*/README.md`. [`qwiklabs/en.md`](qwiklabs/en.md) omits this appendix altogether.
 - **Image references & assets**:
   - Module READMEs reference diagrams as `![...](../img/NN-*.svg)` (stored in `modules/img/`).
-  - [`codelabs/en.md`](codelabs/en.md) references diagrams as `![...](img/NN-*.svg)` (stored in `codelabs/img/`).
-  - If you add or modify an image in `modules/img/`, update the copy in `codelabs/img/` as well.
+  - [`codelabs/en.md`](codelabs/en.md) and [`qwiklabs/en.md`](qwiklabs/en.md) reference diagrams as `![...](img/NN-*.svg)` (stored in `codelabs/img/` and `qwiklabs/img/`).
+  - If you add or modify an image in `modules/img/`, update the copies in `codelabs/img/` and `qwiklabs/img/` as well.
 - **Links & navigation**:
-  - Module READMEs end with a `Next: [...]` navigation line; **omit** these `Next:` lines in [`codelabs/en.md`](codelabs/en.md) for core modules (Codelabs provides its own step navigation).
-  - Adjust relative paths for the file depth: links like `../../instructor/troubleshooting.md` in `modules/NN-*/README.md` become `instructor/troubleshooting.md` in [`codelabs/en.md`](codelabs/en.md).
+  - Module READMEs end with a `Next: [...]` navigation line; **omit** these `Next:` lines in [`codelabs/en.md`](codelabs/en.md) and [`qwiklabs/en.md`](qwiklabs/en.md) for core modules (Codelabs and Qwiklabs provide their own step navigation).
+  - Adjust relative paths for the file depth: links like `../../instructor/troubleshooting.md` in `modules/NN-*/README.md` become `instructor/troubleshooting.md` in [`codelabs/en.md`](codelabs/en.md) and [`qwiklabs/en.md`](qwiklabs/en.md).
   - Cross-references to optional labs inside [`codelabs/en.md`](codelabs/en.md) use the Codelab step anchor `(#9)` (the step index for `## Appendix: Optional content`) instead of relative links to `optional/*/README.md`.
-- **Intentional Codelabs-specific differences**:
-  - `## Introduction` in [`codelabs/en.md`](codelabs/en.md) is a condensed version of [`README.md`](README.md) (it omits the agenda table, quick start, and teardown sections that duplicate Codelab navigation).
+  - In [`qwiklabs/en.md`](qwiklabs/en.md), **omit all references and links to optional labs** (including parenthetical callouts such as `(optional lab J)` or `(see optional lab G)`, the `### Keep going: optional labs` subsection in `Wrap-up`, and the `## Appendix: Optional content` step).
+- **Intentional Codelabs/Qwiklabs-specific differences**:
+  - `## Introduction` in [`codelabs/en.md`](codelabs/en.md) and [`qwiklabs/en.md`](qwiklabs/en.md) is a condensed version of [`README.md`](README.md) (it omits the agenda table, quick start, and teardown sections that duplicate step navigation).
 
 ---
 
@@ -40,7 +43,8 @@ Whenever you add, edit, or remove instructions, commands, explanations, or diagr
 |---|---|
 | `modules/NN-*/` | Core workshop sections (`README.md`, `manifests/*.yaml.tmpl`, and `solution/main.go`). |
 | `optional/*-*/` | Post-workshop optional labs (`README.md`, manifests, upstream patch scripts, and `solution/main.go`). |
-| `codelabs/` | Consolidated Codelabs markdown (`en.md`) and duplicated diagram assets (`img/`). |
+| `codelabs/` | Consolidated Codelabs markdown (`en.md`, including optional labs appendix) and duplicated diagram assets (`img/`). |
+| `qwiklabs/` | Consolidated Qwiklabs markdown (`en.md`, core modules only, no optional content appendix) and duplicated diagram assets (`img/`). |
 | `app/` | Go module (`go.mod`) containing `cmd/agent` (edited by participants), `cmd/gateway`, `cmd/egressctl`, and shared packages in `internal/`. |
 | `scripts/` | Bash & Python automation backing `Makefile` targets (`lib.sh`, `render.sh`, `catch-up.sh`, `verify/NN.sh`, `test/*_test.sh`). |
 | `observability/` | Cloud Monitoring `dashboard.json`, `podmonitoring.yaml`, Prometheus UI deployment, and sample PromQL queries. |
