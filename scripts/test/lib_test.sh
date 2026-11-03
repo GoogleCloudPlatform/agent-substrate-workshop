@@ -297,6 +297,16 @@ t_env_sh_missing_file_returns() {
     [[ "$(WORKSHOP_ENV_FILE="$TMP/nope.env" interactive "$sh" "${flags[@]}" 'source scripts/env.sh; echo "alive rc=$?"')" == "alive rc=1" ]] || return 1
   done
 }
+t_env_sh_puts_bin_on_path() {
+  # Start from your shell's own PATH (lib.sh already put bin/ on this one). Sourcing twice adds bin/ once, first.
+  local sh want="1|$ROOT_DIR/bin"
+  for sh in bash zsh; do
+    command -v "$sh" >/dev/null || continue
+    local flags=(-i -c); [[ $sh == bash ]] && flags=(--norc -i -c)
+    [[ "$(PATH="$WORKSHOP_USER_PATH" interactive "$sh" "${flags[@]}" 'source scripts/env.sh; source scripts/env.sh
+      printf "%s|%s" "$(printf "%s\n" "$PATH" | tr ":" "\n" | grep -cx "$REPO_ROOT/bin")" "${PATH%%:*}"')" == "$want" ]] || return 1
+  done
+}
 
 # make install-status: running / finished / died / never started, from the pid file and the marker.
 install_status() { WORKSHOP_STATE_DIR="$1" bash "$HERE/../install-bg.sh" --status 2>&1; }
@@ -350,4 +360,5 @@ check "install-status points a disk-full install at the fix" t_install_status_di
 check "lib.sh refuses an interactive shell instead of taking it over" t_lib_refuses_interactive_shell
 check "env.sh loads workshop.env in bash/zsh without strict mode" t_env_sh_loads_without_strict_mode
 check "env.sh returns (not exits) when workshop.env is missing" t_env_sh_missing_file_returns
+check "env.sh puts bin/ on PATH once, in bash and zsh" t_env_sh_puts_bin_on_path
 exit "$fails"

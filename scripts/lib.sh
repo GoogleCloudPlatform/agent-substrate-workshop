@@ -110,7 +110,9 @@ render() {
   envsubst "$list" <"$tmpl"
 }
 
-_port_listening() { nc -z localhost "$1" >/dev/null 2>&1; }
+# _port_listening <port>: true if something accepts connections on localhost:<port>. Uses bash's /dev/tcp, so it
+# needs no nc (Cloud Shell doesn't ship one).
+_port_listening() { (: <"/dev/tcp/localhost/$1") >/dev/null 2>&1; }
 # _port_holder <port>: "pid N: command" of whatever listens on the port, if lsof can tell.
 _port_holder() {
   local pid

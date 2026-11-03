@@ -7,8 +7,9 @@ and start the Substrate install in the background. It runs while you take the ar
 - A GCP project where you are Owner, and a GKE **1.37+** cluster in it. The cluster needs Workload Identity,
   managed OpenTelemetry, Managed Prometheus, no node auto-upgrade (or an active maintenance exclusion), and no spot nodes. Your instructor created it, or you can use the cluster creation commands in the [instructor runbook](../../instructor/runbook.md#one-week-before) (also see [the substrate GCP guide](https://github.com/agent-substrate/substrate/tree/main/tools/setup-gcp)).
 - `kubectl` pointed at that cluster: `kubectl config current-context`.
-- Locally installed: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `nc`, `curl`, `git`, `python3`.
-  You need a running **Docker** with `buildx` only to build substrate from source (empty `SUBSTRATE_IMAGE_REPO`). Cloud Shell has all of these.
+- Locally installed: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `curl`, `git`, `python3`.
+  You need a running **Docker** with `buildx` only to build substrate from source (empty `SUBSTRATE_IMAGE_REPO`).
+  Cloud Shell has all of these except `ko`: run `go install github.com/google/ko@latest`.
 
 ## Steps
 
@@ -19,7 +20,7 @@ and start the Substrate install in the background. It runs while you take the ar
    ```bash
    gcloud container clusters list --project YOUR_PROJECT_ID    # NAME and LOCATION
    cp workshop.env.example workshop.env
-   $EDITOR workshop.env
+   ${EDITOR:-nano} workshop.env
    ```
 2. **Preflight.** This checks your tools and the cluster's version, Workload Identity, managed OTel,
    and node pool settings. Fix anything it flags before you continue.
