@@ -25,6 +25,12 @@ SRC="$STATE_DIR/substrate"
 export KO_DOCKER_REPO KO_DEFAULTPLATFORMS
 # Guard against a go.work in a parent directory (the repo no longer ships one): substrate is its own module.
 export GOWORK=off
+# Cloud Shell's home disk is 5 GB, and Go's build cache for substrate's tools takes a big share of it. There, build
+# with a throwaway cache under /tmp (the VM's larger, ephemeral disk), removed when this script exits.
+if [[ "${CLOUD_SHELL:-}" == true ]]; then
+  GOCACHE="$(mktemp -d "${TMPDIR:-/tmp}/workshop-gocache.XXXXXX")"; export GOCACHE
+  trap 'rm -rf "$GOCACHE"' EXIT
+fi
 
 step "Substrate checkout @ ${SUBSTRATE_REF}"
 if [[ ! -d "$SRC/.git" ]]; then

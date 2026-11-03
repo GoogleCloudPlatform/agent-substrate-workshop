@@ -311,6 +311,12 @@ t_install_status_states() {
   sleep 1; echo "2026-01-01T00:00:00Z SUBSTRATE_REF=v0" >"$d/install-complete"
   [[ "$(install_status "$d")" == *"install finished: 2026-01-01T00:00:00Z"* ]]
 }
+t_install_status_disk_full() {
+  local d="$TMP/full"; rm -rf "$d"; mkdir -p "$d"
+  echo "ERROR: mkdir /home/u/.docker/buildx: no space left on device" >"$d/install.log"
+  echo 1 >"$d/install.pid"   # pid 1 is never install-substrate.sh, so the install counts as dead
+  [[ "$(install_status "$d")" == *"ran out of disk space"*"make install-bg"* ]]
+}
 
 load_env
 check "load_env expands references" t_load_env_expands
@@ -340,6 +346,7 @@ check "reset_template deletes its actors, then the template (idempotent)" t_rese
 check "make help lists every target" t_make_help_lists_every_target
 check "make teardown ALL=1 passes --all" t_make_teardown_all_passes_flag
 check "install-status tells running, finished, died, and never started apart" t_install_status_states
+check "install-status points a disk-full install at the fix" t_install_status_disk_full
 check "lib.sh refuses an interactive shell instead of taking it over" t_lib_refuses_interactive_shell
 check "env.sh loads workshop.env in bash/zsh without strict mode" t_env_sh_loads_without_strict_mode
 check "env.sh returns (not exits) when workshop.env is missing" t_env_sh_missing_file_returns

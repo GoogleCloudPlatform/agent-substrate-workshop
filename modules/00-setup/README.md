@@ -7,8 +7,8 @@ and start the Substrate install in the background. It runs while you take the ar
 - A GCP project where you are Owner, and a GKE **1.37+** cluster in it. The cluster needs Workload Identity,
   managed OpenTelemetry, Managed Prometheus, no node auto-upgrade (or an active maintenance exclusion), and no spot nodes. Your instructor created it, or you can use the cluster creation commands in the [instructor runbook](../../instructor/runbook.md#one-week-before) (also see [the substrate GCP guide](https://github.com/agent-substrate/substrate/tree/main/tools/setup-gcp)).
 - `kubectl` pointed at that cluster: `kubectl config current-context`.
-- Locally installed: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `nc`, `curl`, `git`, `python3`,
-  and a running **Docker** with `buildx` (the install builds one substrate image from a Dockerfile). Cloud Shell has all of these.
+- Locally installed: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `nc`, `curl`, `git`, `python3`.
+  You need a running **Docker** with `buildx` only to build substrate from source (empty `SUBSTRATE_IMAGE_REPO`). Cloud Shell has all of these.
 
 ## Steps
 
@@ -41,7 +41,7 @@ and start the Substrate install in the background. It runs while you take the ar
    It only lasts for this terminal. Add the same line, with the absolute repo path instead of `$PWD`, to
    `~/.zshrc` or `~/.bashrc`. If you use direnv, put `PATH_add bin` in an `.envrc` at the repo root.
 5. **Start the install in the background.** It clones substrate at `SUBSTRATE_REF`, builds `kubectl ate`,
-   deploys `ate-system`, pins a worker image that matches the control plane, labels your nodes, and
+   deploys `ate-system`, pins a worker image that matches the control plane, and
    raises the router's parked-request budget (and its shutdown grace period to match).
    ```bash
    make install-bg
