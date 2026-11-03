@@ -80,9 +80,14 @@ was validated for the next event. The workshop is validated on GKE 1.37, and `ma
 ## Clean up
 `make teardown` deletes the workshop's atespace, namespace, dashboards (the workshop's and substrate's three), and snapshots, and keeps your cluster,
 bucket, and Artifact Registry — it asks you to confirm unless you set `YES=1`. `YES=1 scripts/teardown.sh --all`
-also removes the bucket and the Artifact Registry repo (with the grants `make gcp` put on them) and the
-project IAM bindings `make gcp` created for the workshop namespace, but never
+also removes the bucket and the Artifact Registry repo (with the grants `make gcp` put on them), the
+project IAM bindings `make gcp` created for the workshop namespace, and the snapshot transfer service account, but never
 the GKE cluster; see [Module 7](modules/07-wrap-up/README.md#clean-up).
+
+If the project exists only for this workshop, deleting the project is the simplest complete clean up. Otherwise, run
+`make teardown ALL=1`, then `make delete-cluster`, which deletes the cluster's PersistentVolumeClaims first so their
+disks (Substrate's Postgres volume among them) don't outlive the cluster. At an instructor-led event, check with your
+instructor before you delete a cluster they provisioned.
 
 ## License and Disclaimers
 

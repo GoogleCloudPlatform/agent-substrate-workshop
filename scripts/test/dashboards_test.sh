@@ -101,4 +101,6 @@ PATH="$TMP/td/bin:$PATH" STUB_LOG="$TMP/td/log" FAIL_ID=none YES=1 WORKSHOP_ENV_
 check "teardown --all deletes the repo and unbinds the workshop's project roles" \
   "grep -q 'artifacts repositories delete' '$TMP/td/log' && grep -q 'remove-iam-policy-binding.*aiplatform.user' '$TMP/td/log'"
 check "teardown --all leaves project-level artifactregistry.reader alone" "! grep -q 'artifactregistry' '$TMP/td/log'"
+check "teardown --all deletes the snapshot transfer service account" \
+  "grep -q 'iam service-accounts delete ate-snapshot-transfer@p.iam.gserviceaccount.com' '$TMP/td/log'"
 exit "$fails"

@@ -13,12 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# teardown.sh [--all] — delete everything the workshop created. Never deletes the GKE cluster,
+# teardown.sh [--all] — delete everything the workshop created. Never deletes the GKE cluster (make delete-cluster does),
 # and never touches the ate-system Deployments/DaemonSets Substrate itself runs as.
 # --all also deletes the snapshot bucket and the Artifact Registry repo (and with them the bucket/repo IAM
-# grants), plus the workshop namespace's project IAM bindings `make gcp` created. In source install mode
-# that leaves the already-running Substrate without the images or IAM grants it needs, so it needs a full
-# reinstall before the project is used again.
+# grants), plus the workshop namespace's project IAM bindings and the snapshot transfer service account `make gcp`
+# created. In source install mode that leaves the already-running Substrate without the images or IAM grants it
+# needs, so it needs a full reinstall before the project is used again.
 # Set YES=1 to skip the confirmation prompt.
 source "$(dirname "$0")/lib.sh"
 load_env
@@ -29,7 +29,7 @@ case "${1:-}" in
 esac
 if [[ "${YES:-}" != 1 ]]; then
   echo "This deletes atespace $ATESPACE (all actors and templates), namespace $NAMESPACE, the workshop and substrate dashboards,"
-  echo "and gs://$BUCKET_NAME/$ATESPACE/.$($ALL && echo " ALSO the bucket gs://$BUCKET_NAME, repo $AR_REPO, and the workshop's IAM bindings.")"
+  echo "and gs://$BUCKET_NAME/$ATESPACE/.$($ALL && echo " ALSO the bucket gs://$BUCKET_NAME, repo $AR_REPO, the snapshot transfer service account, and the workshop's IAM bindings.")"
   read -r -p "Type 'yes' to continue: " answer || answer=""
   [[ "$answer" == yes ]] || die "aborted"
 fi
@@ -103,6 +103,13 @@ if $ALL; then
     ok "project IAM bindings removed"
   else
     warn "could not resolve the project number; leaving project IAM bindings in place"
+  fi
+  # `make gcp` also created Substrate's snapshot transfer service account; without the bucket it has nothing to do.
+  transfer_gsa="${SNAPSHOT_TRANSFER_GSA_NAME:-ate-snapshot-transfer}@${PROJECT_ID}.iam.gserviceaccount.com"
+  if gcloud iam service-accounts delete "$transfer_gsa" --project "$PROJECT_ID" --quiet >/dev/null 2>&1; then
+    ok "service account $transfer_gsa deleted"
+  else
+    warn "could not delete service account $transfer_gsa (it may already be gone)"
   fi
   # Substrate itself is untouched (ate-system isn't ours to delete), but in source mode its
   # control-plane and worker images lived in the Artifact Registry repo just deleted, and the

@@ -73,11 +73,13 @@ test: test-go test-scripts ## Run all offline tests
 test-go: ## Run go vet and the Go tests
 	@cd app && go vet ./... && go test ./...
 test-scripts: ## Run the shell script tests
-	@bash scripts/test/lib_test.sh && bash scripts/test/render_test.sh && bash scripts/test/dashboards_test.sh && bash scripts/test/solutions_test.sh && bash scripts/test/preflight_test.sh
+	@bash scripts/test/lib_test.sh && bash scripts/test/render_test.sh && bash scripts/test/dashboards_test.sh && bash scripts/test/solutions_test.sh && bash scripts/test/preflight_test.sh && bash scripts/test/delete_cluster_test.sh
 stop-forwards: ## Stop background port-forwards
 	@source scripts/lib.sh && stop_port_forwards
 teardown: ## Delete workshop resources, keeps the cluster [ALL=1 (also bucket, repo, IAM) YES=1 (no prompt)]
 	@scripts/teardown.sh $(if $(ALL),--all)
+delete-cluster: ## Delete the GKE cluster, its PVCs and their disks first; run teardown before [YES=1 (no prompt)]
+	@scripts/delete-cluster.sh
 clean: ## Remove local build output (bin/, dist/)
 	@rm -rf bin dist
-.PHONY: help preflight gcp install install-bg install-status dashboards build-agent build-gateway build gateway egress tools load observe prometheus-ui forward-router forward-gateway patch-router idle-off idle-on catch-up verify e2e test test-go test-scripts stop-forwards teardown clean
+.PHONY: help preflight gcp install install-bg install-status dashboards build-agent build-gateway build gateway egress tools load observe prometheus-ui forward-router forward-gateway patch-router idle-off idle-on catch-up verify e2e test test-go test-scripts stop-forwards teardown delete-cluster clean

@@ -59,7 +59,10 @@ cluster-wide `SandboxConfig`. Each lab's README opens with the same impact note.
 | [J — Egress credential injection](../../optional/J-credential-injection/README.md) | `ate-secret://`: let egress add credentials so actors never hold them | Adds a `workshop-secrets` namespace and grants `workshop` access in `k8s-credential-provider-namespace-policy` |
 
 ## Clean up
+If the project exists only for this workshop, deleting the project is the simplest complete clean up. Otherwise:
 ```bash
 make teardown          # workshop resources; keeps the cluster, the bucket, and Artifact Registry
-YES=1 scripts/teardown.sh --all   # also deletes the bucket and the Artifact Registry repo
+YES=1 scripts/teardown.sh --all   # also deletes the bucket, the Artifact Registry repo, and the snapshot transfer service account
+make delete-cluster    # then the cluster: its PersistentVolumeClaims (and their disks) first, so nothing keeps billing
 ```
+At an instructor-led event, check with your instructor before you delete a cluster they provisioned.
