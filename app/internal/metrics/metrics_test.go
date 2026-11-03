@@ -26,11 +26,11 @@ import (
 
 func TestObserveModelRecordsDurationAndTokens(t *testing.T) {
 	m := New()
-	m.ObserveModel("vertex", "ok", 1500*time.Millisecond, 12, 34)
-	if got := promtest.ToFloat64(m.ModelTokens.WithLabelValues("vertex", "input")); got != 12 {
+	m.ObserveModel("gemini", "ok", 1500*time.Millisecond, 12, 34)
+	if got := promtest.ToFloat64(m.ModelTokens.WithLabelValues("gemini", "input")); got != 12 {
 		t.Errorf("input tokens = %v", got)
 	}
-	if got := promtest.ToFloat64(m.ModelTokens.WithLabelValues("vertex", "output")); got != 34 {
+	if got := promtest.ToFloat64(m.ModelTokens.WithLabelValues("gemini", "output")); got != 34 {
 		t.Errorf("output tokens = %v", got)
 	}
 	if n := promtest.CollectAndCount(m.ModelDuration); n != 1 {

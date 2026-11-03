@@ -74,7 +74,7 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
    logs in Logs Explorer all hold only the `ate-secret://` URI. Only the provider and the egress gateway ever saw
    the key. (One caveat: httpbin *echoes* the header back, so after this call the key is in the actor's memory,
    and in its next `SNAPSHOT_FIDELITY_MEMORY` snapshot. A real API doesn't echo credentials.)
-6. Compare with the gateway pattern (Module 4: the gateway holds the Vertex credential and the actor never
+6. Compare with the gateway pattern (Module 4: the gateway holds the model credential and the actor never
    calls out at all). When would you use each — an actor egress rule with provider-injected auth, vs. keeping
    the call entirely on the always-on tier?
 

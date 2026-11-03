@@ -68,7 +68,7 @@ default this deploys with real Vertex calls through a fresh `conf-gateway` GSA. 
 ```bash
 source scripts/env.sh   # workshop.env into this shell (bash or zsh)
 cd .workshop/agent-swarm
-export KO_DOCKER_REPO BUCKET_NAME VERTEX_LOCATION KO_DEFAULTPLATFORMS   # KO_DEFAULTPLATFORMS: linux/amd64 unless workshop.env says otherwise
+export KO_DOCKER_REPO BUCKET_NAME VERTEX_LOCATION="$REGION" KO_DEFAULTPLATFORMS   # KO_DEFAULTPLATFORMS: linux/amd64 unless workshop.env says otherwise
 # Optional, with defaults: DEMO_CONF_ACTORS=50 DEMO_CONF_MIN_WORKERS=2 DEMO_CONF_MAX_WORKERS=5 DEMO_CONF_ACTORS_PER_WORKER=4
 ( export PROJECT_ID; hack/deploy.sh up --patch-router )        # real Vertex calls, or:
 ( unset PROJECT_ID;  hack/deploy.sh up --patch-router )        # mock replies, no Vertex AI cost

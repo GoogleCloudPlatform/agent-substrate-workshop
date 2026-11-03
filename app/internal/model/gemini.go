@@ -17,6 +17,8 @@ package model
 import (
 	"context"
 	"errors"
+	"os"
+	"strings"
 
 	"github.com/agent-substrate/workshop/app/internal/chatapi"
 	"google.golang.org/genai"
@@ -24,28 +26,33 @@ import (
 
 const systemPrompt = "You are a concise, friendly assistant running as an Agent Substrate actor in a workshop. Answer in at most three sentences."
 
-type vertex struct {
+type gemini struct {
 	client *genai.Client
 	model  string
 }
 
-// NewVertex returns a Gemini backend on Vertex AI. Credentials come from Application
-// Default Credentials, which on GKE is the pod's Workload Identity.
-func NewVertex(ctx context.Context, project, location, model string) (Backend, error) {
-	if project == "" || location == "" || model == "" {
-		return nil, errors.New("GOOGLE_CLOUD_PROJECT, VERTEX_LOCATION and GEMINI_MODEL must be set")
+// NewGemini returns a Gemini backend on the Gemini Enterprise Agent Platform. The Google GenAI SDK
+// reads GOOGLE_GENAI_USE_ENTERPRISE and GOOGLE_CLOUD_LOCATION (default global) from the environment,
+// which the gateway Deployment sets. Credentials come from Application Default Credentials, which on
+// GKE is the pod's Workload Identity.
+func NewGemini(ctx context.Context, project, model string) (Backend, error) {
+	if project == "" || model == "" {
+		return nil, errors.New("GOOGLE_CLOUD_PROJECT and GEMINI_MODEL must be set")
 	}
-	c, err := genai.NewClient(ctx, &genai.ClientConfig{Backend: genai.BackendVertexAI, Project: project, Location: location})
+	if v := strings.ToLower(os.Getenv("GOOGLE_GENAI_USE_ENTERPRISE")); v != "true" && v != "1" {
+		return nil, errors.New("set GOOGLE_GENAI_USE_ENTERPRISE=true (the gateway Deployment does)")
+	}
+	c, err := genai.NewClient(ctx, &genai.ClientConfig{Project: project})
 	if err != nil {
 		return nil, err
 	}
-	return &vertex{client: c, model: model}, nil
+	return &gemini{client: c, model: model}, nil
 }
 
-func (*vertex) Name() string { return "vertex" }
+func (*gemini) Name() string { return "gemini" }
 
-func (v *vertex) Generate(ctx context.Context, msgs []chatapi.Message) (Result, error) {
-	resp, err := v.client.Models.GenerateContent(ctx, v.model, toContents(msgs), &genai.GenerateContentConfig{
+func (g *gemini) Generate(ctx context.Context, msgs []chatapi.Message) (Result, error) {
+	resp, err := g.client.Models.GenerateContent(ctx, g.model, toContents(msgs), &genai.GenerateContentConfig{
 		SystemInstruction: genai.NewContentFromText(systemPrompt, genai.RoleUser),
 	})
 	if err != nil {

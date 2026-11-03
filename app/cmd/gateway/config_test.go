@@ -30,7 +30,7 @@ func TestLoadConfigDefaults(t *testing.T) {
 		c.RouterServerName != "atenet-router.ate-system.svc" || c.RouterClientCert != "/var/run/ate/identity/credential-bundle.pem" ||
 		c.ATE.Addr != "api.ate-system.svc.cluster.local:443" || c.ATE.TokenFile != "/var/run/ate/token/token" ||
 		c.ATE.CAFile != "/var/run/ate/trust/trust-bundle.pem" || c.IdleAfter != 0 || c.IdleCheckEvery != time.Second ||
-		c.MockLLM || c.GeminiModel != "gemini-2.5-flash" {
+		c.MockLLM || c.GeminiModel != "gemini-3.8-flash" {
 		t.Fatalf("defaults = %+v", c)
 	}
 }

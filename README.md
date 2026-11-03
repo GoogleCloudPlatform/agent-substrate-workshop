@@ -5,7 +5,7 @@ starting from a bare GKE cluster. In about 85 minutes you will:
 
 - install Substrate, and learn what each of its components does;
 - build a Go agent, run it as a Substrate **actor**, and suspend and resume it across workers;
-- give it a model (Vertex Gemini) through an always-on gateway, and lock down its egress;
+- give it a model (Gemini on the Gemini Enterprise Agent Platform) through an always-on gateway, and lock down its egress;
 - run 20 agents on 2 workers with request parking and idle suspend;
 - watch the whole fleet in Prometheus and Cloud Console dashboards.
 

@@ -93,7 +93,7 @@ if $ALL; then
   # Deleting the bucket and the repo also drops their IAM policies, including the Artifact Registry
   # reader grants (repo-level, never project-level, so nothing outside the workshop loses access).
   # The project-level bindings `scripts/gcp-resources.sh` created (the workshop namespace's Workload
-  # Identity -> Vertex/Monitoring) outlive both, so they need to be removed explicitly.
+  # Identity -> Gemini/Monitoring) outlive both, so they need to be removed explicitly.
   PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')" || true
   if [[ -n "${PROJECT_NUMBER:-}" ]]; then
     WI="principal://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${PROJECT_ID}.svc.id.goog/subject"

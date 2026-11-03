@@ -94,7 +94,8 @@ t_load_env_cluster_vars() {
   [[ "$(unset CLUSTER_NAME CLUSTER_LOCATION; WORKSHOP_ENV_FILE="$o" load_env
        bash -c 'echo "$CLUSTER_NAME/$CLUSTER_LOCATION"')" == "c2/europe-west1" ]]
 }
-# gateway.sh against a stub kubectl whose live Deployment has MOCK_LLM=$LIVE_MOCK; prints the applied MOCK_LLM.
+# gateway.sh against a stub kubectl whose live Deployment has MOCK_LLM=$LIVE_MOCK; prints the applied MOCK_LLM
+# (or the env var named by SHOW).
 run_gateway_sh() {
   local d; d="$(mktemp -d "$TMP/t.XXXXXX")"; mkdir -p "$d/bin" "$d/state"
   cat >"$d/bin/kubectl" <<'STUB'
@@ -112,12 +113,16 @@ STUB
   printf 'PROJECT_ID=p\nMOCK_LLM=false\n' >"$d/env"
   env -u MOCK_LLM -u WORKSHOP_MOCK_LLM_OVERRIDE PATH="$d/bin:$PATH" WORKSHOP_ENV_FILE="$d/env" \
     WORKSHOP_STATE_DIR="$d/state" APPLIED="$d/applied" "$@" bash "$HERE/../gateway.sh" >/dev/null 2>&1 || return 1
-  grep -A1 'name: MOCK_LLM' "$d/applied" | sed -n 's/.*value: "\([a-z]*\)".*/\1/p' | head -n1
+  grep -A1 "name: ${SHOW:-MOCK_LLM}" "$d/applied" | sed -n 's/.*value: "\([a-z]*\)".*/\1/p' | head -n1
 }
 t_gateway_keeps_live_mock_llm() {
   [[ "$(run_gateway_sh LIVE_MOCK=true)" == true ]] &&     # live beats workshop.env
     [[ "$(run_gateway_sh LIVE_MOCK=)" == false ]] &&      # no gateway yet: workshop.env
     [[ "$(run_gateway_sh LIVE_MOCK=true MOCK_LLM=false)" == false ]]   # command line beats live
+}
+t_gateway_sets_gemini_env() {
+  [[ "$(SHOW=GOOGLE_GENAI_USE_ENTERPRISE run_gateway_sh LIVE_MOCK=)" == true ]] &&
+    [[ "$(SHOW=GOOGLE_CLOUD_LOCATION run_gateway_sh LIVE_MOCK=)" == global ]]
 }
 t_stop_port_forward_stops_one() {
   sleep 30 & local a=$!; sleep 30 & local b=$!
@@ -322,6 +327,7 @@ check "port_forward reuses live forward" t_port_forward_reuses_live
 check "load_env: command-line MOCK_LLM beats workshop.env" t_load_env_mock_llm_override
 check "load_env exports CLUSTER_NAME/CLUSTER_LOCATION (legacy names too)" t_load_env_cluster_vars
 check "gateway.sh keeps a live MOCK_LLM unless one is passed" t_gateway_keeps_live_mock_llm
+check "gateway.sh sets the Gemini Enterprise Agent Platform env (global by default)" t_gateway_sets_gemini_env
 check "stop_port_forward stops only the named forward" t_stop_port_forward_stops_one
 check "gateway_chat prints body then status code" t_gateway_chat_prints_body_then_status
 check "actor_state strips ACTOR_STATE_ prefix" t_actor_state_strips_prefix

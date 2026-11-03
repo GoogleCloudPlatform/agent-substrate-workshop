@@ -49,7 +49,7 @@ type ModelResponse struct {
 	Backend      string `json:"backend"`
 	InputTokens  int    `json:"inputTokens"`
 	OutputTokens int    `json:"outputTokens"`
-	// UpstreamError says why Vertex didn't answer, when Backend is "mock-fallback".
+	// UpstreamError says why Gemini didn't answer, when Backend is "mock-fallback".
 	UpstreamError string `json:"upstreamError,omitempty"`
 }
 

@@ -23,10 +23,10 @@ check "buddy has an EgressPolicy allowing the gateway" bash -c \
 out="$(gateway_chat buddy "verify: say ok" 2>&1)" || true
 code="${out##*$'\n'}"; body="${out%$'\n'*}"
 check "chat with buddy returns 200 (got $code)" test "$code" = 200
-backend_ok() { jq -e '.backend | IN("vertex", "mock", "mock-fallback")' <<<"$body"; }
-check "reply came from a model backend" backend_ok
-# mock-fallback still passes (the agent -> egress -> gateway path works), but Vertex refused the call.
+backend_ok() { jq -e '.backend | IN("gemini", "mock")' <<<"$body"; }
+check "reply came from gemini (or from the mock, with MOCK_LLM=true)" backend_ok
+# mock-fallback means the agent -> egress -> gateway path works, but the gateway's model call failed.
 if [[ "$(jq -r '.backend // ""' <<<"$body" 2>/dev/null)" == mock-fallback ]]; then
-  warn "the gateway answered from mock-fallback: Vertex refused the request. Check: kubectl -n $NAMESPACE logs deploy/gateway, and instructor/troubleshooting.md"
+  warn "the gateway answered from mock-fallback: its Gemini call failed. See why: curl -s localhost:${GATEWAY_LOCAL_PORT:-8081}/v1/model -d '{\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}' | jq .upstreamError (or kubectl -n $NAMESPACE logs deploy/gateway), and instructor/troubleshooting.md. To carry on with the mock: MOCK_LLM=true make gateway"
 fi
 finish 4
