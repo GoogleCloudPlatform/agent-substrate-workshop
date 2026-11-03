@@ -52,7 +52,7 @@ load: ## Burst chat traffic across swarm actors [DURATION=180 (s) CONCURRENCY=2 
 observe: ## Deploy the gateway PodMonitoring and the Prometheus UI
 	@scripts/observability.sh
 prometheus-ui: ## Port-forward the Prometheus UI to http://localhost:9090
-	@source scripts/lib.sh && load_env && port_forward prom-ui $$NAMESPACE svc/prometheus-ui 9090 9090 && echo "open http://localhost:9090"
+	@source scripts/lib.sh && load_env && port_forward prom-ui $$NAMESPACE svc/prometheus-ui 9090 9090 && open_hint 9090
 forward-router: ## (Re)start the atenet-router port-forward on http://localhost:8080
 	@source scripts/lib.sh && load_env && stop_port_forward router && port_forward router ate-system svc/atenet-router 8080 80 && echo "open http://localhost:8080"
 forward-gateway: ## (Re)start the gateway port-forward on http://localhost:8081
