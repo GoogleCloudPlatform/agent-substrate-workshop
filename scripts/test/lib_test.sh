@@ -128,6 +128,18 @@ t_gateway_sets_gemini_env() {
   [[ "$(SHOW=GOOGLE_GENAI_USE_ENTERPRISE run_gateway_sh LIVE_MOCK=)" == true ]] &&
     [[ "$(SHOW=GOOGLE_CLOUD_LOCATION run_gateway_sh LIVE_MOCK=)" == global ]]
 }
+# build.sh against a stub ko that always returns the same digest.
+build_agent_stub() {
+  PATH="$1/bin:$PATH" WORKSHOP_ENV_FILE="$1/env" WORKSHOP_STATE_DIR="$1/state" bash "$HERE/../build.sh" agent "${@:2}" 2>&1
+}
+t_build_warns_when_unchanged() {
+  local d; d="$(mktemp -d "$TMP/t.XXXXXX")"; mkdir -p "$d/bin" "$d/state"
+  printf '#!/usr/bin/env bash\necho "r/agent@sha256:abc"\n' >"$d/bin/ko"; chmod +x "$d/bin/ko"
+  printf 'PROJECT_ID=p\nKO_DOCKER_REPO=r\n' >"$d/env"
+  [[ "$(build_agent_stub "$d" --check-changed)" != *"same as your last"* ]] &&            # first build
+    [[ "$(build_agent_stub "$d" --check-changed)" == *"same as your last agent build"* ]] &&
+    [[ "$(build_agent_stub "$d")" != *"same as your last"* ]]                              # no flag (catch-up): quiet
+}
 t_stop_port_forward_stops_one() {
   sleep 30 & local a=$!; sleep 30 & local b=$!
   echo "$a" >"$STATE_DIR/pf-one.pid"; echo "$b" >"$STATE_DIR/pf-two.pid"
@@ -349,6 +361,7 @@ check "load_env: command-line MOCK_LLM beats workshop.env" t_load_env_mock_llm_o
 check "load_env exports CLUSTER_NAME/CLUSTER_LOCATION (legacy names too)" t_load_env_cluster_vars
 check "gateway.sh keeps a live MOCK_LLM unless one is passed" t_gateway_keeps_live_mock_llm
 check "gateway.sh sets the Gemini Enterprise Agent Platform env (global by default)" t_gateway_sets_gemini_env
+check "build.sh --check-changed warns when the image didn't change" t_build_warns_when_unchanged
 check "stop_port_forward stops only the named forward" t_stop_port_forward_stops_one
 check "gateway_chat prints body then status code" t_gateway_chat_prints_body_then_status
 check "actor_state strips ACTOR_STATE_ prefix" t_actor_state_strips_prefix

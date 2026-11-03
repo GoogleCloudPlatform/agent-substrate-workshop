@@ -37,7 +37,7 @@ install-status: ## Show background install progress: running, finished, or died
 dashboards: ## Create/update Cloud Monitoring dashboards
 	@scripts/dashboards.sh
 build-agent: ## ko build the agent -> .workshop/agent-image
-	@scripts/build.sh agent
+	@scripts/build.sh agent --check-changed
 build-gateway: ## ko build the gateway -> .workshop/gateway-image
 	@scripts/build.sh gateway
 build: build-agent build-gateway ## Build the agent and gateway images

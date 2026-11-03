@@ -27,7 +27,7 @@ upsert_dashboard() {
   file="$(mktemp)"; scoped "$1" >"$file"
   local title existing name etag
   title="$(jq -r .displayName "$file")"
-  existing="$(gcloud monitoring dashboards list --project "$PROJECT_ID" \
+  existing="$(gcloud monitoring dashboards list --project "$PROJECT_ID" --verbosity=error \
     --filter="displayName=\"$title\"" --format='value(name,etag)' | head -n1)"
   if [[ -z "$existing" ]]; then
     gcloud monitoring dashboards create --project "$PROJECT_ID" --config-from-file="$file" --quiet >/dev/null
