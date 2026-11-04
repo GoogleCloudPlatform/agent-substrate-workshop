@@ -83,6 +83,15 @@ path_hint() {
   warn "kubectl ate is not on your shell's PATH. Run this (and add it to ~/.zshrc, ~/.bashrc or .envrc):"
   echo "    export PATH=\"$REPO_ROOT/bin:\$PATH\"" >&2
 }
+# open_hint <port>: how to open a port-forwarded UI in your browser. In Cloud Shell, localhost is the Cloud Shell
+# VM rather than your laptop, so the browser gets there through Web Preview.
+open_hint() {
+  if [[ "${CLOUD_SHELL:-}" == true ]]; then
+    echo "open it with Web Preview (top right of Cloud Shell) > Change port > $1"
+  else
+    echo "open http://localhost:$1"
+  fi
+}
 
 state_put() { mkdir -p "$STATE_DIR"; printf '%s\n' "$2" >"$STATE_DIR/$1"; }
 state_get() { [[ -f "$STATE_DIR/$1" ]] && cat "$STATE_DIR/$1"; }
@@ -110,7 +119,9 @@ render() {
   envsubst "$list" <"$tmpl"
 }
 
-_port_listening() { nc -z localhost "$1" >/dev/null 2>&1; }
+# _port_listening <port>: true if something accepts connections on localhost:<port>. Uses bash's /dev/tcp, so it
+# needs no nc (Cloud Shell doesn't ship one).
+_port_listening() { (: <"/dev/tcp/localhost/$1") >/dev/null 2>&1; }
 # _port_holder <port>: "pid N: command" of whatever listens on the port, if lsof can tell.
 _port_holder() {
   local pid

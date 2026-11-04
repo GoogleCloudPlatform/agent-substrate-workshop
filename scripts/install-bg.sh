@@ -36,6 +36,9 @@ if install_running; then
 elif [[ -s "$DONE" && ( ! -f "$PIDF" || "$DONE" -nt "$PIDF" ) ]]; then
   ok "install finished: $(cat "$DONE")"
 elif [[ -f "$PIDF" ]]; then
+  if [[ -f "$LOG" ]] && grep -q 'no space left on device' "$LOG"; then
+    warn "the install ran out of disk space. Free some (go clean -cache), keep the published-image lines from workshop.env.example (SUBSTRATE_IMAGE_REPO, SUBSTRATE_IMAGE_TAG) in workshop.env, then: make install-bg"
+  fi
   # Closing the terminal can take a background job with it on some setups; so can a failed step.
   die "the install is not running and did not finish — read the log above, then re-run: make install-bg"
 else

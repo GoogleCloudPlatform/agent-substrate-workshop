@@ -20,12 +20,15 @@ load_env
 require_state gateway-image "make gateway"
 GATEWAY_IMAGE="$(state_get gateway-image)"
 export GATEWAY_IMAGE
-: "${GEMINI_MODEL:=gemini-2.5-flash}" "${VERTEX_LOCATION:=${REGION:-us-central1}}"
+: "${GEMINI_MODEL:=gemini-3.8-flash}" "${MODEL_LOCATION:=global}"
+if [[ -n "${VERTEX_LOCATION:-}" ]]; then
+  warn "workshop.env is from before the Gemini Enterprise Agent Platform switch: replace VERTEX_LOCATION with MODEL_LOCATION=global and set GEMINI_MODEL=gemini-3.8-flash (see workshop.env.example)"
+fi
 if [[ -z "${IDLE_AFTER:-}" ]]; then
   IDLE_AFTER="$(kubectl -n "$NAMESPACE" get deploy gateway \
     -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="IDLE_AFTER")].value}' 2>/dev/null || true)"
 fi
-export IDLE_AFTER="${IDLE_AFTER:-0s}" GEMINI_MODEL VERTEX_LOCATION
+export IDLE_AFTER="${IDLE_AFTER:-0s}" GEMINI_MODEL MODEL_LOCATION
 # load_env already let a command-line MOCK_LLM win over workshop.env; without one, the live value wins.
 if [[ -z "${WORKSHOP_MOCK_LLM_OVERRIDE:-}" ]]; then
   live_mock="$(kubectl -n "$NAMESPACE" get deploy gateway \
@@ -41,7 +44,7 @@ kubectl label namespace "$NAMESPACE" ate.dev/api-access=true --overwrite >/dev/n
 ensure_gateway_access "$ATESPACE" "$NAMESPACE"
 step "deploying gateway ($GATEWAY_IMAGE, MOCK_LLM=$MOCK_LLM, IDLE_AFTER=$IDLE_AFTER)"
 render "$REPO_ROOT/modules/04-make-it-an-agent/manifests/gateway.yaml.tmpl" \
-  NAMESPACE GATEWAY_IMAGE ATESPACE MOCK_LLM GEMINI_MODEL PROJECT_ID VERTEX_LOCATION IDLE_AFTER | kubectl apply -f -
+  NAMESPACE GATEWAY_IMAGE ATESPACE MOCK_LLM GEMINI_MODEL PROJECT_ID MODEL_LOCATION IDLE_AFTER | kubectl apply -f -
 kubectl -n "$NAMESPACE" rollout status deploy/gateway --timeout=180s
 # A forward to a replaced pod can stay alive but dead; drop it so the next port_forward starts fresh.
 if [[ -f "$STATE_DIR/pf-gateway.pid" ]]; then

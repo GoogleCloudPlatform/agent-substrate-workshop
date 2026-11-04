@@ -78,7 +78,7 @@ bind_bucket  "$COMPUTE_SA" roles/storage.objectViewer
 bind_repo    "$COMPUTE_SA" roles/artifactregistry.reader
 ok "substrate IAM bound"
 
-step "IAM for the workshop (gateway -> Vertex, prometheus-ui -> Monitoring)"
+step "IAM for the workshop (gateway -> Gemini, prometheus-ui -> Monitoring)"
 bind_project "${WI}/ns/${NAMESPACE}/sa/gateway" roles/aiplatform.user
 bind_project "${WI}/ns/${NAMESPACE}/sa/prometheus-ui" roles/monitoring.viewer
 ok "workshop IAM bound (propagation can take ~2 minutes)"

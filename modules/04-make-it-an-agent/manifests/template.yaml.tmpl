@@ -14,8 +14,8 @@
 
 # ActorTemplate agent-v3: the agent now asks a model, through the gateway.
 # Template env is literal and is baked into every snapshot: never put credentials here.
-# The gateway holds the only credential (Workload Identity to Vertex); the actor only
-# gets the gateway's in-cluster address.
+# The gateway holds the only credential (Workload Identity to the Gemini Enterprise Agent
+# Platform); the actor only gets the gateway's in-cluster address.
 metadata:
   atespace: ${ATESPACE}
   name: agent-v3

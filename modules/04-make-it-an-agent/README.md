@@ -7,33 +7,33 @@ model access, and a deny-by-default **egress policy** lets the actor reach the g
 flowchart LR
   U[you] -- POST /chat/buddy --> G
   subgraph workshop ns
-    G[gateway Deployment<br/>WI → Vertex Gemini<br/>/chat front door, /v1/model]
+    G[gateway Deployment<br/>WI → Gemini<br/>/chat front door, /v1/model]
   end
   G -- ate-target-actor --> R[atenet-router] --> A[actor buddy<br/>history in /data]
   A -- MODEL_URL --> E{atenet-egress<br/>EgressPolicy} -- allowed --> G
   E -. denied .-> X[internet, metadata server]
-  G -- Workload Identity --> V[(Vertex AI)]
+  G -- Workload Identity --> V[(Gemini Enterprise Agent Platform)]
 ```
 
 ## Why a gateway?
 - **Template env is literal and baked into every snapshot.** A key there ends up in GCS, in every clone, forever.
-- Actors don't get a Kubernetes ServiceAccount token. The gateway does, so it uses **Workload Identity** to call Vertex.
+- Actors don't get a Kubernetes ServiceAccount token. The gateway does, so it uses **Workload Identity** to call Gemini.
 - The gateway is always on and cheap. Actors are the expensive, suspendable part. This split between
   **presence** (always on) and **cognition** (suspendable) is the pattern behind real agent systems on Substrate.
 
 ## Steps
 
-1. **Deploy the gateway.** It serves `/v1/model` (Vertex Gemini, or a mock if `MOCK_LLM=true` or
-   Vertex fails) and `/chat/{actor}`, which forwards to the router with the header set.
+1. **Deploy the gateway.** It serves `/v1/model` (Gemini, or a mock if `MOCK_LLM=true` or
+   the Gemini call fails) and `/chat/{actor}`, which forwards to the router with the header set.
    ```bash
    make gateway
    make forward-gateway            # port-forwards the gateway to http://localhost:8081
    curl -s localhost:8081/v1/model -d '{"messages":[{"role":"user","content":"Say hi in five words"}]}' | jq
    ```
-   `backend` shows which model answered. If a Vertex call fails (say, a 403 while the Workload Identity
+   `backend` shows which model answered (`gemini`). If a Gemini call fails (say, a 403 while the Workload Identity
    binding propagates), the gateway answers that request from a mock instead: `backend` is `mock-fallback`
-   and `upstreamError` says what Vertex returned. So a `502` from the agent in step 3 is about
-   egress, not Vertex.
+   and `upstreamError` says what the platform returned. So a `502` from the agent in step 3 is about
+   egress, not the model.
 2. **Free a worker, then teach the agent to call the model.** Suspend `memo` so the new template's golden
    actor has a worker. In `app/cmd/agent/main.go`, find `WORKSHOP(module-4)` and set `ModelURL: os.Getenv("MODEL_URL")`.
    ```bash
@@ -81,7 +81,7 @@ flowchart LR
    Don't worry if the model's first reply says something like "as an AI I can't remember between
    conversations": the agent sends the whole history with every turn, and "What is my name?" shows it did.
 
-## If Vertex isn't available
+## If the model isn't available
 `MOCK_LLM=true make gateway`, or live: `kubectl -n workshop set env deploy/gateway MOCK_LLM=true`.
 Everything else in the workshop behaves the same. Once the gateway is running, `make gateway` and `make catch-up`
 keep its live `MOCK_LLM` (workshop.env only sets the first deploy); `MOCK_LLM=false make gateway` switches back.

@@ -5,7 +5,7 @@ starting from a bare GKE cluster. In about 85 minutes you will:
 
 - install Substrate, and learn what each of its components does;
 - build a Go agent, run it as a Substrate **actor**, and suspend and resume it across workers;
-- give it a model (Vertex Gemini) through an always-on gateway, and lock down its egress;
+- give it a model (Gemini on the Gemini Enterprise Agent Platform) through an always-on gateway, and lock down its egress;
 - run 20 agents on 2 workers with request parking and idle suspend;
 - watch the whole fleet in Prometheus and Cloud Console dashboards.
 
@@ -36,8 +36,9 @@ can't break an earlier one (see [Module 7](modules/07-wrap-up/README.md#keep-goi
 - A GCP project where you are **Owner**, with a GKE **1.37+** cluster that has Workload Identity, managed
   OpenTelemetry, Managed Prometheus, no node auto-upgrade, no spot nodes, 2× `c3-standard-4`. `make preflight`
   checks all of it.
-- Local tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst`, `nc`, `curl`, `git`, `python3`, and a running
-  Docker with `buildx`. Cloud Shell has all of them.
+- Local tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst`, `curl`, `git`, `python3`, and, only to
+  build substrate from source, a running Docker with `buildx`. Cloud Shell has all of them except `ko`
+  (`go install github.com/google/ko@latest`).
 - Comfort with Kubernetes. No prior Substrate knowledge needed.
 
 For comparison, [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) solves a
@@ -79,9 +80,14 @@ was validated for the next event. The workshop is validated on GKE 1.37, and `ma
 ## Clean up
 `make teardown` deletes the workshop's atespace, namespace, dashboards (the workshop's and substrate's three), and snapshots, and keeps your cluster,
 bucket, and Artifact Registry — it asks you to confirm unless you set `YES=1`. `YES=1 scripts/teardown.sh --all`
-also removes the bucket and the Artifact Registry repo (with the grants `make gcp` put on them) and the
-project IAM bindings `make gcp` created for the workshop namespace, but never
+also removes the bucket and the Artifact Registry repo (with the grants `make gcp` put on them), the
+project IAM bindings `make gcp` created for the workshop namespace, and the snapshot transfer service account, but never
 the GKE cluster; see [Module 7](modules/07-wrap-up/README.md#clean-up).
+
+If the project exists only for this workshop, deleting the project is the simplest complete clean up. Otherwise, run
+`make teardown ALL=1`, then `make delete-cluster`, which deletes the cluster's PersistentVolumeClaims first so their
+disks (Substrate's Postgres volume among them) don't outlive the cluster. At an instructor-led event, check with your
+instructor before you delete a cluster they provisioned.
 
 ## License and Disclaimers
 

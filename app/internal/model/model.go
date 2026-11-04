@@ -13,8 +13,8 @@
 // limitations under the License.
 
 // Package model serves the gateway's /v1/model endpoint. Actors never hold model
-// credentials: they POST their conversation here, and the gateway calls Vertex AI with its
-// own Workload Identity, or answers from a mock.
+// credentials: they POST their conversation here, and the gateway calls Gemini on the
+// Gemini Enterprise Agent Platform with its own Workload Identity, or answers from a mock.
 package model
 
 import (
@@ -47,7 +47,7 @@ type Backend interface {
 	Generate(ctx context.Context, msgs []chatapi.Message) (Result, error)
 }
 
-// Mock answers without any model. Fallback marks a mock answering because Vertex failed,
+// Mock answers without any model. Fallback marks a mock answering because Gemini failed,
 // either at startup or on this request.
 type Mock struct{ Fallback bool }
 
@@ -69,16 +69,16 @@ func (Mock) Generate(_ context.Context, msgs []chatapi.Message) (Result, error) 
 	return Result{Reply: fmt.Sprintf("mock model (turn %d): you said %q", turn, last), InputTokens: len(last) / 4, OutputTokens: 8}, nil
 }
 
-// Select picks the backend: the mock when asked, otherwise Vertex. It falls back to the mock
-// if Vertex can't be initialized, and per request if a Vertex call fails, so the workshop
+// Select picks the backend: the mock when asked, otherwise Gemini. It falls back to the mock
+// if Gemini can't be initialized, and per request if a Gemini call fails, so the workshop
 // keeps moving and the reply's backend says "mock-fallback" instead of looking like an egress 502.
-func Select(mock bool, newVertex func() (Backend, error)) Backend {
+func Select(mock bool, newGemini func() (Backend, error)) Backend {
 	if mock {
 		return Mock{}
 	}
-	b, err := newVertex()
+	b, err := newGemini()
 	if err != nil {
-		log.Printf("vertex unavailable (%v); using mock-fallback", err)
+		log.Printf("gemini unavailable (%v); using mock-fallback", err)
 		return Mock{Fallback: true}
 	}
 	return WithFallback(b)

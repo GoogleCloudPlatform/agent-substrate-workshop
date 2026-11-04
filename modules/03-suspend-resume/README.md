@@ -55,6 +55,7 @@ with **VOLUMES** fidelity (`SNAPSHOT_FIDELITY_VOLUMES`): only the durable direct
    ```
 6. Follow its logs in a second terminal. The stream follows the actor across workers and restarts:
    ```bash
+   source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
    kubectl ate logs actor memo -a workshop -f
    ```
    Most of what scrolls past is gVisor's own runtime logging (`I…`/`W…` lines from `cli.go`,

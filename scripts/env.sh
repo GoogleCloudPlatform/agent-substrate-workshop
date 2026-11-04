@@ -14,7 +14,8 @@
 
 # Load workshop.env into your own shell, from the repo root, in bash or zsh:
 #   source scripts/env.sh
-# It exports PROJECT_ID, KO_DOCKER_REPO, BUCKET_NAME, REPO_ROOT, … with the same defaults the scripts use.
+# It exports PROJECT_ID, KO_DOCKER_REPO, BUCKET_NAME, REPO_ROOT, … with the same defaults the scripts use, and
+# puts bin/ (kubectl ate) on your PATH. Run it again in every new terminal.
 # It never changes your shell's options and never exits your shell: the work happens in a bash child
 # (scripts/print-env.sh), and this file only evals the `export` lines it prints.
 if [ ! -f scripts/print-env.sh ]; then
@@ -24,6 +25,10 @@ fi
 if _workshop_env="$(bash scripts/print-env.sh)"; then
   eval "$_workshop_env"
   unset _workshop_env
+  case ":$PATH:" in
+    *":$REPO_ROOT/bin:"*) ;;
+    *) export PATH="$REPO_ROOT/bin:$PATH" ;;
+  esac
 else
   unset _workshop_env
   return 1

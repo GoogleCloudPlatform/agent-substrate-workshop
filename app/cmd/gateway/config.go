@@ -33,7 +33,6 @@ type config struct {
 	MockLLM          bool
 	GeminiModel      string
 	Project          string
-	VertexLocation   string
 	ATE              ateclient.Options
 	IdleAfter        time.Duration
 	IdleCheckEvery   time.Duration
@@ -70,10 +69,9 @@ func loadConfig(getenv func(string) string) (config, error) {
 		RouterServerName: or("ROUTER_SERVER_NAME", "atenet-router.ate-system.svc"),
 		RouterClientCert: or("ROUTER_CLIENT_CERT_FILE", "/var/run/ate/identity/credential-bundle.pem"),
 		SelfURL:          getenv("SELF_URL"),
-		MockLLM:        boolean("MOCK_LLM"),
-		GeminiModel:    or("GEMINI_MODEL", "gemini-2.5-flash"),
-		Project:        getenv("GOOGLE_CLOUD_PROJECT"),
-		VertexLocation: or("VERTEX_LOCATION", "us-central1"),
+		MockLLM:          boolean("MOCK_LLM"),
+		GeminiModel:      or("GEMINI_MODEL", "gemini-3.8-flash"),
+		Project:          getenv("GOOGLE_CLOUD_PROJECT"),
 		ATE: ateclient.Options{
 			Addr:      or("ATE_API_ADDR", "api.ate-system.svc.cluster.local:443"),
 			TokenFile: or("ATE_API_TOKEN_FILE", "/var/run/ate/token/token"),

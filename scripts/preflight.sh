@@ -24,11 +24,10 @@ failures=0
 need() { if "$@"; then ok "$CHECK"; else warn "$CHECK — $HINT"; failures=$((failures+1)); fi; }
 
 step "Tools"
-for t in gcloud kubectl go ko jq envsubst nc curl git python3; do
+for t in gcloud kubectl go ko jq envsubst curl git python3; do
   case "$t" in
     ko)       hint="install ko: go install github.com/google/ko@latest (then make sure \$(go env GOPATH)/bin is on PATH)" ;;
     envsubst) hint="install envsubst (gettext: brew install gettext / apt install gettext-base)" ;;
-    nc)       hint="install nc (netcat)" ;;
     *)        hint="install $t" ;;
   esac
   CHECK="$t on PATH" HINT="$hint"; need bash -c "command -v $t >/dev/null"

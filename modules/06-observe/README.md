@@ -30,10 +30,11 @@ Both end up in Cloud Monitoring, so you can query them with PromQL from one plac
    ```bash
    cat observability/podmonitoring.yaml
    make observe
-   make prometheus-ui          # → http://localhost:9090
+   make prometheus-ui          # → http://localhost:9090 (in Cloud Shell: Web Preview > Change port > 9090)
    ```
 2. **Generate traffic.** In a second terminal, run bursty chats across the swarm for 3 minutes:
    ```bash
+   source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
    make load
    ```
 3. **Ask questions in the Prometheus UI** (http://localhost:9090 → Graph). Copy each query from
