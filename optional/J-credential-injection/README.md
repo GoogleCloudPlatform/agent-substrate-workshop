@@ -5,10 +5,10 @@
 **Goal:** let an actor call an authenticated external API without ever holding the credential.
 `HttpRuleEffects.replace_headers` lets a matching `https` rule replace a placeholder request header with a value that comes
 from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
-(`pkg/proto/ateapipb/ateapi.proto`, `CredentialHeader`), resolved at request time by dialing a
-**credential provider**, a small gRPC service (`pkg/proto/credproviderpb/credprovider.proto`).
+(`api/ateapi/v1/ateapi.proto`, `CredentialHeader`), resolved at request time by dialing a
+**credential provider**, a small gRPC service (`api/credprovider/v1/credprovider.proto`).
 
-> **Fact-checked against the substrate checkout at `SUBSTRATE_REF` (v0.6.0):** substrate ships the built-in
+> **Fact-checked against the substrate checkout at `SUBSTRATE_REF` (v1.0.0-rc.1):** substrate ships the built-in
 > `k8s.io` provider (`cmd/credential-provider/kubernetes-secrets`) with manifests in
 > `manifests/egress-credential-injection/` and a guide in `docs/egress-credential-injection.md`. It resolves
 > `ate-secret://k8s.io/default/<namespace>/<secret>/<key>` from a Kubernetes Secret, and it denies by default:
@@ -22,7 +22,7 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
 - `ko`, and an API key for any HTTPS API. The steps use `https://httpbin.org`, which needs no real key and
   echoes the headers it received back to you, so you can see the injected header.
 
-1. Read `docs/egress-credential-injection.md`, `pkg/proto/credproviderpb/credprovider.proto` (the one-RPC plugin contract), and the `k8s.io`
+1. Read `docs/egress-credential-injection.md`, `api/credprovider/v1/credprovider.proto` (the one-RPC plugin contract), and the `k8s.io`
    provider in `cmd/credential-provider/kubernetes-secrets` and its manifests in `manifests/egress-credential-injection/`.
 2. **Verify the credential provider is running.** Because `make install` passes `--credential-provider='{"name":"k8s.io"}'`,
    `k8s-credential-provider` and `atenet-egress` are already deployed and wired together:
@@ -74,7 +74,7 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
    logs in Logs Explorer all hold only the `ate-secret://` URI. Only the provider and the egress gateway ever saw
    the key. (One caveat: httpbin *echoes* the header back, so after this call the key is in the actor's memory,
    and in its next `SNAPSHOT_FIDELITY_MEMORY` snapshot. A real API doesn't echo credentials.)
-6. Compare with the gateway pattern (Module 4: the gateway holds the Vertex credential and the actor never
+6. Compare with the gateway pattern (Module 4: the gateway holds the model credential and the actor never
    calls out at all). When would you use each — an actor egress rule with provider-injected auth, vs. keeping
    the call entirely on the always-on tier?
 

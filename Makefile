@@ -1,3 +1,17 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # Agent Substrate workshop. Run `make help` for targets.
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
@@ -23,7 +37,7 @@ install-status: ## Show background install progress: running, finished, or died
 dashboards: ## Create/update Cloud Monitoring dashboards
 	@scripts/dashboards.sh
 build-agent: ## ko build the agent -> .workshop/agent-image
-	@scripts/build.sh agent
+	@scripts/build.sh agent --check-changed
 build-gateway: ## ko build the gateway -> .workshop/gateway-image
 	@scripts/build.sh gateway
 build: build-agent build-gateway ## Build the agent and gateway images
@@ -38,7 +52,7 @@ load: ## Burst chat traffic across swarm actors [DURATION=180 (s) CONCURRENCY=2 
 observe: ## Deploy the gateway PodMonitoring and the Prometheus UI
 	@scripts/observability.sh
 prometheus-ui: ## Port-forward the Prometheus UI to http://localhost:9090
-	@source scripts/lib.sh && load_env && port_forward prom-ui $$NAMESPACE svc/prometheus-ui 9090 9090 && echo "open http://localhost:9090"
+	@source scripts/lib.sh && load_env && port_forward prom-ui $$NAMESPACE svc/prometheus-ui 9090 9090 && open_hint 9090
 forward-router: ## (Re)start the atenet-router port-forward on http://localhost:8080
 	@source scripts/lib.sh && load_env && stop_port_forward router && port_forward router ate-system svc/atenet-router 8080 80 && echo "open http://localhost:8080"
 forward-gateway: ## (Re)start the gateway port-forward on http://localhost:8081
@@ -59,11 +73,13 @@ test: test-go test-scripts ## Run all offline tests
 test-go: ## Run go vet and the Go tests
 	@cd app && go vet ./... && go test ./...
 test-scripts: ## Run the shell script tests
-	@bash scripts/test/lib_test.sh && bash scripts/test/render_test.sh && bash scripts/test/dashboards_test.sh && bash scripts/test/solutions_test.sh && bash scripts/test/preflight_test.sh
+	@bash scripts/test/lib_test.sh && bash scripts/test/render_test.sh && bash scripts/test/dashboards_test.sh && bash scripts/test/solutions_test.sh && bash scripts/test/preflight_test.sh && bash scripts/test/delete_cluster_test.sh
 stop-forwards: ## Stop background port-forwards
 	@source scripts/lib.sh && stop_port_forwards
 teardown: ## Delete workshop resources, keeps the cluster [ALL=1 (also bucket, repo, IAM) YES=1 (no prompt)]
 	@scripts/teardown.sh $(if $(ALL),--all)
+delete-cluster: ## Delete the GKE cluster, its PVCs and their disks first; run teardown before [YES=1 (no prompt)]
+	@scripts/delete-cluster.sh
 clean: ## Remove local build output (bin/, dist/)
 	@rm -rf bin dist
-.PHONY: help preflight gcp install install-bg install-status dashboards build-agent build-gateway build gateway egress tools load observe prometheus-ui forward-router forward-gateway patch-router idle-off idle-on catch-up verify e2e test test-go test-scripts stop-forwards teardown clean
+.PHONY: help preflight gcp install install-bg install-status dashboards build-agent build-gateway build gateway egress tools load observe prometheus-ui forward-router forward-gateway patch-router idle-off idle-on catch-up verify e2e test test-go test-scripts stop-forwards teardown delete-cluster clean

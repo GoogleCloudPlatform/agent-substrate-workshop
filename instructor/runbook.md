@@ -1,17 +1,17 @@
 # Instructor runbook
 
-**Current target:** `SUBSTRATE_REF=v0.6.0` (2026-10-22). Last full cluster run: 2026-10-22 on `v0.6.0`, GKE `1.37.0-gke.3503000` (Rapid, zonal, 2× `c3-standard-4`),
-source install mode (`make e2e` passed with real Vertex; optional labs A, B, and J passed end-to-end on the cluster). Not run:
-published-image mode (the release notes name no image repo).
+**Current target:** `SUBSTRATE_REF=v1.0.0-rc.1` (2026-11-02). Last full cluster run: 2026-11-02 on `v1.0.0-rc.1`, GKE `1.37.1-gke.1697000` (Rapid, zonal, 2× `c3-standard-4`),
+published and source install modes (`make e2e` passed with real Gemini; optional labs A, B, and J passed end-to-end on the cluster). Published images are used by default from `ghcr.io/agent-substrate/substrate` (`v1.0.0-rc.1`).
 
 ## One week before
 
 1. **Pick `SUBSTRATE_REF`**: the newest tag or commit that passes `make e2e` in **both** install modes,
    against a scratch GCP project (not an attendee's).
+   - Published mode (default in `workshop.env.example`): `SUBSTRATE_IMAGE_REPO=ghcr.io/agent-substrate/substrate` and
+     `SUBSTRATE_IMAGE_TAG=${SUBSTRATE_REF}`, so `install-substrate.sh` runs
+     `ate-setup deploy ate-system --image-repo … --image-tag …` without building from source.
    - Source mode: leave `SUBSTRATE_IMAGE_REPO`/`SUBSTRATE_IMAGE_TAG` empty in `workshop.env` — `install-substrate.sh`
-     clones `SUBSTRATE_REF` and ko-builds `ate-setup`, `kubectl-ate`, and `ateworker-gvisor` from source.
-   - Published mode: set both `SUBSTRATE_IMAGE_REPO` and `SUBSTRATE_IMAGE_TAG` if images exist for that ref, so
-     `install-substrate.sh` runs `ate-setup deploy ate-system --image-repo … --image-tag …` instead of building.
+     clones `SUBSTRATE_REF` and builds `ate-setup`, `kubectl-ate`, `ateworker-gvisor`, and the Envoy dataplane from source.
    - `make e2e` drives every module through `catch-up` + `verify` (`scripts/catch-up.sh $n && scripts/verify/$((n-1)).sh`
      for n = 1..7). Run it start to finish in **each** mode; a pass in one mode does not imply a pass in the other,
      since the worker image (`ateworker-gvisor`) comes from a different path in each. Run it with `bin/` on your
@@ -19,19 +19,19 @@ published-image mode (the release notes name no image repo).
    - Put the validated ref in `workshop.env.example`'s `SUBSTRATE_REF` and in `app/go.mod`
      (`cd app && go get go.ate.dev/substrate@<ref> && go mod tidy`), since `ateapipb` (used by the
      gateway, `egressctl`, and the idle-suspender) must speak the same protocol as the control plane you install.
-2. **Run the mock path too**: `MOCK_LLM=true make e2e`, so you know the whole workshop still works when Vertex is
+2. **Run the mock path too**: `MOCK_LLM=true make e2e`, so you know the whole workshop still works when Gemini is
    unreachable (quota, a locked-down project, a flaky network) — the fallback attendees are told about in Module 4.
-   The gateway keeps that live `MOCK_LLM=true` afterwards; run `MOCK_LLM=false make gateway` to go back to Vertex.
+   The gateway keeps that live `MOCK_LLM=true` afterwards; run `MOCK_LLM=false make gateway` to go back to Gemini.
 3. **Check external dependencies that drift independently of substrate:**
-   - `GEMINI_MODEL` (`workshop.env.example`, currently `gemini-3.8-flash`) is still served in `VERTEX_LOCATION`
-     (currently `${REGION}`, i.e. `us-central1`).
+   - `GEMINI_MODEL` (`workshop.env.example`, currently `gemini-3.8-flash`) is still served at `MODEL_LOCATION`
+     (currently `global`).
    - `PROM_FRONTEND_IMAGE` (currently `gke.gcr.io/prometheus-engine/frontend:v0.15.3-gke.0`) is a current tag.
 4. **Re-check [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) releases.** If it has
    gained auto suspend/resume or multi-sandbox-per-Pod, update the comparison table in
    [Module 1](../modules/01-architecture/README.md) and the wrap-up table in
    [Module 7](../modules/07-wrap-up/README.md).
 5. **For optional lab A** (`agent-substrate/env`) and **optional lab B** (`google/ax`): verify that their pinned commits
-   (`ENV_REF` and `AX_REF`) and `v0.6.0` patch (`optional/B-ax/patch-ax-v040.py`) still build and pass unit tests against `SUBSTRATE_REF` (or drop the
+   (`ENV_REF` and `AX_REF`) and `v1.0.0-rc.1` patches (`optional/A-env/patch-env-v060.py` and `optional/B-ax/patch-ax-v040.py`) still build and pass unit tests against `SUBSTRATE_REF` (or drop the
    patch once upstream `main` catches up to `SUBSTRATE_REF`).
    **For optional lab H** (`moficodes/agent-swarm`, which must be public before the event): pick a commit whose `go.mod` substrate version is
    exactly `SUBSTRATE_REF`. Its `hack/deploy.sh` refuses to deploy onto a cluster running any other version.
@@ -39,7 +39,7 @@ published-image mode (the release notes name no image repo).
    bare GKE cluster that has, at creation:
    - GKE **1.37+** (the minimum the workshop is validated on; `make preflight` rejects older). GKE 1.37 serves
      `certificates.k8s.io/v1` (`ClusterTrustBundle` and `PodCertificateRequest`) by default, which Substrate
-     `v0.6.0` uses directly (`make preflight` checks that `v1` or `v1beta1` is served).
+     `v1.0.0-rc.1` uses directly (`make preflight` checks that `v1` or `v1beta1` is served).
    - **Workload Identity** and **managed OpenTelemetry** with `--managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS`.
    - **Managed Prometheus** enabled (`--enable-managed-prometheus`) — Module 6's Prometheus UI reads through it.
    - Machine type **`c3-standard-4`**, 2 nodes, **no node auto-upgrade**, **no spot/preemptible nodes** (an
@@ -110,10 +110,10 @@ which is exactly what `catch-up.sh <current>` produces.
 
 Ask attendees to run `make teardown` (keeps their cluster, bucket, and Artifact Registry — only the in-cluster
 workshop state goes away), or `YES=1 scripts/teardown.sh --all` if the whole project is being torn down too
-(also deletes the bucket and the Artifact Registry repo, which takes the grants on them along, and the
+(also deletes the bucket, the Artifact Registry repo, the snapshot transfer service account, and the
 workshop namespace's project IAM bindings `make gcp` created). Artifact Registry read access is granted on the
 workshop repo only, so no other cluster in the project loses image pulls. Neither
-one touches the GKE cluster, and neither deletes Substrate's own `ate-system` Deployments/DaemonSets — but
+one touches the GKE cluster (`make delete-cluster` deletes the cluster after releasing its PersistentVolumeClaims and their disks), and neither deletes Substrate's own `ate-system` Deployments/DaemonSets — but
 **`--all` leaves the already-running Substrate unable to actually work**: in source install mode its
 control-plane and worker images lived in the Artifact Registry repo that was just deleted, and the IAM grants
 that let `atelet`/`ateapi` write snapshots are gone too. If the project is being kept around rather than

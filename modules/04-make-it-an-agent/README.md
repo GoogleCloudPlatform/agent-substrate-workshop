@@ -7,23 +7,23 @@ model access, and a deny-by-default **egress policy** lets the actor reach the g
 
 ## Why use a gateway?
 - **Template environment variables are literal and baked into every snapshot.** If you put an API key in a template, Substrate writes it to Cloud Storage and includes it in every clone.
-- Actors don't receive a Kubernetes ServiceAccount token. The gateway does, so it uses **Workload Identity** to call Vertex AI.
+- Actors don't receive a Kubernetes ServiceAccount token. The gateway does, so it uses **Workload Identity** to call Gemini.
 - The gateway is always on and lightweight. Actors are the resource-intensive, suspendable part. This split between
   **presence** (always on) and **cognition** (suspendable) is the core pattern behind production agent systems on Substrate.
 
 ## Steps
 
-1. **Deploy the gateway.** The gateway serves `/v1/model` (calling Vertex AI Gemini, or returning a mock response if `MOCK_LLM=true` or
-   Vertex AI fails) and `/chat/{actor}`, which forwards requests to the router with the `ate-target-actor` header set.
+1. **Deploy the gateway.** The gateway serves `/v1/model` (calling Gemini, or returning a mock response if `MOCK_LLM=true` or
+   the Gemini call fails) and `/chat/{actor}`, which forwards requests to the router with the `ate-target-actor` header set.
    ```bash
    make gateway
    make forward-gateway            # port-forwards the gateway to http://localhost:8081
    curl -s localhost:8081/v1/model -d '{"messages":[{"role":"user","content":"Say hi in five words"}]}' | jq
    ```
-   `backend` shows which model answered. If a Vertex AI call fails (for example, with a `403` error while the Workload Identity
+   `backend` shows which model answered (`gemini`). If a Gemini call fails (for example, with a `403` error while the Workload Identity
    binding propagates), the gateway answers that request from a mock fallback instead: `backend` is `mock-fallback`
-   and `upstreamError` reports what Vertex AI returned. As a result, the `502` response from the agent in step 3 comes from
-   egress blocking, not Vertex AI.
+   and `upstreamError` reports what the platform returned. As a result, the `502` response from the agent in step 3 comes from
+   egress blocking, not the model.
 2. **Free a worker, then configure the agent to call the model.** Suspend `memo` so that the new template's golden-snapshot
    actor has a free worker. In `app/cmd/agent/main.go`, find `WORKSHOP(module-4)` and set `ModelURL: os.Getenv("MODEL_URL")`.
    ```bash
@@ -71,7 +71,7 @@ model access, and a deny-by-default **egress policy** lets the actor reach the g
    Even if the model's first reply claims that it can't remember across
    conversations, the agent sends the full conversation history with every turn, as the response to "What is my name?" confirms.
 
-## If Vertex AI isn't available
+## If the model isn't available
 Run `MOCK_LLM=true make gateway`, or update the running Deployment with `kubectl -n workshop set env deploy/gateway MOCK_LLM=true`.
 Everything else in the workshop behaves the same. Once the gateway is running, `make gateway` and `make catch-up`
 preserve its live `MOCK_LLM` value (`workshop.env` sets only the initial deployment); run `MOCK_LLM=false make gateway` to switch back.

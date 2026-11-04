@@ -20,7 +20,7 @@ starting from a bare GKE cluster. In about 85 minutes, you:
 
 - Install Substrate and learn what each of its components does.
 - Build a Go agent, run it as a Substrate **actor**, and suspend and resume it across workers.
-- Connect the agent to a model (Vertex AI Gemini) through an always-on gateway, and lock down its egress.
+- Connect the agent to a model (Gemini on the Gemini platform) through an always-on gateway, and lock down its egress.
 - Run 20 agents on 2 workers with request parking and idle suspend.
 - Monitor the fleet in Prometheus and Google Cloud console dashboards.
 
@@ -41,13 +41,17 @@ and start the Substrate installation in the background. The installation runs wh
 - A Google Cloud project where you have the **Owner** role, and a GKE **1.37+** cluster in that project. The cluster requires Workload Identity,
   managed OpenTelemetry, Managed Service for Prometheus, no node auto-upgrade (or an active maintenance exclusion), and no spot nodes. Use the cluster that your instructor created, or create one in Step 3 below (see also the [Substrate Google Cloud guide](https://github.com/agent-substrate/substrate/tree/main/tools/setup-gcp)).
 - `kubectl` configured to point at that cluster (`kubectl config current-context`).
-- Locally installed tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `nc`, `curl`, `git`, `python3`,
-  and a running **Docker** daemon with `buildx` (the installation builds one Substrate image from a Dockerfile). Cloud Shell includes all of these tools.
+- Locally installed tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `curl`, `git`, `python3`.
+  You need a running **Docker** daemon with `buildx` only to build Substrate from source (empty `SUBSTRATE_IMAGE_REPO`).
+  Cloud Shell includes all of these tools except `ko`: run `go install github.com/google/ko@latest`.
 
 ### Steps
 
 1. **Activate Cloud Shell.** Open the Google Cloud console and click **Activate Cloud Shell** in the top-right
-   toolbar to launch Cloud Shell — a self-contained VM in your browser with all the required tools pre-installed — and run all the commands in this lab from there.
+   toolbar to launch Cloud Shell — a self-contained VM in your browser with all the required tools except `ko` — and run all the commands in this lab from there. Install `ko` first:
+   ```bash
+   go install github.com/google/ko@latest
+   ```
 2. **Clone the workshop repository.** Clone the repository and move into its root directory:
    ```bash
    git clone https://github.com/moficodes/workshop
@@ -86,7 +90,7 @@ and start the Substrate installation in the background. The installation runs wh
    ```bash
    gcloud container clusters list --project YOUR_PROJECT_ID    # NAME and LOCATION
    cp workshop.env.example workshop.env
-   $EDITOR workshop.env
+   ${EDITOR:-nano} workshop.env
    ```
 5. **Run preflight checks.** Verify your local tools and the cluster's version, Workload Identity, managed OpenTelemetry,
    and node pool settings. Fix any issues that the script flags before you continue.
@@ -108,7 +112,7 @@ and start the Substrate installation in the background. The installation runs wh
    This setting applies only to your current terminal session. To persist it, add the same line with the absolute repository path instead of `$PWD` to
    `~/.zshrc` or `~/.bashrc`. If you use direnv, add `PATH_add bin` to an `.envrc` file at the repository root.
 8. **Start the installation in the background.** This target clones Substrate at `SUBSTRATE_REF`, builds `kubectl ate`,
-   deploys `ate-system`, pins a worker image that matches the control plane, labels your nodes, and
+   deploys `ate-system`, pins a worker image that matches the control plane, and
    increases the router's parked-request budget and shutdown grace period.
    ```bash
    make install-bg
@@ -261,7 +265,7 @@ an actor, and send requests to it through the router.
    kubectl ate create atespace workshop
    ```
 4. **Create an ActorTemplate.** Inspect `modules/02-hello-actor/manifests/template.yaml.tmpl`: it defines the container image, a readiness
-   probe, the snapshot fidelity (`preferredFidelity`), the Cloud Storage location, resource limits (`cpuMillicores`, `memoryBytes`), and one durable directory.
+   probe, the snapshot fidelity (`preferredFidelity`), resource limits (`cpuMillicores`, `memoryBytes`), and one durable directory.
    ```bash
    scripts/render.sh modules/02-hello-actor/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
    kubectl ate get actor-template agent-v1 -a workshop            # repeat until GOLDEN TAG appears
@@ -358,8 +362,9 @@ with **VOLUMES** fidelity (`SNAPSHOT_FIDELITY_VOLUMES`): Substrate saves only th
    kubectl ate get actor-template agent-v2 -a workshop -o yaml | grep -A2 goldenTag   # repeat until set
    kubectl ate create actor memo --template=agent-v2 -a workshop
    ```
-6. Follow the actor's logs in a second terminal. The log stream follows the actor across workers and restarts:
+6. Follow the actor's logs in a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`). The log stream follows the actor across workers and restarts:
    ```bash
+   source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
    kubectl ate logs actor memo -a workshop -f
    ```
    Most of the output comes from gVisor's runtime logging (`I…` and `W…` lines from `cli.go`,
@@ -409,23 +414,23 @@ model access, and a deny-by-default **egress policy** lets the actor reach the g
 
 ### Why use a gateway?
 - **Template environment variables are literal and baked into every snapshot.** If you put an API key in a template, Substrate writes it to Cloud Storage and includes it in every clone.
-- Actors don't receive a Kubernetes ServiceAccount token. The gateway does, so it uses **Workload Identity** to call Vertex AI.
+- Actors don't receive a Kubernetes ServiceAccount token. The gateway does, so it uses **Workload Identity** to call Gemini.
 - The gateway is always on and lightweight. Actors are the resource-intensive, suspendable part. This split between
   **presence** (always on) and **cognition** (suspendable) is the core pattern behind production agent systems on Substrate.
 
 ### Steps
 
-1. **Deploy the gateway.** The gateway serves `/v1/model` (calling Vertex AI Gemini, or returning a mock response if `MOCK_LLM=true` or
-   Vertex AI fails) and `/chat/{actor}`, which forwards requests to the router with the `ate-target-actor` header set.
+1. **Deploy the gateway.** The gateway serves `/v1/model` (calling Gemini, or returning a mock response if `MOCK_LLM=true` or
+   the Gemini call fails) and `/chat/{actor}`, which forwards requests to the router with the `ate-target-actor` header set.
    ```bash
    make gateway
    make forward-gateway            # port-forwards the gateway to http://localhost:8081
    curl -s localhost:8081/v1/model -d '{"messages":[{"role":"user","content":"Say hi in five words"}]}' | jq
    ```
-   `backend` shows which model answered. If a Vertex AI call fails (for example, with a `403` error while the Workload Identity
+   `backend` shows which model answered (`gemini`). If a Gemini call fails (for example, with a `403` error while the Workload Identity
    binding propagates), the gateway answers that request from a mock fallback instead: `backend` is `mock-fallback`
-   and `upstreamError` reports what Vertex AI returned. As a result, the `502` response from the agent in step 3 comes from
-   egress blocking, not Vertex AI.
+   and `upstreamError` reports what the platform returned. As a result, the `502` response from the agent in step 3 comes from
+   egress blocking, not the model.
 2. **Free a worker, then configure the agent to call the model.** Suspend `memo` so that the new template's golden-snapshot
    actor has a free worker. In `app/cmd/agent/main.go`, find `WORKSHOP(module-4)` and set `ModelURL: os.Getenv("MODEL_URL")`.
    ```bash
@@ -473,7 +478,7 @@ model access, and a deny-by-default **egress policy** lets the actor reach the g
    Even if the model's first reply claims that it can't remember across
    conversations, the agent sends the full conversation history with every turn, as the response to "What is my name?" confirms.
 
-### If Vertex AI isn't available
+### If the model isn't available
 Run `MOCK_LLM=true make gateway`, or update the running Deployment with `kubectl -n workshop set env deploy/gateway MOCK_LLM=true`.
 Everything else in the workshop behaves the same. Once the gateway is running, `make gateway` and `make catch-up`
 preserve its live `MOCK_LLM` value (`workshop.env` sets only the initial deployment); run `MOCK_LLM=false make gateway` to switch back.
@@ -627,13 +632,14 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    ```bash
    cat observability/podmonitoring.yaml
    make observe
-   make prometheus-ui          # opens http://localhost:9090
+   make prometheus-ui          # opens http://localhost:9090 (in Cloud Shell: Web Preview > Change port > 9090)
    ```
-2. **Generate traffic.** In a second terminal, send bursty chat traffic across the swarm for 3 minutes:
+2. **Generate traffic.** In a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`), send bursty chat traffic across the swarm for 3 minutes:
    ```bash
+   source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
    make load
    ```
-3. **Run queries in the Prometheus UI** (`http://localhost:9090` → **Graph**). Copy each query from
+3. **Run queries in the Prometheus UI** (`http://localhost:9090` → **Graph**, or Web Preview `:9090` in Cloud Shell). Copy each query from
    [observability/queries.md](observability/queries.md) (if your `CLUSTER_NAME` in `workshop.env` isn't
    `ate-cluster`, replace `cluster="ate-cluster"` to match):
    - **How many workers are busy vs. idle?** `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="agents", cluster="ate-cluster"})`
@@ -658,6 +664,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    ```
    In a second terminal, resume `buddy` and record its worker Pod name:
    ```bash
+   source scripts/env.sh     # if this is a fresh terminal, from the repo root: puts bin/ (kubectl ate) on PATH
    kubectl ate resume actor buddy -a workshop
    FIRST=$(kubectl ate get actor buddy -a workshop -o json | jq -r .status.workerAssignment.workerPod)
    echo "$FIRST"
@@ -776,10 +783,13 @@ doesn't affect an earlier one:
 | [J — Egress credential injection](#9) | Use `ate-secret://` rules so the egress proxy injects credentials without exposing them to actors. | Adds a `workshop-secrets` namespace and grants `workshop` access in `k8s-credential-provider-namespace-policy` |
 
 ### Clean up
+If the project exists only for this workshop, deleting the project is the simplest complete cleanup. Otherwise:
 ```bash
 make teardown          # deletes workshop resources; keeps the cluster, bucket, and Artifact Registry repository
-YES=1 scripts/teardown.sh --all   # also deletes the bucket, Artifact Registry repository, and IAM bindings
+YES=1 scripts/teardown.sh --all   # also deletes the bucket, Artifact Registry repository, IAM bindings, and snapshot transfer service account
+make delete-cluster    # deletes the cluster's PersistentVolumeClaims (and their disks) first, then deletes the cluster
 ```
+At an instructor-led event, check with your instructor before you delete a cluster that they provisioned.
 
 ## Appendix: Optional content
 
@@ -800,14 +810,14 @@ It's the pattern you built in Modules 4–5 (an always-on API in front of suspen
 
 #### Which env commit, and why
 
-Our `SUBSTRATE_REF` is `v0.6.0` (pinned in `app/go.mod` as `go.ate.dev/substrate v0.6.0`).
+Our `SUBSTRATE_REF` is `v1.0.0-rc.1` (pinned in `app/go.mod` as `go.ate.dev/substrate v1.0.0-rc.1`).
 
 We checked every env tag and `main`:
 
-| env ref | substrate pin (`go.mod`) | compatibility with `v0.6.0` |
+| env ref | substrate pin (`go.mod`) | compatibility with `v1.0.0-rc.1` |
 |---|---|---|
 | `v0.0.7`–`v0.0.10` | `v0.0.0-20260717234919-a2d55e99e02e` (2026-07-17) | Pre-`v0.2.0` (`readyz`, `snapshotsConfig`) |
-| `2c780cd` | `go.ate.dev/substrate v0.5.1-0.20261018212731-ddb46651d605` (2026-10-18) | Matches `v0.6.0` (`ServiceAccount/ate-env-api`, `ate-env manifest access-policy`, `workerSelector` without `sandboxConfig` on `ActorTemplate`, `ate.dev/api-access: "true"` on `Namespace/ate-env`); [`patch-env-v060.py`](./patch-env-v060.py) bumps `go.ate.dev/substrate` to `v0.6.0` (`Actor.actor_template` proto tag `2` and integer `cpuMillicores`/`memoryBytes` limits) |
+| `2c780cd` | `go.ate.dev/substrate v0.5.1-0.20261018212731-ddb46651d605` (2026-10-18) | Matches `v1.0.0-rc.1` with [`patch-env-v060.py`](./patch-env-v060.py) (`ServiceAccount/ate-env-api`, `ate-env manifest access-policy`, `workerSelector` without `sandboxConfig`, `ate.dev/v1` `WorkerPool`, `go.ate.dev/substrate/api/ateapi/v1`, cluster-default snapshot storage location, and integer `cpuMillicores`/`memoryBytes` limits) |
 
 This lab pins `env` at:
 
@@ -815,7 +825,7 @@ This lab pins `env` at:
 ENV_REF=2c780cd94891c134cd10375a30a5e1e662ee2c2d   # env, 2026-10-18
 ```
 
-A small idempotent patch script ([`patch-env-v060.py`](./patch-env-v060.py)) updates the 3 Go files that construct `ateapipb.Limits` and bumps `go.ate.dev/substrate` to `v0.6.0`.
+A small idempotent patch script ([`patch-env-v060.py`](./patch-env-v060.py)) updates the `ateapi`/`v1` imports, `ResourceRequirements`, and `SnapshotConfig` and bumps `go.ate.dev/substrate` to `v1.0.0-rc.1`.
 
 #### Two things to know before you start
 
@@ -1021,7 +1031,7 @@ flowchart LR
 
 #### Which AX commit, and why
 
-Our `SUBSTRATE_REF` is `v0.6.0` (pinned in `app/go.mod` as `go.ate.dev/substrate v0.6.0`).
+Our `SUBSTRATE_REF` is `v1.0.0-rc.1` (pinned in `app/go.mod` as `go.ate.dev/substrate v1.0.0-rc.1`).
 
 Upstream `google/ax` pins an older Substrate commit (`v0.0.0-20260918201817-944abe3278b8` in `go.mod`). This lab pins AX at:
 
@@ -1029,9 +1039,9 @@ Upstream `google/ax` pins an older Substrate commit (`v0.0.0-20260918201817-944a
 AX_REF=ac2332829f22360ff97b0ba34d94dd0dd782f17e   # google/ax main, 2026-10-12
 ```
 
-Step 1 runs [`optional/B-ax/patch-ax-v040.py`](patch-ax-v040.py) to bring it up to `v0.6.0` before building:
+Step 1 runs [`optional/B-ax/patch-ax-v040.py`](patch-ax-v040.py) to bring it up to `v1.0.0-rc.1` before building:
 
-1. **Substrate `v0.6.0` proto and module path changes**: `github.com/agent-substrate/substrate` → `go.ate.dev/substrate v0.6.0`, `ContainerReadyz` → `WakeupProbe` + `HttpGetAction` (pointed at `/healthz` so the actor transitions to `RUNNING` and activates its `EgressPolicy` as soon as the runner's HTTP server starts, while `TaskReconciler` polls `/readyz?check=workspace`), `SnapshotsConfig` (with `OnPause`/`OnResume`) → `SnapshotConfig` (`PreferredFidelity: SNAPSHOT_FIDELITY_VOLUMES`), `SandboxConfig` removed from `ActorTemplate` (the `WorkerPool` determines the sandbox class), `ResourceRequirements.Limits` (`CpuMillicores: 1000`, `MemoryBytes: 536870912`), `WorkerPodIp` → `WorkerPodIps`, `DeleteActorRequest.AnyState` removed, `GetAtespace` checked before `CreateAtespace` (so an `editor` on a pre-created atespace does not need `can_create_atespace` on `global:root`), and a retry in `EnsureActor` while the template's golden snapshot finishes (`FailedPrecondition`).
+1. **Substrate `v1.0.0-rc.1` proto and module path changes**: `github.com/agent-substrate/substrate/pkg/proto/ateapipb` → `go.ate.dev/substrate/api/ateapi/v1` (`v1.0.0-rc.1`), `ContainerReadyz` → `WakeupProbe` + `HttpGetAction` (pointed at `/healthz` so the actor transitions to `RUNNING` as soon as the runner's HTTP server starts, while `TaskReconciler` polls `/readyz?check=workspace`), `SnapshotsConfig` (with `OnPause`/`OnResume`) → `SnapshotConfig` (`PreferredFidelity: SNAPSHOT_FIDELITY_VOLUMES`, omitting `StorageLocation` so the cluster's `--snapshot-location` is used), `SandboxConfig` removed from `ActorTemplate` (the `WorkerPool` determines the sandbox class), `ResourceRequirements.Limits` (`CpuMillicores: 1000`, `MemoryBytes: 536870912`), `WorkerPodIp` → `WorkerPodIps`, `DeleteActorRequest.AnyState` removed, `GetAtespace` checked before `CreateAtespace` (so an `editor` on a pre-created atespace does not need `can_create_atespace` on `global:root`), and a retry in `EnsureActor` while the template's golden snapshot finishes (`FailedPrecondition`).
 2. **`ko`-built runner path**: AX's `.ko.yaml` already configures `cmd/ax-task-runner` to use `alpine/git:latest` (Alpine + `git`, `sh`, `wget`), which lets `ko build` produce a `@sha256:` digest-pinned runner image without Docker. The patch switches `DefaultGuestCommand` in `internal/substrate/client.go` from `/usr/local/bin/ax-task-runner` to `/ko-app/ax-task-runner` where `ko` places the binary.
 3. **`WorkerSelector`, `VOLUMES`-fidelity marker path, and namespace-scoped RBAC**: adds `workerSelector: {workload: ax-worker}` so AX tasks run on their own `ax-workers` pool instead of the workshop's `agents` pool, moves AX's maiden-run marker directory (`DefaultAXDir` in `internal/workspace/setup.go`) from `/ax` to `/workspace/.ax` so it lives inside the `/workspace` `durableDir` and survives a `SNAPSHOT_FIDELITY_VOLUMES` suspend/resume ([Module 3 Part B](../../modules/03-suspend-resume/README.md#part-b-disk-only-suspend-template-agent-v2)), labels `Namespace/ax-system` with `ate.dev/api-access: "true"`, and removes the cluster-wide Secret `ClusterRole` and `ClusterRoleBinding` from `deploy/ax-server.yaml` so the deployment stays strictly namespace-scoped to `ax-system`.
 
@@ -1762,7 +1772,7 @@ Back to [Module 7 — Wrap-up](../../modules/07-wrap-up/README.md) for the rest 
 [agent-swarm](https://github.com/moficodes/agent-swarm) is the reference conference demo: 50 attendee
 actors (`attendee-01`…`attendee-50`) on an autoscaled WorkerPool (`conf-workers`, 2 to 5 pods), with a
 presenter "stage" UI. Its gateway uses a **relay** instead of egress: the actor has no egress at all, and
-instead of calling out itself it returns a `model_call` step; the gateway calls Vertex and posts the result
+instead of calling out itself it returns a `model_call` step; the gateway calls Gemini and posts the result
 back through the router. Compare that with Module 4's gateway-only-egress pattern.
 
 Each `conf-workers` pod hosts `DEMO_CONF_ACTORS_PER_WORKER` actors at once (default 4). `hack/deploy.sh` sets
@@ -1774,8 +1784,8 @@ on worker demand: workers that are `partial` or `at_capacity`, plus one worker f
 
 > **Fact-checked against an agent-swarm checkout** — its `README.md`,
 > `hack/deploy.sh`, `manifests/workerpool.yaml.tmpl`, `manifests/actortemplate.yaml.tmpl`, and `go.mod`:
-> - agent-swarm must pin `go.ate.dev/substrate v0.6.0`, the same as this workshop's
->   `SUBSTRATE_REF`, with `manifests/workerpool.yaml.tmpl` (`sandboxClasses`), `manifests/actortemplate.yaml.tmpl` (`preferredFidelity: SNAPSHOT_FIDELITY_MEMORY`, `cpuMillicores`/`memoryBytes`, no `sandboxConfig`), and an OpenFGA `access-policy` for `conf-gateway` updated for `v0.6.0`.
+> - agent-swarm must pin `go.ate.dev/substrate v1.0.0-rc.1`, the same as this workshop's
+>   `SUBSTRATE_REF`, with `manifests/workerpool.yaml.tmpl` (`apiVersion: ate.dev/v1`, `sandboxClasses`), `manifests/actortemplate.yaml.tmpl` (`preferredFidelity: SNAPSHOT_FIDELITY_MEMORY`, `cpuMillicores`/`memoryBytes`, no `sandboxConfig` or `storageLocation`), and an OpenFGA `access-policy` for `conf-gateway`.
 > - The gateway image is built with **`docker buildx`**, not `ko` (`hack/deploy.sh`'s `conf_build_gateway`
 >   runs `docker buildx build --platform=linux/amd64 --push`). Only the *worker* image
 >   (`ko://go.ate.dev/substrate/cmd/ateworker-gvisor`, in `manifests/workerpool.yaml.tmpl`) is
@@ -1795,7 +1805,7 @@ agent-swarm refuses to deploy unless your cluster runs the substrate version pin
 `main` moves, so re-check the pin against `SUBSTRATE_REF` before each event:
 ```bash
 git clone https://github.com/moficodes/agent-swarm .workshop/agent-swarm
-grep 'substrate ' .workshop/agent-swarm/go.mod     # expect v0.6.0, the SUBSTRATE_REF in workshop.env
+grep 'substrate ' .workshop/agent-swarm/go.mod     # expect v1.0.0-rc.1, the SUBSTRATE_REF in workshop.env
 ```
 If they differ, `hack/deploy.sh up` stops and prints the pin and the cluster's version (agent-swarm's
 README has a "Bumping Substrate" section). Use an agent-swarm commit whose pin matches rather than bumping
@@ -1818,17 +1828,17 @@ Two things to know about sharing the cluster with the workshop:
 #### Deploy
 
 `source scripts/env.sh` exports `PROJECT_ID` (it's required for the whole workshop), and `hack/deploy.sh` treats "is
-`PROJECT_ID` set" as its only mock-vs-Vertex switch — it does **not** read this workshop's `MOCK_LLM`. So by
-default this deploys with real Vertex calls through a fresh `conf-gateway` GSA. Run it in a subshell with
+`PROJECT_ID` set" as its only mock-vs-Gemini switch — it does **not** read this workshop's `MOCK_LLM`. So by
+default this deploys with real Gemini calls through a fresh `conf-gateway` GSA. Run it in a subshell with
 `PROJECT_ID` unset if you want mock replies instead:
 
 ```bash
 source scripts/env.sh   # workshop.env into this shell (bash or zsh)
 cd .workshop/agent-swarm
-export KO_DOCKER_REPO BUCKET_NAME VERTEX_LOCATION KO_DEFAULTPLATFORMS   # KO_DEFAULTPLATFORMS: linux/amd64 unless workshop.env says otherwise
+export KO_DOCKER_REPO BUCKET_NAME VERTEX_LOCATION="$REGION" KO_DEFAULTPLATFORMS   # KO_DEFAULTPLATFORMS: linux/amd64 unless workshop.env says otherwise
 # Optional, with defaults: DEMO_CONF_ACTORS=50 DEMO_CONF_MIN_WORKERS=2 DEMO_CONF_MAX_WORKERS=5 DEMO_CONF_ACTORS_PER_WORKER=4
-( export PROJECT_ID; hack/deploy.sh up --patch-router )        # real Vertex calls, or:
-( unset PROJECT_ID;  hack/deploy.sh up --patch-router )        # mock replies, no Vertex AI cost
+( export PROJECT_ID; hack/deploy.sh up --patch-router )        # real Gemini calls, or:
+( unset PROJECT_ID;  hack/deploy.sh up --patch-router )        # mock replies, no model cost
 cd "$REPO_ROOT"
 scripts/forward.sh conf-gateway ate-demo-conf svc/conf-gateway 8090 80   # never hand-roll `kubectl port-forward &`
 open "http://localhost:8090/stage?key=$(kubectl get secret conf-gateway -n ate-demo-conf -o jsonpath='{.data.PRESENTER_TOKEN}' | base64 -d)"
@@ -1940,7 +1950,7 @@ source scripts/env.sh    # workshop.env into this shell (bash or zsh): PROJECT_I
    kubectl ate get actor-template agent-vm-v1 -a workshop -o yaml | grep -A2 goldenTag   # repeat until set (~20s)
    ```
    `diff modules/04-make-it-an-agent/manifests/template.yaml.tmpl optional/I-microvm/template.yaml.tmpl`
-   shows everything that changed: in `v0.6.0`, the sandbox class is chosen on the `WorkerPool` (`sandboxClasses`), not on the `ActorTemplate`, so `template.yaml.tmpl` simply selects the microVM pool via `workerSelector`. `.workshop/substrate/demos/counter/counter-microvm-template.yaml.tmpl` is
+   shows everything that changed: in `v0.6.0`+, the sandbox class is chosen on the `WorkerPool` (`sandboxClasses`), not on the `ActorTemplate`, so `template.yaml.tmpl` simply selects the microVM pool via `workerSelector`. `.workshop/substrate/demos/counter/counter-microvm-template.yaml.tmpl` is
    substrate's own reference.
 4. Create an actor on `agent-vm-v1`, give it the same egress as `buddy`, and chat with it:
    ```bash
@@ -1968,10 +1978,10 @@ covers a kind-cluster path with Lima on Apple Silicon.
 **Goal:** let an actor call an authenticated external API without ever holding the credential.
 `HttpRuleEffects.replace_headers` lets a matching `https` rule replace a placeholder request header with a value that comes
 from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
-(`pkg/proto/ateapipb/ateapi.proto`, `CredentialHeader`), resolved at request time by dialing a
-**credential provider**, a small gRPC service (`pkg/proto/credproviderpb/credprovider.proto`).
+(`api/ateapi/v1/ateapi.proto`, `CredentialHeader`), resolved at request time by dialing a
+**credential provider**, a small gRPC service (`api/credprovider/v1/credprovider.proto`).
 
-> **Fact-checked against the substrate checkout at `SUBSTRATE_REF` (v0.6.0):** substrate ships the built-in
+> **Fact-checked against the substrate checkout at `SUBSTRATE_REF` (v1.0.0-rc.1):** substrate ships the built-in
 > `k8s.io` provider (`cmd/credential-provider/kubernetes-secrets`) with manifests in
 > `manifests/egress-credential-injection/` and a guide in `docs/egress-credential-injection.md`. It resolves
 > `ate-secret://k8s.io/default/<namespace>/<secret>/<key>` from a Kubernetes Secret, and it denies by default:
@@ -1985,7 +1995,7 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
 - `ko`, and an API key for any HTTPS API. The steps use `https://httpbin.org`, which needs no real key and
   echoes the headers it received back to you, so you can see the injected header.
 
-1. Read `docs/egress-credential-injection.md`, `pkg/proto/credproviderpb/credprovider.proto` (the one-RPC plugin contract), and the `k8s.io`
+1. Read `docs/egress-credential-injection.md`, `api/credprovider/v1/credprovider.proto` (the one-RPC plugin contract), and the `k8s.io`
    provider in `cmd/credential-provider/kubernetes-secrets` and its manifests in `manifests/egress-credential-injection/`.
 2. **Verify the credential provider is running.** Because `make install` passes `--credential-provider='{"name":"k8s.io"}'`,
    `k8s-credential-provider` and `atenet-egress` are already deployed and wired together:
@@ -2037,7 +2047,7 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
    logs in Logs Explorer all hold only the `ate-secret://` URI. Only the provider and the egress gateway ever saw
    the key. (One caveat: httpbin *echoes* the header back, so after this call the key is in the actor's memory,
    and in its next `SNAPSHOT_FIDELITY_MEMORY` snapshot. A real API doesn't echo credentials.)
-6. Compare with the gateway pattern (Module 4: the gateway holds the Vertex credential and the actor never
+6. Compare with the gateway pattern (Module 4: the gateway holds the model credential and the actor never
    calls out at all). When would you use each — an actor egress rule with provider-injected auth, vs. keeping
    the call entirely on the always-on tier?
 

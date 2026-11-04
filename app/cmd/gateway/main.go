@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Command gateway is the workshop's always-on Deployment next to the actors. It holds what
-// must not live in an actor: model credentials (Workload Identity → Vertex AI), the public
+// must not live in an actor: model credentials (Workload Identity → Gemini Enterprise Agent Platform), the public
 // chat entry point, and the policy deciding when an actor is idle.
 package main
 
@@ -42,7 +42,7 @@ func main() {
 
 	m := metrics.New()
 	backend := model.Select(cfg.MockLLM, func() (model.Backend, error) {
-		return model.NewVertex(ctx, cfg.Project, cfg.VertexLocation, cfg.GeminiModel)
+		return model.NewGemini(ctx, cfg.Project, cfg.GeminiModel)
 	})
 
 	ate, closer, err := ateclient.Dial(cfg.ATE)

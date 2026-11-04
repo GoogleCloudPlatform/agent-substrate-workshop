@@ -5,7 +5,7 @@
 [agent-swarm](https://github.com/moficodes/agent-swarm) is the reference conference demo: 50 attendee
 actors (`attendee-01`…`attendee-50`) on an autoscaled WorkerPool (`conf-workers`, 2 to 5 pods), with a
 presenter "stage" UI. Its gateway uses a **relay** instead of egress: the actor has no egress at all, and
-instead of calling out itself it returns a `model_call` step; the gateway calls Vertex and posts the result
+instead of calling out itself it returns a `model_call` step; the gateway calls Gemini and posts the result
 back through the router. Compare that with Module 4's gateway-only-egress pattern.
 
 Each `conf-workers` pod hosts `DEMO_CONF_ACTORS_PER_WORKER` actors at once (default 4). `hack/deploy.sh` sets
@@ -17,8 +17,8 @@ on worker demand: workers that are `partial` or `at_capacity`, plus one worker f
 
 > **Fact-checked against an agent-swarm checkout** — its `README.md`,
 > `hack/deploy.sh`, `manifests/workerpool.yaml.tmpl`, `manifests/actortemplate.yaml.tmpl`, and `go.mod`:
-> - agent-swarm must pin `go.ate.dev/substrate v0.6.0`, the same as this workshop's
->   `SUBSTRATE_REF`, with `manifests/workerpool.yaml.tmpl` (`sandboxClasses`), `manifests/actortemplate.yaml.tmpl` (`preferredFidelity: SNAPSHOT_FIDELITY_MEMORY`, `cpuMillicores`/`memoryBytes`, no `sandboxConfig`), and an OpenFGA `access-policy` for `conf-gateway` updated for `v0.6.0`.
+> - agent-swarm must pin `go.ate.dev/substrate v1.0.0-rc.1`, the same as this workshop's
+>   `SUBSTRATE_REF`, with `manifests/workerpool.yaml.tmpl` (`apiVersion: ate.dev/v1`, `sandboxClasses`), `manifests/actortemplate.yaml.tmpl` (`preferredFidelity: SNAPSHOT_FIDELITY_MEMORY`, `cpuMillicores`/`memoryBytes`, no `sandboxConfig` or `storageLocation`), and an OpenFGA `access-policy` for `conf-gateway`.
 > - The gateway image is built with **`docker buildx`**, not `ko` (`hack/deploy.sh`'s `conf_build_gateway`
 >   runs `docker buildx build --platform=linux/amd64 --push`). Only the *worker* image
 >   (`ko://go.ate.dev/substrate/cmd/ateworker-gvisor`, in `manifests/workerpool.yaml.tmpl`) is
@@ -38,7 +38,7 @@ agent-swarm refuses to deploy unless your cluster runs the substrate version pin
 `main` moves, so re-check the pin against `SUBSTRATE_REF` before each event:
 ```bash
 git clone https://github.com/moficodes/agent-swarm .workshop/agent-swarm
-grep 'substrate ' .workshop/agent-swarm/go.mod     # expect v0.6.0, the SUBSTRATE_REF in workshop.env
+grep 'substrate ' .workshop/agent-swarm/go.mod     # expect v1.0.0-rc.1, the SUBSTRATE_REF in workshop.env
 ```
 If they differ, `hack/deploy.sh up` stops and prints the pin and the cluster's version (agent-swarm's
 README has a "Bumping Substrate" section). Use an agent-swarm commit whose pin matches rather than bumping
@@ -61,17 +61,17 @@ Two things to know about sharing the cluster with the workshop:
 ## Deploy
 
 `source scripts/env.sh` exports `PROJECT_ID` (it's required for the whole workshop), and `hack/deploy.sh` treats "is
-`PROJECT_ID` set" as its only mock-vs-Vertex switch — it does **not** read this workshop's `MOCK_LLM`. So by
-default this deploys with real Vertex calls through a fresh `conf-gateway` GSA. Run it in a subshell with
+`PROJECT_ID` set" as its only mock-vs-Gemini switch — it does **not** read this workshop's `MOCK_LLM`. So by
+default this deploys with real Gemini calls through a fresh `conf-gateway` GSA. Run it in a subshell with
 `PROJECT_ID` unset if you want mock replies instead:
 
 ```bash
 source scripts/env.sh   # workshop.env into this shell (bash or zsh)
 cd .workshop/agent-swarm
-export KO_DOCKER_REPO BUCKET_NAME VERTEX_LOCATION KO_DEFAULTPLATFORMS   # KO_DEFAULTPLATFORMS: linux/amd64 unless workshop.env says otherwise
+export KO_DOCKER_REPO BUCKET_NAME VERTEX_LOCATION="$REGION" KO_DEFAULTPLATFORMS   # KO_DEFAULTPLATFORMS: linux/amd64 unless workshop.env says otherwise
 # Optional, with defaults: DEMO_CONF_ACTORS=50 DEMO_CONF_MIN_WORKERS=2 DEMO_CONF_MAX_WORKERS=5 DEMO_CONF_ACTORS_PER_WORKER=4
-( export PROJECT_ID; hack/deploy.sh up --patch-router )        # real Vertex calls, or:
-( unset PROJECT_ID;  hack/deploy.sh up --patch-router )        # mock replies, no Vertex AI cost
+( export PROJECT_ID; hack/deploy.sh up --patch-router )        # real Gemini calls, or:
+( unset PROJECT_ID;  hack/deploy.sh up --patch-router )        # mock replies, no model cost
 cd "$REPO_ROOT"
 scripts/forward.sh conf-gateway ate-demo-conf svc/conf-gateway 8090 80   # never hand-roll `kubectl port-forward &`
 open "http://localhost:8090/stage?key=$(kubectl get secret conf-gateway -n ate-demo-conf -o jsonpath='{.data.PRESENTER_TOKEN}' | base64 -d)"

@@ -24,18 +24,17 @@ failures=0
 need() { if "$@"; then ok "$CHECK"; else warn "$CHECK — $HINT"; failures=$((failures+1)); fi; }
 
 step "Tools"
-for t in gcloud kubectl go ko jq envsubst nc curl git python3; do
+for t in gcloud kubectl go ko jq envsubst curl git python3; do
   case "$t" in
     ko)       hint="install ko: go install github.com/google/ko@latest (then make sure \$(go env GOPATH)/bin is on PATH)" ;;
     envsubst) hint="install envsubst (gettext: brew install gettext / apt install gettext-base)" ;;
-    nc)       hint="install nc (netcat)" ;;
     *)        hint="install $t" ;;
   esac
   CHECK="$t on PATH" HINT="$hint"; need bash -c "command -v $t >/dev/null"
 done
 CHECK="go >= 1.27" HINT="install Go 1.27+ (or leave GOTOOLCHAIN=auto so Go uses the version in app/go.mod)"
 need bash -c '[[ "$(printf "%s\n" "go1.27" "$(cd "$1/app" && go env GOVERSION 2>/dev/null)" | sort -V | head -1)" == "go1.27" ]]' _ "$REPO_ROOT"
-# Building substrate from source (SUBSTRATE_IMAGE_REPO empty, the default) includes one Dockerfile image,
+# Building substrate from source (SUBSTRATE_IMAGE_REPO empty) includes one Dockerfile image,
 # the Envoy dataplane, which ate-setup builds and pushes with `docker buildx build --push`. Without a working
 # Docker the background install would get most of the way and then fail.
 if [[ -z "${SUBSTRATE_IMAGE_REPO:-}" ]]; then

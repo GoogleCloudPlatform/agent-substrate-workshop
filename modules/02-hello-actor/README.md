@@ -26,7 +26,7 @@ an actor, and send requests to it through the router.
    kubectl ate create atespace workshop
    ```
 4. **Create an ActorTemplate.** Inspect `modules/02-hello-actor/manifests/template.yaml.tmpl`: it defines the container image, a readiness
-   probe, the snapshot fidelity (`preferredFidelity`), the Cloud Storage location, resource limits (`cpuMillicores`, `memoryBytes`), and one durable directory.
+   probe, the snapshot fidelity (`preferredFidelity`), resource limits (`cpuMillicores`, `memoryBytes`), and one durable directory.
    ```bash
    scripts/render.sh modules/02-hello-actor/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
    kubectl ate get actor-template agent-v1 -a workshop            # repeat until GOLDEN TAG appears

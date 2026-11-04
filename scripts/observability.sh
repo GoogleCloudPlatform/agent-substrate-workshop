@@ -26,4 +26,4 @@ kubectl -n "$NAMESPACE" apply -f "$REPO_ROOT/observability/podmonitoring.yaml"
 step "Prometheus UI (GMP frontend)"
 render "$REPO_ROOT/observability/prometheus-ui.yaml.tmpl" NAMESPACE PROJECT_ID PROM_FRONTEND_IMAGE | kubectl apply -f -
 kubectl -n "$NAMESPACE" rollout status deploy/prometheus-ui --timeout=180s
-ok "run: make prometheus-ui   (then open http://localhost:9090)"
+ok "run: make prometheus-ui   (then $(open_hint 9090))"

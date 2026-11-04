@@ -1,3 +1,17 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # The always-on gateway. Rendered by scripts/gateway.sh.
 apiVersion: v1
 kind: ServiceAccount
@@ -30,7 +44,9 @@ spec:
         - {name: MOCK_LLM, value: "${MOCK_LLM}"}
         - {name: GEMINI_MODEL, value: "${GEMINI_MODEL}"}
         - {name: GOOGLE_CLOUD_PROJECT, value: "${PROJECT_ID}"}
-        - {name: VERTEX_LOCATION, value: "${VERTEX_LOCATION}"}
+        # Read by the Google GenAI SDK: call Gemini on the Gemini platform, at MODEL_LOCATION.
+        - {name: GOOGLE_GENAI_USE_ENTERPRISE, value: "true"}
+        - {name: GOOGLE_CLOUD_LOCATION, value: "${MODEL_LOCATION}"}
         - {name: IDLE_AFTER, value: "${IDLE_AFTER}"}
         # Where actors reach the gateway: background jobs send heartbeats here (optional lab C).
         - {name: SELF_URL, value: "http://gateway.${NAMESPACE}.svc.cluster.local"}

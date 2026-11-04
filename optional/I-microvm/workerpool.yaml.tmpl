@@ -16,7 +16,7 @@
 # Same shape as Module 2's `agents` pool, plus sandboxClasses=[microvm], the node pool's label, and a toleration for
 # its taint. MICROVM_WORKER_IMAGE comes from your shell (step 3 builds it); the gVisor WORKER_IMAGE can't
 # run microVMs.
-apiVersion: ate.dev/v1alpha1
+apiVersion: ate.dev/v1
 kind: WorkerPool
 metadata:
   name: agents-vm

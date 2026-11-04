@@ -26,17 +26,18 @@ case $- in *i*)
     return 1
   fi
   bash scripts/ate-api.sh || return 1
-  export ATE_API_ADDR=localhost:8443 \
+  export ATE_API_ADDR="localhost:${ATE_API_LOCAL_PORT:-8443}" \
     ATE_TOKEN_FILE="${WORKSHOP_STATE_DIR:-$PWD/.workshop}/ate-token" \
     ATE_CA_FILE="${WORKSHOP_STATE_DIR:-$PWD/.workshop}/ate-ca.pem"
   return 0 ;;
 esac
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 load_env
-port_forward ate-api ate-system svc/api 8443 443
+_ate_api_port="${ATE_API_LOCAL_PORT:-8443}"
+port_forward ate-api ate-system svc/api "$_ate_api_port" 443
 kubectl -n ate-system create token ate-client --audience api.ate-system.svc --duration 1h >"$STATE_DIR/ate-token"
 kubectl get clustertrustbundles -l podcert.ate.dev/canarying=live -o json \
   | jq -r '[.items[] | select(.spec.signerName == "servicedns.podcert.ate.dev/identity") | .spec.trustBundle] | join("\n")' \
   >"$STATE_DIR/ate-ca.pem"
 [[ -s "$STATE_DIR/ate-ca.pem" ]] || die "no live ClusterTrustBundle for servicedns.podcert.ate.dev/identity — is podcertcontroller running?"
-export ATE_API_ADDR=localhost:8443 ATE_TOKEN_FILE="$STATE_DIR/ate-token" ATE_CA_FILE="$STATE_DIR/ate-ca.pem"
+export ATE_API_ADDR="localhost:${_ate_api_port}" ATE_TOKEN_FILE="$STATE_DIR/ate-token" ATE_CA_FILE="$STATE_DIR/ate-ca.pem"

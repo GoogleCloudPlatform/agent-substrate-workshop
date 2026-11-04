@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"go.ate.dev/substrate/pkg/proto/ateapipb"
+	ateapipb "go.ate.dev/substrate/api/ateapi/v1"
 	"github.com/agent-substrate/workshop/app/internal/testutil"
 )
 

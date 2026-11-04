@@ -60,7 +60,7 @@ source scripts/env.sh    # workshop.env into this shell (bash or zsh): PROJECT_I
    kubectl ate get actor-template agent-vm-v1 -a workshop -o yaml | grep -A2 goldenTag   # repeat until set (~20s)
    ```
    `diff modules/04-make-it-an-agent/manifests/template.yaml.tmpl optional/I-microvm/template.yaml.tmpl`
-   shows everything that changed: in `v0.6.0`, the sandbox class is chosen on the `WorkerPool` (`sandboxClasses`), not on the `ActorTemplate`, so `template.yaml.tmpl` simply selects the microVM pool via `workerSelector`. `.workshop/substrate/demos/counter/counter-microvm-template.yaml.tmpl` is
+   shows everything that changed: in `v0.6.0`+, the sandbox class is chosen on the `WorkerPool` (`sandboxClasses`), not on the `ActorTemplate`, so `template.yaml.tmpl` simply selects the microVM pool via `workerSelector`. `.workshop/substrate/demos/counter/counter-microvm-template.yaml.tmpl` is
    substrate's own reference.
 4. Create an actor on `agent-vm-v1`, give it the same egress as `buddy`, and chat with it:
    ```bash

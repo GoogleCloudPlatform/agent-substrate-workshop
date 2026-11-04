@@ -31,7 +31,7 @@ import (
 
 type failing struct{}
 
-func (failing) Name() string { return "vertex" }
+func (failing) Name() string { return "gemini" }
 func (failing) Generate(context.Context, []chatapi.Message) (Result, error) {
 	return Result{}, errors.New("permission denied on aiplatform.endpoints.predict")
 }
@@ -56,16 +56,16 @@ func TestMockCountsUserTurns(t *testing.T) {
 
 func TestSelect(t *testing.T) {
 	called := false
-	vertex := func() (Backend, error) { called = true; return failing{}, nil }
-	if b := Select(true, vertex); b.Name() != "mock" || called {
-		t.Errorf("mock=true: got %s, vertex called=%v", b.Name(), called)
+	gemini := func() (Backend, error) { called = true; return failing{}, nil }
+	if b := Select(true, gemini); b.Name() != "mock" || called {
+		t.Errorf("mock=true: got %s, gemini called=%v", b.Name(), called)
 	}
-	if b := Select(false, vertex); b.Name() != "vertex" {
+	if b := Select(false, gemini); b.Name() != "gemini" {
 		t.Errorf("mock=false: got %s", b.Name())
 	}
 	broken := func() (Backend, error) { return nil, errors.New("no credentials") }
 	if b := Select(false, broken); b.Name() != "mock-fallback" {
-		t.Errorf("vertex init failure: got %s", b.Name())
+		t.Errorf("gemini init failure: got %s", b.Name())
 	}
 }
 
@@ -96,38 +96,38 @@ func TestHandlerBackendErrorIs502(t *testing.T) {
 		t.Fatalf("handler = %d %v", code, out)
 	}
 	if n := promtest.CollectAndCount(m.ModelDuration); n != 1 {
-		t.Errorf("want one (vertex,error) duration series, got %d", n)
+		t.Errorf("want one (gemini,error) duration series, got %d", n)
 	}
 }
 
 type answering struct{}
 
-func (answering) Name() string { return "vertex" }
+func (answering) Name() string { return "gemini" }
 func (answering) Generate(context.Context, []chatapi.Message) (Result, error) {
 	return Result{Reply: "from gemini", InputTokens: 3, OutputTokens: 4}, nil
 }
 
-func TestVertexErrorFallsBackToMockPerRequest(t *testing.T) {
+func TestGeminiErrorFallsBackToMockPerRequest(t *testing.T) {
 	m := metrics.New()
 	b := Select(false, func() (Backend, error) { return failing{}, nil })
 	code, out := post(t, Handler(b, m), `{"messages":[{"role":"user","content":"hi"}]}`)
 	if code != http.StatusOK || out["backend"] != "mock-fallback" || !strings.Contains(out["reply"].(string), `"hi"`) {
 		t.Fatalf("handler = %d %v", code, out)
 	}
-	if up, _ := out["upstreamError"].(string); !strings.Contains(up, "vertex: permission denied") {
+	if up, _ := out["upstreamError"].(string); !strings.Contains(up, "gemini: permission denied") {
 		t.Errorf("upstreamError = %q", up)
 	}
-	// One (vertex,error) and one (mock-fallback,ok) duration series.
+	// One (gemini,error) and one (mock-fallback,ok) duration series.
 	if n := promtest.CollectAndCount(m.ModelDuration); n != 2 {
 		t.Errorf("duration series = %d, want 2", n)
 	}
 }
 
-func TestVertexSuccessStaysOnVertex(t *testing.T) {
+func TestGeminiSuccessStaysOnGemini(t *testing.T) {
 	m := metrics.New()
 	b := Select(false, func() (Backend, error) { return answering{}, nil })
 	code, out := post(t, Handler(b, m), `{"messages":[{"role":"user","content":"hi"}]}`)
-	if code != http.StatusOK || out["backend"] != "vertex" || out["reply"] != "from gemini" {
+	if code != http.StatusOK || out["backend"] != "gemini" || out["reply"] != "from gemini" {
 		t.Fatalf("handler = %d %v", code, out)
 	}
 	if _, ok := out["upstreamError"]; ok {
@@ -142,5 +142,12 @@ func TestToContentsMapsRoles(t *testing.T) {
 	got := toContents([]chatapi.Message{{Role: "user", Content: "q"}, {Role: "assistant", Content: "a"}})
 	if len(got) != 2 || got[0].Role != genai.RoleUser || got[1].Role != genai.RoleModel || got[1].Parts[0].Text != "a" {
 		t.Fatalf("contents = %+v", got)
+	}
+}
+
+func TestNewGeminiNeedsEnterpriseEnv(t *testing.T) {
+	t.Setenv("GOOGLE_GENAI_USE_ENTERPRISE", "")
+	if _, err := NewGemini(context.Background(), "p", "m"); err == nil || !strings.Contains(err.Error(), "GOOGLE_GENAI_USE_ENTERPRISE=true") {
+		t.Fatalf("err = %v, want one naming GOOGLE_GENAI_USE_ENTERPRISE=true", err)
 	}
 }

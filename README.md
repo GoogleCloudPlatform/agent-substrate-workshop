@@ -5,7 +5,7 @@ starting from a bare GKE cluster. In about 85 minutes, you:
 
 - Install Substrate and learn what each of its components does.
 - Build a Go agent, run it as a Substrate **actor**, and suspend and resume it across workers.
-- Connect the agent to a model (Vertex AI Gemini) through an always-on gateway, and lock down its egress.
+- Connect the agent to a model (Gemini on the Gemini platform) through an always-on gateway, and lock down its egress.
 - Run 20 agents on 2 workers with request parking and idle suspend.
 - Monitor the fleet in Prometheus and Google Cloud console dashboards.
 
@@ -36,8 +36,9 @@ doesn't break an earlier one (see [Wrap-up](modules/07-wrap-up/README.md#keep-go
 - A Google Cloud project where you have the **Owner** role, with a GKE **1.37+** cluster that has Workload Identity, managed
   OpenTelemetry, Managed Service for Prometheus, no node auto-upgrade, no spot nodes, and 2× `c3-standard-4` nodes. `make preflight`
   verifies all of these settings.
-- Local tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst`, `nc`, `curl`, `git`, `python3`, and a running
-  Docker daemon with `buildx`. Cloud Shell includes all of these tools.
+- Local tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst`, `curl`, `git`, `python3`, and, only to
+  build Substrate from source, a running Docker daemon with `buildx`. Cloud Shell includes all of these tools except `ko`
+  (`go install github.com/google/ko@latest`).
 - Familiarity with Kubernetes. You don't need prior Substrate knowledge.
 
 For comparison, [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) solves a
@@ -79,6 +80,21 @@ validated for the next event. This workshop requires GKE 1.37 or later, and `mak
 ## Clean up
 `make teardown` deletes the workshop's atespace, namespace, dashboards (the workshop dashboard and Substrate's three dashboards), and snapshots, while keeping your cluster,
 bucket, and Artifact Registry repository. It prompts for confirmation unless you set `YES=1`. Running `YES=1 scripts/teardown.sh --all`
-also deletes the bucket, the Artifact Registry repository, and the
-project IAM bindings that `make gcp` created for the workshop namespace, but never deletes
+also deletes the bucket, the Artifact Registry repository, the
+project IAM bindings that `make gcp` created for the workshop namespace, and the snapshot transfer service account, but never deletes
 the GKE cluster. See [Wrap-up](modules/07-wrap-up/README.md#clean-up) for details.
+
+If the project exists only for this workshop, deleting the project is the simplest complete cleanup. Otherwise, run
+`make teardown ALL=1`, and then run `make delete-cluster`, which deletes the cluster's PersistentVolumeClaims first so their
+disks (including Substrate's Postgres volume) don't outlive the cluster. At an instructor-led event, check with your
+instructor before you delete a cluster that they provisioned.
+
+## License and Disclaimers
+
+This project is licensed under the Apache License, Version 2.0 — see [LICENSE](LICENSE) for details and [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+
+This project is intended for demonstration purposes only. It is not intended for use in a production environment.
+
+Use of Google Cloud services in this workshop is subject to the [Google Cloud Terms of Service](https://cloud.google.com/terms) and the [Google Cloud Service Specific Terms](https://cloud.google.com/terms/service-terms).
+
+Eligibility for the [Google Open Source Software Vulnerability Rewards Program](https://bughunters.google.com/open-source-security) is determined by the [Google Open Source Software Vulnerability Reward Program Rules](https://bughunters.google.com/about/rules/open-source/google-open-source-software-vulnerability-reward-program-rules).

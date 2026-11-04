@@ -61,7 +61,10 @@ doesn't affect an earlier one:
 | [J — Egress credential injection](../../optional/J-credential-injection/README.md) | Use `ate-secret://` rules so the egress proxy injects credentials without exposing them to actors. | Adds a `workshop-secrets` namespace and grants `workshop` access in `k8s-credential-provider-namespace-policy` |
 
 ## Clean up
+If the project exists only for this workshop, deleting the project is the simplest complete cleanup. Otherwise:
 ```bash
 make teardown          # deletes workshop resources; keeps the cluster, bucket, and Artifact Registry repository
-YES=1 scripts/teardown.sh --all   # also deletes the bucket, Artifact Registry repository, and IAM bindings
+YES=1 scripts/teardown.sh --all   # also deletes the bucket, Artifact Registry repository, IAM bindings, and snapshot transfer service account
+make delete-cluster    # deletes the cluster's PersistentVolumeClaims (and their disks) first, then deletes the cluster
 ```
+At an instructor-led event, check with your instructor before you delete a cluster that they provisioned.

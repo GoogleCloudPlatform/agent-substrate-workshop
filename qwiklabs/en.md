@@ -20,7 +20,7 @@ starting from a bare GKE cluster. In about 85 minutes, you:
 
 - Install Substrate and learn what each of its components does.
 - Build a Go agent, run it as a Substrate **actor**, and suspend and resume it across workers.
-- Connect the agent to a model (Vertex AI Gemini) through an always-on gateway, and lock down its egress.
+- Connect the agent to a model (Gemini on the Gemini platform) through an always-on gateway, and lock down its egress.
 - Run 20 agents on 2 workers with request parking and idle suspend.
 - Monitor the fleet in Prometheus and Google Cloud console dashboards.
 
@@ -41,13 +41,17 @@ and start the Substrate installation in the background. The installation runs wh
 - A Google Cloud project where you have the **Owner** role, and a GKE **1.37+** cluster in that project. The cluster requires Workload Identity,
   managed OpenTelemetry, Managed Service for Prometheus, no node auto-upgrade (or an active maintenance exclusion), and no spot nodes. Use the cluster that your instructor created, or create one in Step 3 below (see also the [Substrate Google Cloud guide](https://github.com/agent-substrate/substrate/tree/main/tools/setup-gcp)).
 - `kubectl` configured to point at that cluster (`kubectl config current-context`).
-- Locally installed tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `nc`, `curl`, `git`, `python3`,
-  and a running **Docker** daemon with `buildx` (the installation builds one Substrate image from a Dockerfile). Cloud Shell includes all of these tools.
+- Locally installed tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `curl`, `git`, `python3`.
+  You need a running **Docker** daemon with `buildx` only to build Substrate from source (empty `SUBSTRATE_IMAGE_REPO`).
+  Cloud Shell includes all of these tools except `ko`: run `go install github.com/google/ko@latest`.
 
 ### Steps
 
 1. **Activate Cloud Shell.** Open the Google Cloud console and click **Activate Cloud Shell** in the top-right
-   toolbar to launch Cloud Shell — a self-contained VM in your browser with all the required tools pre-installed — and run all the commands in this lab from there.
+   toolbar to launch Cloud Shell — a self-contained VM in your browser with all the required tools except `ko` — and run all the commands in this lab from there. Install `ko` first:
+   ```bash
+   go install github.com/google/ko@latest
+   ```
 2. **Clone the workshop repository.** Clone the repository and move into its root directory:
    ```bash
    git clone https://github.com/moficodes/workshop
@@ -86,7 +90,7 @@ and start the Substrate installation in the background. The installation runs wh
    ```bash
    gcloud container clusters list --project YOUR_PROJECT_ID    # NAME and LOCATION
    cp workshop.env.example workshop.env
-   $EDITOR workshop.env
+   ${EDITOR:-nano} workshop.env
    ```
 5. **Run preflight checks.** Verify your local tools and the cluster's version, Workload Identity, managed OpenTelemetry,
    and node pool settings. Fix any issues that the script flags before you continue.
@@ -108,7 +112,7 @@ and start the Substrate installation in the background. The installation runs wh
    This setting applies only to your current terminal session. To persist it, add the same line with the absolute repository path instead of `$PWD` to
    `~/.zshrc` or `~/.bashrc`. If you use direnv, add `PATH_add bin` to an `.envrc` file at the repository root.
 8. **Start the installation in the background.** This target clones Substrate at `SUBSTRATE_REF`, builds `kubectl ate`,
-   deploys `ate-system`, pins a worker image that matches the control plane, labels your nodes, and
+   deploys `ate-system`, pins a worker image that matches the control plane, and
    increases the router's parked-request budget and shutdown grace period.
    ```bash
    make install-bg
@@ -260,7 +264,7 @@ an actor, and send requests to it through the router.
    kubectl ate create atespace workshop
    ```
 4. **Create an ActorTemplate.** Inspect `modules/02-hello-actor/manifests/template.yaml.tmpl`: it defines the container image, a readiness
-   probe, the snapshot fidelity (`preferredFidelity`), the Cloud Storage location, resource limits (`cpuMillicores`, `memoryBytes`), and one durable directory.
+   probe, the snapshot fidelity (`preferredFidelity`), resource limits (`cpuMillicores`, `memoryBytes`), and one durable directory.
    ```bash
    scripts/render.sh modules/02-hello-actor/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
    kubectl ate get actor-template agent-v1 -a workshop            # repeat until GOLDEN TAG appears
@@ -357,8 +361,9 @@ with **VOLUMES** fidelity (`SNAPSHOT_FIDELITY_VOLUMES`): Substrate saves only th
    kubectl ate get actor-template agent-v2 -a workshop -o yaml | grep -A2 goldenTag   # repeat until set
    kubectl ate create actor memo --template=agent-v2 -a workshop
    ```
-6. Follow the actor's logs in a second terminal. The log stream follows the actor across workers and restarts:
+6. Follow the actor's logs in a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`). The log stream follows the actor across workers and restarts:
    ```bash
+   source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
    kubectl ate logs actor memo -a workshop -f
    ```
    Most of the output comes from gVisor's runtime logging (`I…` and `W…` lines from `cli.go`,
@@ -408,23 +413,23 @@ model access, and a deny-by-default **egress policy** lets the actor reach the g
 
 ### Why use a gateway?
 - **Template environment variables are literal and baked into every snapshot.** If you put an API key in a template, Substrate writes it to Cloud Storage and includes it in every clone.
-- Actors don't receive a Kubernetes ServiceAccount token. The gateway does, so it uses **Workload Identity** to call Vertex AI.
+- Actors don't receive a Kubernetes ServiceAccount token. The gateway does, so it uses **Workload Identity** to call Gemini.
 - The gateway is always on and lightweight. Actors are the resource-intensive, suspendable part. This split between
   **presence** (always on) and **cognition** (suspendable) is the core pattern behind production agent systems on Substrate.
 
 ### Steps
 
-1. **Deploy the gateway.** The gateway serves `/v1/model` (calling Vertex AI Gemini, or returning a mock response if `MOCK_LLM=true` or
-   Vertex AI fails) and `/chat/{actor}`, which forwards requests to the router with the `ate-target-actor` header set.
+1. **Deploy the gateway.** The gateway serves `/v1/model` (calling Gemini, or returning a mock response if `MOCK_LLM=true` or
+   the Gemini call fails) and `/chat/{actor}`, which forwards requests to the router with the `ate-target-actor` header set.
    ```bash
    make gateway
    make forward-gateway            # port-forwards the gateway to http://localhost:8081
    curl -s localhost:8081/v1/model -d '{"messages":[{"role":"user","content":"Say hi in five words"}]}' | jq
    ```
-   `backend` shows which model answered. If a Vertex AI call fails (for example, with a `403` error while the Workload Identity
+   `backend` shows which model answered (`gemini`). If a Gemini call fails (for example, with a `403` error while the Workload Identity
    binding propagates), the gateway answers that request from a mock fallback instead: `backend` is `mock-fallback`
-   and `upstreamError` reports what Vertex AI returned. As a result, the `502` response from the agent in step 3 comes from
-   egress blocking, not Vertex AI.
+   and `upstreamError` reports what the platform returned. As a result, the `502` response from the agent in step 3 comes from
+   egress blocking, not the model.
 2. **Free a worker, then configure the agent to call the model.** Suspend `memo` so that the new template's golden-snapshot
    actor has a free worker. In `app/cmd/agent/main.go`, find `WORKSHOP(module-4)` and set `ModelURL: os.Getenv("MODEL_URL")`.
    ```bash
@@ -472,7 +477,7 @@ model access, and a deny-by-default **egress policy** lets the actor reach the g
    Even if the model's first reply claims that it can't remember across
    conversations, the agent sends the full conversation history with every turn, as the response to "What is my name?" confirms.
 
-### If Vertex AI isn't available
+### If the model isn't available
 Run `MOCK_LLM=true make gateway`, or update the running Deployment with `kubectl -n workshop set env deploy/gateway MOCK_LLM=true`.
 Everything else in the workshop behaves the same. Once the gateway is running, `make gateway` and `make catch-up`
 preserve its live `MOCK_LLM` value (`workshop.env` sets only the initial deployment); run `MOCK_LLM=false make gateway` to switch back.
@@ -626,13 +631,14 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    ```bash
    cat observability/podmonitoring.yaml
    make observe
-   make prometheus-ui          # opens http://localhost:9090
+   make prometheus-ui          # opens http://localhost:9090 (in Cloud Shell: Web Preview > Change port > 9090)
    ```
-2. **Generate traffic.** In a second terminal, send bursty chat traffic across the swarm for 3 minutes:
+2. **Generate traffic.** In a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`), send bursty chat traffic across the swarm for 3 minutes:
    ```bash
+   source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
    make load
    ```
-3. **Run queries in the Prometheus UI** (`http://localhost:9090` → **Graph**). Copy each query from
+3. **Run queries in the Prometheus UI** (`http://localhost:9090` → **Graph**, or Web Preview `:9090` in Cloud Shell). Copy each query from
    [observability/queries.md](observability/queries.md) (if your `CLUSTER_NAME` in `workshop.env` isn't
    `ate-cluster`, replace `cluster="ate-cluster"` to match):
    - **How many workers are busy vs. idle?** `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="agents", cluster="ate-cluster"})`
@@ -657,6 +663,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    ```
    In a second terminal, resume `buddy` and record its worker Pod name:
    ```bash
+   source scripts/env.sh     # if this is a fresh terminal, from the repo root: puts bin/ (kubectl ate) on PATH
    kubectl ate resume actor buddy -a workshop
    FIRST=$(kubectl ate get actor buddy -a workshop -o json | jq -r .status.workerAssignment.workerPod)
    echo "$FIRST"
@@ -754,7 +761,10 @@ actor checkpoints memory so it can resume on any worker. See the "Architecture t
 - Substrate evolves quickly. Pin `SUBSTRATE_REF` and rebuild worker images alongside the control plane.
 
 ### Clean up
+If the project exists only for this workshop, deleting the project is the simplest complete cleanup. Otherwise:
 ```bash
 make teardown          # deletes workshop resources; keeps the cluster, bucket, and Artifact Registry repository
-YES=1 scripts/teardown.sh --all   # also deletes the bucket, Artifact Registry repository, and IAM bindings
+YES=1 scripts/teardown.sh --all   # also deletes the bucket, Artifact Registry repository, IAM bindings, and snapshot transfer service account
+make delete-cluster    # deletes the cluster's PersistentVolumeClaims (and their disks) first, then deletes the cluster
 ```
+At an instructor-led event, check with your instructor before you delete a cluster that they provisioned.

@@ -42,6 +42,10 @@ t_user_has_ate() {
     (WORKSHOP_USER_PATH="/usr/bin:$REPO_ROOT/bin/" user_has_ate) &&
     [[ "$(WORKSHOP_USER_PATH=/usr/bin path_hint 2>&1)" == *"export PATH=\"$REPO_ROOT/bin:"* ]]
 }
+t_open_hint() {
+  [[ "$(CLOUD_SHELL=true open_hint 9090)" == *"Web Preview"*"9090"* ]] &&
+    [[ "$(CLOUD_SHELL='' open_hint 9090)" == "open http://localhost:9090" ]]
+}
 t_state_roundtrip() { state_put agent-image "r/agent@sha256:abc" && [[ "$(state_get agent-image)" == "r/agent@sha256:abc" ]]; }
 t_require_state_names_target() {
   local out; out="$( (require_state gateway-image "make gateway") 2>&1 )"
@@ -94,7 +98,8 @@ t_load_env_cluster_vars() {
   [[ "$(unset CLUSTER_NAME CLUSTER_LOCATION; WORKSHOP_ENV_FILE="$o" load_env
        bash -c 'echo "$CLUSTER_NAME/$CLUSTER_LOCATION"')" == "c2/europe-west1" ]]
 }
-# gateway.sh against a stub kubectl whose live Deployment has MOCK_LLM=$LIVE_MOCK; prints the applied MOCK_LLM.
+# gateway.sh against a stub kubectl whose live Deployment has MOCK_LLM=$LIVE_MOCK; prints the applied MOCK_LLM
+# (or the env var named by SHOW).
 run_gateway_sh() {
   local d; d="$(mktemp -d "$TMP/t.XXXXXX")"; mkdir -p "$d/bin" "$d/state"
   cat >"$d/bin/kubectl" <<'STUB'
@@ -112,12 +117,35 @@ STUB
   printf 'PROJECT_ID=p\nMOCK_LLM=false\n' >"$d/env"
   env -u MOCK_LLM -u WORKSHOP_MOCK_LLM_OVERRIDE PATH="$d/bin:$PATH" WORKSHOP_ENV_FILE="$d/env" \
     WORKSHOP_STATE_DIR="$d/state" APPLIED="$d/applied" "$@" bash "$HERE/../gateway.sh" >/dev/null 2>&1 || return 1
-  grep -A1 'name: MOCK_LLM' "$d/applied" | sed -n 's/.*value: "\([a-z]*\)".*/\1/p' | head -n1
+  grep -A1 "name: ${SHOW:-MOCK_LLM}" "$d/applied" | sed -n 's/.*value: "\([a-z]*\)".*/\1/p' | head -n1
 }
 t_gateway_keeps_live_mock_llm() {
   [[ "$(run_gateway_sh LIVE_MOCK=true)" == true ]] &&     # live beats workshop.env
     [[ "$(run_gateway_sh LIVE_MOCK=)" == false ]] &&      # no gateway yet: workshop.env
     [[ "$(run_gateway_sh LIVE_MOCK=true MOCK_LLM=false)" == false ]]   # command line beats live
+}
+t_gateway_sets_gemini_env() {
+  [[ "$(SHOW=GOOGLE_GENAI_USE_ENTERPRISE run_gateway_sh LIVE_MOCK=)" == true ]] &&
+    [[ "$(SHOW=GOOGLE_CLOUD_LOCATION run_gateway_sh LIVE_MOCK=)" == global ]]
+}
+t_gateway_warns_on_legacy_model_env() {
+  local d; d="$(mktemp -d "$TMP/t.XXXXXX")"; mkdir -p "$d/bin" "$d/state"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$d/bin/kubectl"; chmod +x "$d/bin/kubectl"
+  echo "r/gw@sha256:abc" >"$d/state/gateway-image"
+  printf 'PROJECT_ID=p\nGEMINI_MODEL=gemini-2.5-flash\n' >"$d/env"
+  [[ "$(PATH="$d/bin:$PATH" WORKSHOP_ENV_FILE="$d/env" WORKSHOP_STATE_DIR="$d/state" bash "$HERE/../gateway.sh" 2>&1)" == *"GEMINI_MODEL=gemini-3.8-flash"* ]]
+}
+# build.sh against a stub ko that always returns the same digest.
+build_agent_stub() {
+  PATH="$1/bin:$PATH" WORKSHOP_ENV_FILE="$1/env" WORKSHOP_STATE_DIR="$1/state" bash "$HERE/../build.sh" agent "${@:2}" 2>&1
+}
+t_build_warns_when_unchanged() {
+  local d; d="$(mktemp -d "$TMP/t.XXXXXX")"; mkdir -p "$d/bin" "$d/state"
+  printf '#!/usr/bin/env bash\necho "r/agent@sha256:abc"\n' >"$d/bin/ko"; chmod +x "$d/bin/ko"
+  printf 'PROJECT_ID=p\nKO_DOCKER_REPO=r\n' >"$d/env"
+  [[ "$(build_agent_stub "$d" --check-changed)" != *"same as your last"* ]] &&            # first build
+    [[ "$(build_agent_stub "$d" --check-changed)" == *"same as your last agent build"* ]] &&
+    [[ "$(build_agent_stub "$d")" != *"same as your last"* ]]                              # no flag (catch-up): quiet
 }
 t_stop_port_forward_stops_one() {
   sleep 30 & local a=$!; sleep 30 & local b=$!
@@ -292,6 +320,16 @@ t_env_sh_missing_file_returns() {
     [[ "$(WORKSHOP_ENV_FILE="$TMP/nope.env" interactive "$sh" "${flags[@]}" 'source scripts/env.sh; echo "alive rc=$?"')" == "alive rc=1" ]] || return 1
   done
 }
+t_env_sh_puts_bin_on_path() {
+  # Start from your shell's own PATH (lib.sh already put bin/ on this one). Sourcing twice adds bin/ once, first.
+  local sh want="1|$ROOT_DIR/bin"
+  for sh in bash zsh; do
+    command -v "$sh" >/dev/null || continue
+    local flags=(-i -c); [[ $sh == bash ]] && flags=(--norc -i -c)
+    [[ "$(PATH="$WORKSHOP_USER_PATH" interactive "$sh" "${flags[@]}" 'source scripts/env.sh; source scripts/env.sh
+      printf "%s|%s" "$(printf "%s\n" "$PATH" | tr ":" "\n" | grep -cx "$REPO_ROOT/bin")" "${PATH%%:*}"')" == "$want" ]] || return 1
+  done
+}
 
 # make install-status: running / finished / died / never started, from the pid file and the marker.
 install_status() { WORKSHOP_STATE_DIR="$1" bash "$HERE/../install-bg.sh" --status 2>&1; }
@@ -306,11 +344,18 @@ t_install_status_states() {
   sleep 1; echo "2026-01-01T00:00:00Z SUBSTRATE_REF=v0" >"$d/install-complete"
   [[ "$(install_status "$d")" == *"install finished: 2026-01-01T00:00:00Z"* ]]
 }
+t_install_status_disk_full() {
+  local d="$TMP/full"; rm -rf "$d"; mkdir -p "$d"
+  echo "ERROR: mkdir /home/u/.docker/buildx: no space left on device" >"$d/install.log"
+  echo 1 >"$d/install.pid"   # pid 1 is never install-substrate.sh, so the install counts as dead
+  [[ "$(install_status "$d")" == *"ran out of disk space"*"make install-bg"* ]]
+}
 
 load_env
 check "load_env expands references" t_load_env_expands
 check "load_env requires PROJECT_ID" t_load_env_requires_project
 check "user_has_ate checks the caller's PATH" t_user_has_ate
+check "open_hint points Cloud Shell at Web Preview" t_open_hint
 check "state roundtrip" t_state_roundtrip
 check "require_state names the make target" t_require_state_names_target
 check "render substitutes only listed vars" t_render_only_listed_vars
@@ -322,6 +367,9 @@ check "port_forward reuses live forward" t_port_forward_reuses_live
 check "load_env: command-line MOCK_LLM beats workshop.env" t_load_env_mock_llm_override
 check "load_env exports CLUSTER_NAME/CLUSTER_LOCATION (legacy names too)" t_load_env_cluster_vars
 check "gateway.sh keeps a live MOCK_LLM unless one is passed" t_gateway_keeps_live_mock_llm
+check "gateway.sh sets the Gemini Enterprise Agent Platform env (global by default)" t_gateway_sets_gemini_env
+check "gateway.sh warns when workshop.env still sets gemini-2.5-flash" t_gateway_warns_on_legacy_model_env
+check "build.sh --check-changed warns when the image didn't change" t_build_warns_when_unchanged
 check "stop_port_forward stops only the named forward" t_stop_port_forward_stops_one
 check "gateway_chat prints body then status code" t_gateway_chat_prints_body_then_status
 check "actor_state strips ACTOR_STATE_ prefix" t_actor_state_strips_prefix
@@ -334,7 +382,9 @@ check "reset_template deletes its actors, then the template (idempotent)" t_rese
 check "make help lists every target" t_make_help_lists_every_target
 check "make teardown ALL=1 passes --all" t_make_teardown_all_passes_flag
 check "install-status tells running, finished, died, and never started apart" t_install_status_states
+check "install-status points a disk-full install at the fix" t_install_status_disk_full
 check "lib.sh refuses an interactive shell instead of taking it over" t_lib_refuses_interactive_shell
 check "env.sh loads workshop.env in bash/zsh without strict mode" t_env_sh_loads_without_strict_mode
 check "env.sh returns (not exits) when workshop.env is missing" t_env_sh_missing_file_returns
+check "env.sh puts bin/ on PATH once, in bash and zsh" t_env_sh_puts_bin_on_path
 exit "$fails"

@@ -14,7 +14,7 @@
 
 # ActorTemplate agent-vm-v1 (optional lab I): Module 4's agent-v3 under the microVM sandbox class.
 # Diff it against modules/04-make-it-an-agent/manifests/template.yaml.tmpl: the name, the workerSelector
-# (the agents-vm pool, which runs ateworker-microvm), the storage path, and a longer wakeupProbe timeout
+# (the agents-vm pool, which runs ateworker-microvm), and a longer wakeupProbe timeout
 # (a VM guest boots slower than gVisor on the golden run; substrate's demos/counter microVM template uses 120s too).
 metadata:
   atespace: ${ATESPACE}
@@ -40,7 +40,6 @@ resources:
     memoryBytes: 536870912
 snapshotConfig:
   preferredFidelity: SNAPSHOT_FIDELITY_MEMORY
-  storageLocation: gs://${BUCKET_NAME}/${ATESPACE}/agent-vm-v1/
 volumes:
 - name: data
   durableDir: {}

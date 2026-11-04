@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.ate.dev/substrate/pkg/proto/ateapipb"
+	ateapipb "go.ate.dev/substrate/api/ateapi/v1"
 	"github.com/agent-substrate/workshop/app/internal/ateclient"
 	"github.com/agent-substrate/workshop/app/internal/testutil"
 	"google.golang.org/protobuf/encoding/protojson"
