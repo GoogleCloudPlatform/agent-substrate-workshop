@@ -11,17 +11,18 @@ Workshop documentation is maintained in **three places** that must always be kep
    - `modules/00-setup/README.md` through `modules/07-wrap-up/README.md`: Individual READMEs for the 8 core workshop sections, alongside each module's `manifests/` and `solution/`.
    - `optional/A-env/README.md` through `optional/J-credential-injection/README.md`: Individual READMEs and supporting files for the 10 optional post-workshop labs.
 2. **Codelabs edition ([`codelabs/en.md`](codelabs/en.md))**:
-   - A single consolidated Markdown file formatted for Google Codelabs (`claat`), containing the introduction, all 8 core modules in order, and all 10 optional labs under a trailing `## Appendix: Optional content` section.
-3. **Qwiklabs edition ([`qwiklabs/en.md`](qwiklabs/en.md))**:
-   - A single consolidated Markdown file formatted identically to [`codelabs/en.md`](codelabs/en.md) for the introduction and all 8 core modules, **without** the trailing `## Appendix: Optional content` section or any references/links to optional labs.
+   - A single consolidated Markdown file formatted for Google Codelabs (`claat`), containing the `claat` YAML frontmatter, introduction, all 8 core modules in order (with `Duration: MM:SS` metadata), and all 10 optional labs under a trailing `## Appendix: Optional content` section.
+3. **Qwiklabs edition ([`qwiklabs/en.md`](codelabs/en.md))**:
+   - A single consolidated Markdown file for Qwiklabs containing the introduction and all 8 core modules, **without** the `claat` YAML frontmatter, `Duration: MM:SS` lines, the trailing `## Appendix: Optional content` section, or any references/links to optional labs.
 
 ### Rules when editing workshop content
 
 Whenever you add, edit, or remove instructions, commands, explanations, or diagrams in the lab, **apply the change to the modular files (`modules/`, `optional/`, `README.md`), [`codelabs/en.md`](codelabs/en.md), and [`qwiklabs/en.md`](qwiklabs/en.md)** (for core module and introduction changes) while preserving the conventions below:
 
-- **Section headers & `Duration` metadata**:
+- **Frontmatter, section headers & `Duration` metadata**:
   - In `modules/NN-*/README.md`, the title is an H1 with timing in parentheses, e.g. `# Setup (10 min)`, and subsections start at H2 (`##`).
-  - In [`codelabs/en.md`](codelabs/en.md) and [`qwiklabs/en.md`](qwiklabs/en.md), each core module is a top-level step using an H2 (`## Setup`) followed immediately by `Duration: MM:SS` (e.g. `Duration: 10:00`), and subsections shift down one level (`###`, `####`).
+  - In [`codelabs/en.md`](codelabs/en.md), the file starts with `claat` YAML frontmatter (`--- id: ... ---`), each core module is a top-level step using an H2 (`## Setup`) followed immediately by `Duration: MM:SS` (e.g. `Duration: 10:00`), and subsections shift down one level (`###`, `####`).
+  - In [`qwiklabs/en.md`](qwiklabs/en.md), **omit** the YAML frontmatter (start directly at `# Title`) and **omit** `Duration: MM:SS` lines under `##` headers (Qwiklabs does not parse `claat` duration lines and renders them as literal text). Top-level sections still use H2 (`## Setup`) with subsections at `###` / `####`.
   - All optional labs in [`codelabs/en.md`](codelabs/en.md) live inside a single Codelab step (`## Appendix: Optional content`). Inside the appendix, each optional lab's title is an H3 (`### Optional lab A — ...`) and its subsections shift down two levels (`####`, `#####`) compared to `optional/*-*/README.md`. [`qwiklabs/en.md`](qwiklabs/en.md) omits this appendix altogether.
 - **Image references & assets**:
   - Module READMEs reference diagrams as `![...](../img/NN-*.svg)` (stored in `modules/img/`).
@@ -29,11 +30,12 @@ Whenever you add, edit, or remove instructions, commands, explanations, or diagr
   - If you add or modify an image in `modules/img/`, update the copies in `codelabs/img/` and `qwiklabs/img/` as well.
 - **Links & navigation**:
   - Module READMEs end with a `Next: [...]` navigation line; **omit** these `Next:` lines in [`codelabs/en.md`](codelabs/en.md) and [`qwiklabs/en.md`](qwiklabs/en.md) for core modules (Codelabs and Qwiklabs provide their own step navigation).
-  - Adjust relative paths for the file depth: links like `../../instructor/troubleshooting.md` in `modules/NN-*/README.md` become `instructor/troubleshooting.md` in [`codelabs/en.md`](codelabs/en.md) and [`qwiklabs/en.md`](qwiklabs/en.md).
+  - In [`codelabs/en.md`](codelabs/en.md), adjust relative paths for the file depth (e.g. `../../instructor/troubleshooting.md` in `modules/NN-*/README.md` becomes `instructor/troubleshooting.md`). In [`qwiklabs/en.md`](qwiklabs/en.md), use full GitHub URLs (`https://github.com/moficodes/workshop/blob/main/...`) instead of relative links to repository files outside `qwiklabs/`, because Qwiklabs only bundles `qwiklabs/en.md` and `qwiklabs/img/`.
   - Cross-references to optional labs inside [`codelabs/en.md`](codelabs/en.md) use the Codelab step anchor `(#9)` (the step index for `## Appendix: Optional content`) instead of relative links to `optional/*/README.md`.
   - In [`qwiklabs/en.md`](qwiklabs/en.md), **omit all references and links to optional labs** (including parenthetical callouts such as `(optional lab J)` or `(see optional lab G)`, the `### Keep going: optional labs` subsection in `Wrap-up`, and the `## Appendix: Optional content` step).
 - **Intentional Codelabs/Qwiklabs-specific differences**:
   - `## Introduction` in [`codelabs/en.md`](codelabs/en.md) and [`qwiklabs/en.md`](qwiklabs/en.md) is a condensed version of [`README.md`](README.md) (it omits the agenda table, quick start, and teardown sections that duplicate step navigation).
+  - In [`qwiklabs/en.md`](qwiklabs/en.md), `## Setup` uses Qwiklabs variable tags (`<ql-variable key="project_0.project_id" placeHolder="YOUR_PROJECT_ID"></ql-variable>` and `<ql-variable key="project_0.default_region" placeHolder="us-central1"></ql-variable>`) and `<ql-code-block bash templated noWrap>` (`{{{project_0.project_id | YOUR_PROJECT_ID }}}` and `{{{project_0.default_region | us-central1 }}}`) so project ID and region are automatically populated by the Qwiklabs environment.
 
 ---
 

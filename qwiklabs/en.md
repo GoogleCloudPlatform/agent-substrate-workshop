@@ -1,19 +1,6 @@
----
-id: agent-substrate
-summary: Build and operate your own fleet of AI agents on Agent Substrate, starting from a bare GKE cluster.
-authors: Mofi Rahman, Olivier Bourgeois
-categories: GKE, Vertex AI, Agent Substrate
-tags: GKE, Gemini, Agent Substrate
-feedback_link: https://github.com/googlecodelabs/feedback/issues/new?title=[agent-substrate]:&labels[]=content-platform&labels[]=cloud
-analytics_account: UA-66226300-1
-keywords: event:KubeConNA2026,docType:Codelab,skill:Intermediate,language:Python,category:Cloud,category:AiAndMachineLearning,product:GoogleKubernetesEngine,product:VertexAi
-
----
-
 # Untrusted Code on Secure Runtimes: Agent Substrate on Kubernetes
 
 ## Introduction
-Duration: 02:00
 
 In this workshop, you build and operate your own fleet of AI agents on [Agent Substrate](https://github.com/agent-substrate/substrate),
 starting from a bare GKE cluster. In about 85 minutes, you:
@@ -32,7 +19,6 @@ You build everything you deploy: the agent, the gateway, and (in source mode) Su
 - Familiarity with Kubernetes. You don't need prior Substrate knowledge.
 
 ## Setup
-Duration: 10:00
 
 The goal of this section is to point the workshop at your Google Cloud project, create the cloud resources that Substrate needs,
 and start the Substrate installation in the background. The installation runs while you take the architecture tour.
@@ -57,10 +43,11 @@ and start the Substrate installation in the background. The installation runs wh
    git clone https://github.com/moficodes/workshop
    cd workshop
    ```
-3. **Create a GKE cluster (if your instructor didn't pre-create one).** If your project already has a cluster (`gcloud container clusters list`), skip to Step 4. Otherwise, create a zonal GKE 1.37 cluster with Workload Identity, managed OpenTelemetry, Managed Service for Prometheus, and a 48-hour maintenance exclusion to block node auto-upgrades during the workshop:
-   ```bash
-   export PROJECT_ID="YOUR_PROJECT_ID"
-   export CLUSTER_LOCATION="us-central1-a"
+3. **Create a GKE cluster (if your instructor didn't pre-create one).** If your project (<ql-variable key="project_0.project_id" placeHolder="YOUR_PROJECT_ID"></ql-variable>) already has a cluster (`gcloud container clusters list`), skip to Step 4. Otherwise, create a zonal GKE 1.37 cluster in your assigned region (<ql-variable key="project_0.default_region" placeHolder="us-central1"></ql-variable>) with Workload Identity, managed OpenTelemetry, Managed Service for Prometheus, and a 48-hour maintenance exclusion to block node auto-upgrades during the workshop:
+   <ql-code-block bash templated noWrap>
+   export PROJECT_ID="{{{project_0.project_id | YOUR_PROJECT_ID }}}"
+   export REGION="{{{project_0.default_region | us-central1 }}}"
+   export CLUSTER_LOCATION="${REGION}-a"
    export CLUSTER_NAME="ate-cluster"
 
    gcloud services enable container.googleapis.com --project "$PROJECT_ID"
@@ -82,16 +69,16 @@ and start the Substrate installation in the background. The installation runs wh
      --add-maintenance-exclusion-start "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
      --add-maintenance-exclusion-end "$(date -u -d '+2 days' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+2d +%Y-%m-%dT%H:%M:%SZ)" \
      --add-maintenance-exclusion-scope no_minor_or_node_upgrades
-   ```
-4. **Configure the environment.** Copy the example environment file and set `PROJECT_ID` and `CLUSTER_LOCATION` to your cluster's exact zone or
+   </ql-code-block>
+4. **Configure the environment.** Copy the example environment file and set `PROJECT_ID` (<ql-variable key="project_0.project_id" placeHolder="YOUR_PROJECT_ID"></ql-variable>), `REGION` (<ql-variable key="project_0.default_region" placeHolder="us-central1"></ql-variable>), and `CLUSTER_LOCATION` to your cluster's exact zone or
    region from `gcloud container clusters list` (a zonal cluster such as `us-central1-a` won't match
    `us-central1`). If your cluster isn't named `ate-cluster`, set `CLUSTER_NAME` as well. Every other
    variable has a working default.
-   ```bash
-   gcloud container clusters list --project YOUR_PROJECT_ID    # NAME and LOCATION
+   <ql-code-block bash templated noWrap>
+   gcloud container clusters list --project {{{project_0.project_id | YOUR_PROJECT_ID }}}    # NAME and LOCATION
    cp workshop.env.example workshop.env
    ${EDITOR:-nano} workshop.env
-   ```
+   </ql-code-block>
 5. **Run preflight checks.** Verify your local tools and the cluster's version, Workload Identity, managed OpenTelemetry,
    and node pool settings. Fix any issues that the script flags before you continue.
    ```bash
@@ -142,10 +129,9 @@ make verify MODULE=0
 ```
 
 **Stuck?** Run `make catch-up MODULE=1` to run all of these steps in the foreground, and see
-[troubleshooting](instructor/troubleshooting.md).
+[troubleshooting](https://github.com/moficodes/workshop/blob/main/instructor/troubleshooting.md).
 
 ## Architecture tour
-Duration: 10:00
 
 The goal of this section is to learn what each piece of Agent Substrate does before you use it. You inspect
 the live system while the installation finishes (`make install-status`).
@@ -236,7 +222,6 @@ make verify MODULE=1
 **Stuck?** Run `make catch-up MODULE=2`.
 
 ## Hello actor
-Duration: 15:00
 
 The goal of this section is to build your agent image, give Substrate workers to run it, register a template, create
 an actor, and send requests to it through the router.
@@ -310,7 +295,6 @@ make verify MODULE=2
 **Stuck?** Run `make catch-up MODULE=3`. If `agent-v1` or its actors exist in a broken state, run `make catch-up MODULE=3 RESET=1` to delete and recreate them from the solution.
 
 ## Suspend and resume
-Duration: 12:00
 
 The goal of this section is to see what survives a suspend, where the snapshot goes, and how the router brings an actor back,
 possibly on a different worker.
@@ -404,7 +388,6 @@ make verify MODULE=3
 **Stuck?** Run `make catch-up MODULE=4`. If `agent-v2` or its actors exist in a broken state, run `make catch-up MODULE=4 RESET=1` to delete and recreate them from the solution.
 
 ## Make it an agent
-Duration: 13:00
 
 The goal of this section is to give the actor a model backend without giving it credentials. An always-on **gateway** holds the
 model access, and a deny-by-default **egress policy** lets the actor reach the gateway and nothing else.
@@ -501,7 +484,6 @@ make verify MODULE=4
 **Stuck?** Run `make catch-up MODULE=5`. If `agent-v3` or its actors exist in a broken state, run `make catch-up MODULE=5 RESET=1` to delete and recreate them from the solution.
 
 ## Density and idle
-Duration: 10:00
 
 The goal of this section is to run 20 agents on 2 workers, observe what happens when multiple actors need a worker at the same time, and add
 the one piece that Substrate leaves to your application: **deciding when an actor is idle**.
@@ -611,7 +593,6 @@ make verify MODULE=5
 **Stuck?** Run `make catch-up MODULE=6`.
 
 ## Observe the fleet
-Duration: 12:00
 
 The goal of this section is to answer "what is my fleet doing?" in three ways: live PromQL queries, Google Cloud console dashboards, and
 per-actor logs. You use both Substrate's built-in telemetry and your application's metrics.
@@ -639,7 +620,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    make load
    ```
 3. **Run queries in the Prometheus UI** (`http://localhost:9090` → **Graph**, or Web Preview `:9090` in Cloud Shell). Copy each query from
-   [observability/queries.md](observability/queries.md) (if your `CLUSTER_NAME` in `workshop.env` isn't
+   [observability/queries.md](https://github.com/moficodes/workshop/blob/main/observability/queries.md) (if your `CLUSTER_NAME` in `workshop.env` isn't
    `ate-cluster`, replace `cluster="ate-cluster"` to match):
    - **How many workers are busy vs. idle?** `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="agents", cluster="ate-cluster"})`
      (Use `max` rather than `sum` because each `ateapi` replica reports the entire pool.) A busy worker appears as `partial` rather than
@@ -719,7 +700,6 @@ make verify MODULE=6
 **Stuck?** Run `make catch-up MODULE=7`.
 
 ## Wrap-up
-Duration: 03:00
 
 The goal of this section is to review how the primitives you used map to real-world agent systems, cover the platform's current limits, and show how to clean up.
 
