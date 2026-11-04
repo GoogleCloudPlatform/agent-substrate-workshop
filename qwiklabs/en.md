@@ -40,8 +40,8 @@ and start the Substrate installation in the background. The installation runs wh
    ```
 2. **Clone the workshop repository.** Clone the repository and move into its root directory:
    ```bash
-   git clone https://github.com/moficodes/workshop
-   cd workshop
+   git clone https://github.com/GoogleCloudPlatform/agent-substrate-workshop
+   cd agent-substrate-workshop
    ```
 3. **Create a GKE cluster (if your instructor didn't pre-create one).** If your project (<ql-variable key="project_0.project_id" placeHolder="YOUR_PROJECT_ID"></ql-variable>) already has a cluster (`gcloud container clusters list`), skip to Step 4. Otherwise, create a zonal GKE 1.37 cluster in your assigned region (<ql-variable key="project_0.default_region" placeHolder="us-central1"></ql-variable>) with Workload Identity, managed OpenTelemetry, Managed Service for Prometheus, and a 48-hour maintenance exclusion to block node auto-upgrades during the workshop:
    <ql-code-block bash templated noWrap>
@@ -129,7 +129,7 @@ make verify MODULE=0
 ```
 
 **Stuck?** Run `make catch-up MODULE=1` to run all of these steps in the foreground, and see
-[troubleshooting](https://github.com/moficodes/workshop/blob/main/instructor/troubleshooting.md).
+[troubleshooting](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/instructor/troubleshooting.md).
 
 ## Architecture tour
 
@@ -620,7 +620,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    make load
    ```
 3. **Run queries in the Prometheus UI** (`http://localhost:9090` → **Graph**, or Web Preview `:9090` in Cloud Shell). Copy each query from
-   [observability/queries.md](https://github.com/moficodes/workshop/blob/main/observability/queries.md) (if your `CLUSTER_NAME` in `workshop.env` isn't
+   [observability/queries.md](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/observability/queries.md) (if your `CLUSTER_NAME` in `workshop.env` isn't
    `ate-cluster`, replace `cluster="ate-cluster"` to match):
    - **How many workers are busy vs. idle?** `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="agents", cluster="ate-cluster"})`
      (Use `max` rather than `sum` because each `ateapi` replica reports the entire pool.) A busy worker appears as `partial` rather than

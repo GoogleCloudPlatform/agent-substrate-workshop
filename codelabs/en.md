@@ -54,8 +54,8 @@ and start the Substrate installation in the background. The installation runs wh
    ```
 2. **Clone the workshop repository.** Clone the repository and move into its root directory:
    ```bash
-   git clone https://github.com/moficodes/workshop
-   cd workshop
+   git clone https://github.com/GoogleCloudPlatform/agent-substrate-workshop
+   cd agent-substrate-workshop
    ```
 3. **Create a GKE cluster (if your instructor didn't pre-create one).** If your project already has a cluster (`gcloud container clusters list`), skip to Step 4. Otherwise, create a zonal GKE 1.37 cluster with Workload Identity, managed OpenTelemetry, Managed Service for Prometheus, and a 48-hour maintenance exclusion to block node auto-upgrades during the workshop:
    ```bash
