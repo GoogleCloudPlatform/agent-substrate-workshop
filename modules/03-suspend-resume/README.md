@@ -53,7 +53,7 @@ with **VOLUMES** fidelity (`SNAPSHOT_FIDELITY_VOLUMES`): only the durable direct
    kubectl ate get actor-template agent-v2 -a workshop -o yaml | grep -A2 goldenTag   # repeat until set
    kubectl ate create actor memo --template=agent-v2 -a workshop
    ```
-6. Follow its logs in a second terminal. The stream follows the actor across workers and restarts:
+6. Follow its logs in a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`). The stream follows the actor across workers and restarts:
    ```bash
    source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
    kubectl ate logs actor memo -a workshop -f

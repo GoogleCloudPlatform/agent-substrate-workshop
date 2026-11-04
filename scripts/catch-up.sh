@@ -96,8 +96,8 @@ if ! _no_bg_install; then
   step "a background install is running — waiting for it (tail -f .workshop/install.log)"
   wait_for 1800 "background install to finish" _no_bg_install
 fi
-# install-substrate.sh writes .workshop/install-complete as its very last step (after node
-# labeling and the router patch), so that single marker is what verify/01.sh's checks actually
+# install-substrate.sh writes .workshop/install-complete as its very last step (after
+# the router patch), so that single marker is what verify/01.sh's checks actually
 # depend on having happened. A missing marker on an otherwise-installed cluster (e.g. .workshop/
 # predates this marker, or was partially cleaned up) just means we re-run it — install-substrate.sh
 # is safe to re-run (its own header says so, and every step in it is create-or-patch-if-missing).

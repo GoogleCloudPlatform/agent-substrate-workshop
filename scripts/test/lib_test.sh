@@ -128,6 +128,13 @@ t_gateway_sets_gemini_env() {
   [[ "$(SHOW=GOOGLE_GENAI_USE_ENTERPRISE run_gateway_sh LIVE_MOCK=)" == true ]] &&
     [[ "$(SHOW=GOOGLE_CLOUD_LOCATION run_gateway_sh LIVE_MOCK=)" == global ]]
 }
+t_gateway_warns_on_legacy_model_env() {
+  local d; d="$(mktemp -d "$TMP/t.XXXXXX")"; mkdir -p "$d/bin" "$d/state"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$d/bin/kubectl"; chmod +x "$d/bin/kubectl"
+  echo "r/gw@sha256:abc" >"$d/state/gateway-image"
+  printf 'PROJECT_ID=p\nGEMINI_MODEL=gemini-2.5-flash\n' >"$d/env"
+  [[ "$(PATH="$d/bin:$PATH" WORKSHOP_ENV_FILE="$d/env" WORKSHOP_STATE_DIR="$d/state" bash "$HERE/../gateway.sh" 2>&1)" == *"GEMINI_MODEL=gemini-3.8-flash"* ]]
+}
 # build.sh against a stub ko that always returns the same digest.
 build_agent_stub() {
   PATH="$1/bin:$PATH" WORKSHOP_ENV_FILE="$1/env" WORKSHOP_STATE_DIR="$1/state" bash "$HERE/../build.sh" agent "${@:2}" 2>&1
@@ -361,6 +368,7 @@ check "load_env: command-line MOCK_LLM beats workshop.env" t_load_env_mock_llm_o
 check "load_env exports CLUSTER_NAME/CLUSTER_LOCATION (legacy names too)" t_load_env_cluster_vars
 check "gateway.sh keeps a live MOCK_LLM unless one is passed" t_gateway_keeps_live_mock_llm
 check "gateway.sh sets the Gemini Enterprise Agent Platform env (global by default)" t_gateway_sets_gemini_env
+check "gateway.sh warns when workshop.env still sets gemini-2.5-flash" t_gateway_warns_on_legacy_model_env
 check "build.sh --check-changed warns when the image didn't change" t_build_warns_when_unchanged
 check "stop_port_forward stops only the named forward" t_stop_port_forward_stops_one
 check "gateway_chat prints body then status code" t_gateway_chat_prints_body_then_status

@@ -1,16 +1,17 @@
 # Instructor runbook
 
 **Current target:** `SUBSTRATE_REF=v1.0.0-rc.1` (2026-11-02). Last full cluster run: 2026-11-02 on `v1.0.0-rc.1`, GKE `1.37.1-gke.1697000` (Rapid, zonal, 2× `c3-standard-4`),
-source install mode (`make e2e` passed with real Vertex; optional labs A, B, and J passed end-to-end on the cluster). Published images are also available at `ghcr.io/agent-substrate/substrate` (`v1.0.0-rc.1`).
+published and source install modes (`make e2e` passed with real Gemini; optional labs A, B, and J passed end-to-end on the cluster). Published images are used by default from `ghcr.io/agent-substrate/substrate` (`v1.0.0-rc.1`).
 
 ## One week before
 
 1. **Pick `SUBSTRATE_REF`**: the newest tag or commit that passes `make e2e` in **both** install modes,
    against a scratch GCP project (not an attendee's).
+   - Published mode (default in `workshop.env.example`): `SUBSTRATE_IMAGE_REPO=ghcr.io/agent-substrate/substrate` and
+     `SUBSTRATE_IMAGE_TAG=${SUBSTRATE_REF}`, so `install-substrate.sh` runs
+     `ate-setup deploy ate-system --image-repo … --image-tag …` without building from source.
    - Source mode: leave `SUBSTRATE_IMAGE_REPO`/`SUBSTRATE_IMAGE_TAG` empty in `workshop.env` — `install-substrate.sh`
-     clones `SUBSTRATE_REF` and ko-builds `ate-setup`, `kubectl-ate`, and `ateworker-gvisor` from source.
-   - Published mode: set both `SUBSTRATE_IMAGE_REPO` and `SUBSTRATE_IMAGE_TAG` if images exist for that ref, so
-     `install-substrate.sh` runs `ate-setup deploy ate-system --image-repo … --image-tag …` instead of building.
+     clones `SUBSTRATE_REF` and builds `ate-setup`, `kubectl-ate`, `ateworker-gvisor`, and the Envoy dataplane from source.
    - `make e2e` drives every module through `catch-up` + `verify` (`scripts/catch-up.sh $n && scripts/verify/$((n-1)).sh`
      for n = 1..7). Run it start to finish in **each** mode; a pass in one mode does not imply a pass in the other,
      since the worker image (`ateworker-gvisor`) comes from a different path in each. Run it with `bin/` on your
@@ -109,10 +110,10 @@ which is exactly what `catch-up.sh <current>` produces.
 
 Ask attendees to run `make teardown` (keeps their cluster, bucket, and Artifact Registry — only the in-cluster
 workshop state goes away), or `YES=1 scripts/teardown.sh --all` if the whole project is being torn down too
-(also deletes the bucket and the Artifact Registry repo, which takes the grants on them along, and the
+(also deletes the bucket, the Artifact Registry repo, the snapshot transfer service account, and the
 workshop namespace's project IAM bindings `make gcp` created). Artifact Registry read access is granted on the
 workshop repo only, so no other cluster in the project loses image pulls. Neither
-one touches the GKE cluster, and neither deletes Substrate's own `ate-system` Deployments/DaemonSets — but
+one touches the GKE cluster (`make delete-cluster` deletes the cluster after releasing its PersistentVolumeClaims and their disks), and neither deletes Substrate's own `ate-system` Deployments/DaemonSets — but
 **`--all` leaves the already-running Substrate unable to actually work**: in source install mode its
 control-plane and worker images lived in the Artifact Registry repo that was just deleted, and the IAM grants
 that let `atelet`/`ateapi` write snapshots are gone too. If the project is being kept around rather than

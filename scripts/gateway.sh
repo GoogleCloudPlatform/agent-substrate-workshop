@@ -21,7 +21,7 @@ require_state gateway-image "make gateway"
 GATEWAY_IMAGE="$(state_get gateway-image)"
 export GATEWAY_IMAGE
 : "${GEMINI_MODEL:=gemini-3.8-flash}" "${MODEL_LOCATION:=global}"
-if [[ -n "${VERTEX_LOCATION:-}" ]]; then
+if [[ -n "${VERTEX_LOCATION:-}" || "${GEMINI_MODEL:-}" == "gemini-2.5-flash" ]]; then
   warn "workshop.env is from before the Gemini Enterprise Agent Platform switch: replace VERTEX_LOCATION with MODEL_LOCATION=global and set GEMINI_MODEL=gemini-3.8-flash (see workshop.env.example)"
 fi
 if [[ -z "${IDLE_AFTER:-}" ]]; then
