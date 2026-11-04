@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Idempotently patches google/ax (.workshop/ax) for Agent Substrate v1.0.0-rc.1 compatibility."""
+"""Idempotently patches google/ax (.workshop/ax) for Agent Substrate v1.0.0-rc.2 compatibility."""
 
 import os
 import subprocess
@@ -41,7 +41,7 @@ def patch_go_mod(ax_dir: str) -> None:
     env = os.environ.copy()
     env["GOWORK"] = "off"
     subprocess.run(
-        ["go", "get", "go.ate.dev/substrate@v1.0.0-rc.1"],
+        ["go", "get", "go.ate.dev/substrate@v1.0.0-rc.2"],
         cwd=ax_dir,
         env=env,
         check=True,
@@ -87,7 +87,7 @@ def patch_substrate_client(ax_dir: str) -> None:
 
     # 3. v0.6.0+ replaced SnapshotConfig.onCommit with preferredFidelity, removed SandboxConfig from
     #    ActorTemplate (the WorkerPool determines the sandbox class), and uses ResourceRequirements
-    #    with integer CpuMillicores and MemoryBytes limits. v1.0.0-rc.1 rejects snapshotConfig.storageLocation
+    #    with integer CpuMillicores and MemoryBytes limits. v1.0.0-rc.1+ rejects snapshotConfig.storageLocation
     #    unless the PerTemplateSnapshotLocation preview gate is enabled.
     #    Also select the lab's `workload: ax-worker` WorkerPool so AX tasks don't land on `agents`.
     old_snapshots = """\t\tSnapshotsConfig: &ateapipb.SnapshotsConfig{
@@ -202,6 +202,15 @@ def patch_ax_cli_timeout(ax_dir: str) -> None:
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(content)
 
+    tunnel_path = os.path.join(ax_dir, "internal", "tunnel", "tunnel.go")
+    if os.path.isfile(tunnel_path):
+        with open(tunnel_path, "r", encoding="utf-8") as fh:
+            t_content = fh.read()
+        t_content = t_content.replace("time.Now().Add(5 * time.Second)", "time.Now().Add(20 * time.Second)")
+        t_content = t_content.replace("time.After(8 * time.Second)", "time.After(30 * time.Second)")
+        with open(tunnel_path, "w", encoding="utf-8") as fh:
+            fh.write(t_content)
+
 
 def patch_deploy_manifest(ax_dir: str) -> None:
     # Label Namespace/ax-system with ate.dev/api-access: "true" (required by ate-system NetworkPolicy in v0.5.0)
@@ -264,7 +273,7 @@ def main() -> int:
     patch_workspace_setup(ax_dir)
     patch_ax_cli_timeout(ax_dir)
     patch_deploy_manifest(ax_dir)
-    print(f"Patched AX at {ax_dir} for Agent Substrate v1.0.0-rc.1.")
+    print(f"Patched AX at {ax_dir} for Agent Substrate v1.0.0-rc.2.")
     return 0
 
 

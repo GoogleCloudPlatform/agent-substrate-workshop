@@ -8,7 +8,7 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
 (`api/ateapi/v1/ateapi.proto`, `CredentialHeader`), resolved at request time by dialing a
 **credential provider**, a small gRPC service (`api/credprovider/v1/credprovider.proto`).
 
-> **Fact-checked against the substrate checkout at `SUBSTRATE_REF` (v1.0.0-rc.1):** substrate ships the built-in
+> **Fact-checked against the substrate checkout at `SUBSTRATE_REF` (v1.0.0-rc.2):** substrate ships the built-in
 > `k8s.io` provider (`cmd/credential-provider/kubernetes-secrets`) with manifests in
 > `manifests/egress-credential-injection/` and a guide in `docs/egress-credential-injection.md`. It resolves
 > `ate-secret://k8s.io/default/<namespace>/<secret>/<key>` from a Kubernetes Secret, and it denies by default:

@@ -62,12 +62,11 @@ kubectl -n "$NAMESPACE" delete workerpool agents --ignore-not-found --wait=true 
 kubectl delete ns "$NAMESPACE" --ignore-not-found || warn "namespace $NAMESPACE"
 
 step "dashboards (the workshop's and substrate's three, as created by make dashboards)"
-# Titles come from the same files scripts/dashboards.sh uploads; the fallback list is substrate's
-# tools/setup-gcp/dashboards at the pinned ref, for when the checkout is already gone.
+# Titles come from the same files scripts/dashboards.sh uploads.
 dashboard_titles() {
   local f found=false
   echo "Agent Substrate Workshop"
-  for f in "$STATE_DIR"/substrate/tools/setup-gcp/dashboards/*.json; do
+  for f in "$REPO_ROOT"/observability/substrate-dashboards/*.json; do
     [[ -f "$f" ]] || continue
     jq -r .displayName "$f" 2>/dev/null && found=true
   done
@@ -89,6 +88,7 @@ gcloud storage rm -r "gs://$BUCKET_NAME/$ATESPACE/**" --quiet 2>/dev/null || tru
 if $ALL; then
   step "bucket, Artifact Registry repo, and the workshop's IAM bindings (undoing 'make gcp')"
   gcloud storage rm -r "gs://$BUCKET_NAME" --quiet || true
+  gcloud storage rm -r "gs://${BUCKET_NAME}-assets" --quiet 2>/dev/null || true
   gcloud artifacts repositories delete "$AR_REPO" --location "$REGION" --project "$PROJECT_ID" --quiet || true
   # Deleting the bucket and the repo also drops their IAM policies, including the Artifact Registry
   # reader grants (repo-level, never project-level, so nothing outside the workshop loses access).

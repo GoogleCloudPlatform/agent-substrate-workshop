@@ -110,8 +110,9 @@ make -s -C "$REPO_ROOT" tools
 if (( N >= 3 )); then
   step "module 2 end state: WorkerPool, atespace, agent-v1, hello"
   if kubectl -n "$NAMESPACE" get workerpool agents >/dev/null 2>&1 &&
-     [[ -z "$(kubectl -n "$NAMESPACE" get workerpool agents -o jsonpath='{.spec.sandboxClasses[0].name}' 2>/dev/null)" ]]; then
-    kubectl -n "$NAMESPACE" delete workerpool agents --ignore-not-found
+     { [[ -z "$(kubectl -n "$NAMESPACE" get workerpool agents -o jsonpath='{.spec.sandboxClasses[0].name}' 2>/dev/null)" ]] ||
+       [[ "$(kubectl -n "$NAMESPACE" get workerpool agents -o jsonpath='{.spec.workerImage}' 2>/dev/null)" != "$(state_get worker-image)" ]]; }; then
+    kubectl -n "$NAMESPACE" delete workerpool agents --ignore-not-found --wait=true
   fi
   "$S/render.sh" "$M/02-hello-actor/manifests/workerpool.yaml.tmpl" | kubectl apply -f -
   wait_for 600 "2 running worker pods" _two_workers

@@ -32,19 +32,20 @@ source scripts/env.sh    # workshop.env into this shell (bash or zsh): PROJECT_I
    DaemonSet tolerates `ate.dev/sandboxClass:NoSchedule`, and without `atelet` on the node the `/dev/kvm` device
    plugin (`ate.dev/kvm`) is never registered and `agents-vm` stays `Pending`.
    On a regional cluster, `--num-nodes` is per zone.
-2. **Stage the microVM assets and apply the `SandboxConfig`.** substrate's script downloads
-   cloud-hypervisor, virtiofsd, the guest kernel and rootfs, uploads them to `gs://$BUCKET_NAME/kata-assets/`,
-   and applies the cluster-wide `SandboxConfig` named `microvm`. Unlike `sandboxconfig-gvisor.yaml`,
-   nothing applies it for you:
+2. **Stage the microVM assets and apply the `SandboxConfig`.** `ate-setup deploy sandboxconfig --sandbox-classes=microvm` downloads
+   cloud-hypervisor, virtiofsd, and the Kata guest kernel and rootfs, uploads them to a dedicated asset bucket (`gs://${BUCKET_NAME}-assets/microvm-assets/`),
+   and applies the cluster-wide `SandboxConfig` named `microvm`. Because `make install` passes `--sandbox-classes=gvisor`, create the asset bucket, grant `atelet` read access, and deploy the `microvm` `SandboxConfig` now:
    ```bash
-   (cd .workshop/substrate && GOWORK=off NO_DEV_ENV=1 hack/install-microvm-deps.sh --install)
+   gcloud storage buckets create "gs://${BUCKET_NAME}-assets" --project "$PROJECT_ID" --location "$REGION" --uniform-bucket-level-access
+   PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+   gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}-assets" \
+     --member="principal://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${PROJECT_ID}.svc.id.goog/subject/ns/ate-system/sa/atelet" \
+     --role="roles/storage.objectViewer" --condition=None
+   (cd .workshop/substrate && GOWORK=off CLOUDSDK_STORAGE_PARALLEL_COMPOSITE_UPLOAD_ENABLED=False go run ./cmd/ate-setup deploy sandboxconfig --sandbox-classes=microvm --storage-bucket-name="$BUCKET_NAME")
    kubectl get sandboxconfigs
    ```
-   `NO_DEV_ENV=1` makes it use your exported `PROJECT_ID` and `BUCKET_NAME` instead of substrate's own
-   `.ate-dev-env.sh`. It picks the asset architecture from `KO_DEFAULTPLATFORMS` (`linux/amd64` by default),
-   i.e. your nodes, not your laptop: on an Apple Silicon Mac the host-arch fallback would stage arm64 assets
-   for amd64 nodes. The comments at the top of
-   `.workshop/substrate/manifests/microvm/sandboxconfig-microvm.yaml.tmpl` explain each field.
+   The comments at the top of
+   `.workshop/substrate/manifests/ate-install/sandboxconfig-microvm.yaml.tmpl` explain each field.
 3. **A microVM worker pool and template.** The WorkerPool needs substrate's `ateworker-microvm` worker image:
    `make install` built only `ateworker-gvisor`. Build it the way `scripts/install-substrate.sh` builds the
    gVisor one, then apply [`workerpool.yaml.tmpl`](workerpool.yaml.tmpl) (Module 2's pool plus

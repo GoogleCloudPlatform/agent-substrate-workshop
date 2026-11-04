@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Idempotently patches agent-substrate/env (.workshop/env) for Agent Substrate v1.0.0-rc.1 compatibility."""
+"""Idempotently patches agent-substrate/env (.workshop/env) for Agent Substrate v1.0.0-rc.2 compatibility."""
 
 import os
 import subprocess
@@ -50,7 +50,7 @@ def patch_manifest_go(env_dir: str) -> None:
     with open(path, "r", encoding="utf-8") as fh:
         content = fh.read()
 
-    # v1.0.0-rc.1 rejects snapshotConfig.storageLocation unless PerTemplateSnapshotLocation preview gate is enabled.
+    # v1.0.0-rc.1+ rejects snapshotConfig.storageLocation unless PerTemplateSnapshotLocation preview gate is enabled.
     content = content.replace("\t\t\tStorageLocation: cfg.snapshotsBucket,\n", "")
 
     old_resources = """\t\tResources: &ateapipb.Resources{Limits: []*ateapipb.Limits{
@@ -147,7 +147,7 @@ def patch_go_mod(env_dir: str) -> None:
     env = os.environ.copy()
     env["GOWORK"] = "off"
     subprocess.run(
-        ["go", "get", "go.ate.dev/substrate@v1.0.0-rc.1"],
+        ["go", "get", "go.ate.dev/substrate@v1.0.0-rc.2"],
         cwd=env_dir,
         env=env,
         check=True,

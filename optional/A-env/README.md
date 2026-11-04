@@ -15,14 +15,14 @@ It's the pattern you built in Modules 4–5 (an always-on API in front of suspen
 
 ## Which env commit, and why
 
-Our `SUBSTRATE_REF` is `v1.0.0-rc.1` (pinned in `app/go.mod` as `go.ate.dev/substrate v1.0.0-rc.1`).
+Our `SUBSTRATE_REF` is `v1.0.0-rc.2` (pinned in `app/go.mod` as `go.ate.dev/substrate v1.0.0-rc.2`).
 
 We checked every env tag and `main`:
 
-| env ref | substrate pin (`go.mod`) | compatibility with `v1.0.0-rc.1` |
+| env ref | substrate pin (`go.mod`) | compatibility with `v1.0.0-rc.2` |
 |---|---|---|
 | `v0.0.7`–`v0.0.10` | `v0.0.0-20260717234919-a2d55e99e02e` (2026-07-17) | Pre-`v0.2.0` (`readyz`, `snapshotsConfig`) |
-| `2c780cd` | `go.ate.dev/substrate v0.5.1-0.20261018212731-ddb46651d605` (2026-10-18) | Matches `v1.0.0-rc.1` with [`patch-env-v060.py`](./patch-env-v060.py) (`ServiceAccount/ate-env-api`, `ate-env manifest access-policy`, `workerSelector` without `sandboxConfig`, `ate.dev/v1` `WorkerPool`, `go.ate.dev/substrate/api/ateapi/v1`, cluster-default snapshot storage location, and integer `cpuMillicores`/`memoryBytes` limits) |
+| `2c780cd` | `go.ate.dev/substrate v0.5.1-0.20261018212731-ddb46651d605` (2026-10-18) | Matches `v1.0.0-rc.2` with [`patch-env-v060.py`](./patch-env-v060.py) (`ServiceAccount/ate-env-api`, `ate-env manifest access-policy`, `workerSelector` without `sandboxConfig`, `ate.dev/v1` `WorkerPool`, `go.ate.dev/substrate/api/ateapi/v1`, cluster-default snapshot storage location, and integer `cpuMillicores`/`memoryBytes` limits) |
 
 This lab pins `env` at:
 
@@ -30,7 +30,7 @@ This lab pins `env` at:
 ENV_REF=2c780cd94891c134cd10375a30a5e1e662ee2c2d   # env, 2026-10-18
 ```
 
-A small idempotent patch script ([`patch-env-v060.py`](./patch-env-v060.py)) updates the `ateapi`/`v1` imports, `ResourceRequirements`, and `SnapshotConfig` and bumps `go.ate.dev/substrate` to `v1.0.0-rc.1`.
+A small idempotent patch script ([`patch-env-v060.py`](./patch-env-v060.py)) updates the `ateapi`/`v1` imports, `ResourceRequirements`, and `SnapshotConfig` and bumps `go.ate.dev/substrate` to `v1.0.0-rc.2`.
 
 ## Two things to know before you start
 

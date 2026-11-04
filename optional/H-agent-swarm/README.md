@@ -17,7 +17,7 @@ on worker demand: workers that are `partial` or `at_capacity`, plus one worker f
 
 > **Fact-checked against an agent-swarm checkout** — its `README.md`,
 > `hack/deploy.sh`, `manifests/workerpool.yaml.tmpl`, `manifests/actortemplate.yaml.tmpl`, and `go.mod`:
-> - agent-swarm must pin `go.ate.dev/substrate v1.0.0-rc.1`, the same as this workshop's
+> - agent-swarm must pin `go.ate.dev/substrate v1.0.0-rc.2`, the same as this workshop's
 >   `SUBSTRATE_REF`, with `manifests/workerpool.yaml.tmpl` (`apiVersion: ate.dev/v1`, `sandboxClasses`), `manifests/actortemplate.yaml.tmpl` (`preferredFidelity: SNAPSHOT_FIDELITY_MEMORY`, `cpuMillicores`/`memoryBytes`, no `sandboxConfig` or `storageLocation`), and an OpenFGA `access-policy` for `conf-gateway`.
 > - The gateway image is built with **`docker buildx`**, not `ko` (`hack/deploy.sh`'s `conf_build_gateway`
 >   runs `docker buildx build --platform=linux/amd64 --push`). Only the *worker* image
@@ -38,7 +38,7 @@ agent-swarm refuses to deploy unless your cluster runs the substrate version pin
 `main` moves, so re-check the pin against `SUBSTRATE_REF` before each event:
 ```bash
 git clone https://github.com/moficodes/agent-swarm .workshop/agent-swarm
-grep 'substrate ' .workshop/agent-swarm/go.mod     # expect v1.0.0-rc.1, the SUBSTRATE_REF in workshop.env
+grep 'substrate ' .workshop/agent-swarm/go.mod     # expect v1.0.0-rc.2, the SUBSTRATE_REF in workshop.env
 ```
 If they differ, `hack/deploy.sh up` stops and prints the pin and the cluster's version (agent-swarm's
 README has a "Bumping Substrate" section). Use an agent-swarm commit whose pin matches rather than bumping

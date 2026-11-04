@@ -1,7 +1,7 @@
 # Instructor runbook
 
-**Current target:** `SUBSTRATE_REF=v1.0.0-rc.1` (2026-11-02). Last full cluster run: 2026-11-02 on `v1.0.0-rc.1`, GKE `1.37.1-gke.1697000` (Rapid, zonal, 2× `c3-standard-4`),
-published and source install modes (`make e2e` passed with real Gemini; optional labs A, B, and J passed end-to-end on the cluster). Published images are used by default from `ghcr.io/agent-substrate/substrate` (`v1.0.0-rc.1`).
+**Current target:** `SUBSTRATE_REF=v1.0.0-rc.2` (2026-11-04). Last full cluster run: 2026-11-04 on `v1.0.0-rc.2`, GKE `1.37.1-gke.1697000` (Rapid, zonal, 2× `c3-standard-4`),
+published and source install modes (`make e2e` passed with real Gemini; optional labs A, B, and J passed end-to-end on the cluster). Published images are used by default from `ghcr.io/agent-substrate/substrate` (`v1.0.0-rc.2`).
 
 ## One week before
 
@@ -31,7 +31,7 @@ published and source install modes (`make e2e` passed with real Gemini; optional
    [Module 1](../modules/01-architecture/README.md) and the wrap-up table in
    [Module 7](../modules/07-wrap-up/README.md).
 5. **For optional lab A** (`agent-substrate/env`) and **optional lab B** (`google/ax`): verify that their pinned commits
-   (`ENV_REF` and `AX_REF`) and `v1.0.0-rc.1` patches (`optional/A-env/patch-env-v060.py` and `optional/B-ax/patch-ax-v040.py`) still build and pass unit tests against `SUBSTRATE_REF` (or drop the
+   (`ENV_REF` and `AX_REF`) and `v1.0.0-rc.2` patches (`optional/A-env/patch-env-v060.py` and `optional/B-ax/patch-ax-v040.py`) still build and pass unit tests against `SUBSTRATE_REF` (or drop the
    patch once upstream `main` catches up to `SUBSTRATE_REF`).
    **For optional lab H** (`moficodes/agent-swarm`, which must be public before the event): pick a commit whose `go.mod` substrate version is
    exactly `SUBSTRATE_REF`. Its `hack/deploy.sh` refuses to deploy onto a cluster running any other version.
@@ -39,7 +39,7 @@ published and source install modes (`make e2e` passed with real Gemini; optional
    bare GKE cluster that has, at creation:
    - GKE **1.37+** (the minimum the workshop is validated on; `make preflight` rejects older). GKE 1.37 serves
      `certificates.k8s.io/v1` (`ClusterTrustBundle` and `PodCertificateRequest`) by default, which Substrate
-     `v1.0.0-rc.1` uses directly (`make preflight` checks that `v1` or `v1beta1` is served).
+     `v1.0.0-rc.2` uses directly (`make preflight` checks that `v1` or `v1beta1` is served).
    - **Workload Identity** and **managed OpenTelemetry** with `--managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS`.
    - **Managed Prometheus** enabled (`--enable-managed-prometheus`) — Module 6's Prometheus UI reads through it.
    - Machine type **`c3-standard-4`**, 2 nodes, **no node auto-upgrade**, **no spot/preemptible nodes** (an
