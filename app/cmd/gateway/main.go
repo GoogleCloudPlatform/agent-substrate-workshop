@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Command gateway is the workshop's always-on Deployment next to the actors. It holds what
-// must not live in an actor: model credentials (Workload Identity → Gemini Enterprise Agent Platform), the public
+// must not live in an actor: model credentials (Workload Identity → the Gemini platform), the public
 // chat entry point, and the policy deciding when an actor is idle.
 package main
 

@@ -65,7 +65,7 @@ published and source install modes (`make e2e` passed with real Gemini; optional
    gcloud container clusters update "$CLUSTER_NAME" --project "$PROJECT_ID" --location us-central1-a \
      --add-maintenance-exclusion-name workshop-freeze \
      --add-maintenance-exclusion-start "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-     --add-maintenance-exclusion-end <YYYY-MM-DD>T00:00:00Z \
+     --add-maintenance-exclusion-end "$(date -u -d '+2 days' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+2d +%Y-%m-%dT%H:%M:%SZ)" \
      --add-maintenance-exclusion-scope no_minor_or_node_upgrades
    ```
    Projects that still may create unenrolled clusters can use `--release-channel None --no-enable-autoupgrade`

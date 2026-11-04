@@ -367,7 +367,7 @@ check "port_forward reuses live forward" t_port_forward_reuses_live
 check "load_env: command-line MOCK_LLM beats workshop.env" t_load_env_mock_llm_override
 check "load_env exports CLUSTER_NAME/CLUSTER_LOCATION (legacy names too)" t_load_env_cluster_vars
 check "gateway.sh keeps a live MOCK_LLM unless one is passed" t_gateway_keeps_live_mock_llm
-check "gateway.sh sets the Gemini Enterprise Agent Platform env (global by default)" t_gateway_sets_gemini_env
+check "gateway.sh sets the Gemini platform env (global by default)" t_gateway_sets_gemini_env
 check "gateway.sh warns when workshop.env still sets gemini-2.5-flash" t_gateway_warns_on_legacy_model_env
 check "build.sh --check-changed warns when the image didn't change" t_build_warns_when_unchanged
 check "stop_port_forward stops only the named forward" t_stop_port_forward_stops_one
