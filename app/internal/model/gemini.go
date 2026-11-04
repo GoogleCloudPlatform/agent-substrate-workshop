@@ -31,7 +31,7 @@ type gemini struct {
 	model  string
 }
 
-// NewGemini returns a Gemini backend on the Gemini Enterprise Agent Platform. The Google GenAI SDK
+// NewGemini returns a Gemini backend on the Gemini platform. The Google GenAI SDK
 // reads GOOGLE_GENAI_USE_ENTERPRISE and GOOGLE_CLOUD_LOCATION (default global) from the environment,
 // which the gateway Deployment sets. Credentials come from Application Default Credentials, which on
 // GKE is the pod's Workload Identity.

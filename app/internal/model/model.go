@@ -14,7 +14,7 @@
 
 // Package model serves the gateway's /v1/model endpoint. Actors never hold model
 // credentials: they POST their conversation here, and the gateway calls Gemini on the
-// Gemini Enterprise Agent Platform with its own Workload Identity, or answers from a mock.
+// Gemini platform with its own Workload Identity, or answers from a mock.
 package model
 
 import (
