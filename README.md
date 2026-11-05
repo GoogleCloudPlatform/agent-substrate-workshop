@@ -11,6 +11,10 @@ starting from a bare GKE cluster. In about 85 minutes, you:
 
 You build everything you deploy: the agent, the gateway, and (in source mode) Substrate itself go into your own Artifact Registry repository.
 
+This workshop uses billable resources: a GKE cluster with two `c3-standard-4` nodes and a 500 GiB persistent disk for
+Substrate's bundled Postgres, plus Cloud Monitoring, Cloud Storage, and Artifact Registry. Use a dedicated project that you
+can delete when you finish; the "Clean up" section below shows how.
+
 ## Agenda
 
 | # | Section | Min | What you learn |
@@ -35,7 +39,8 @@ doesn't break an earlier one (see [Wrap-up](modules/07-wrap-up/README.md#keep-go
 ## Prerequisites
 - A Google Cloud project where you have the **Owner** role, with a GKE **1.37+** cluster that has Workload Identity, managed
   OpenTelemetry, Managed Service for Prometheus, no node auto-upgrade, no spot nodes, and 2× `c3-standard-4` nodes. `make preflight`
-  verifies all of these settings.
+  verifies all of these settings. If you don't have a cluster yet, the [Setup](modules/00-setup/README.md) section creates one
+  with these settings.
 - Local tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst`, `curl`, `git`, `python3`, and, only to
   build Substrate from source, a running Docker daemon with `buildx`. Cloud Shell includes all of these tools except `ko`
   (`go install github.com/google/ko@latest`).

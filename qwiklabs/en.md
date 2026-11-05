@@ -13,15 +13,20 @@ starting from a bare GKE cluster. In about 85 minutes, you:
 
 You build everything you deploy: the agent, the gateway, and (in source mode) Substrate itself go into your own Artifact Registry repository.
 
+This lab uses a GKE cluster with two `c3-standard-4` nodes and a 500 GiB persistent disk for Substrate's bundled Postgres,
+plus Cloud Monitoring, Cloud Storage, and Artifact Registry, all in the project that the lab provides.
+
 ### Prerequisites
 - A Google Cloud project where you have the **Owner** role, with a GKE **1.37+** cluster that has Workload Identity, managed
-  OpenTelemetry, Managed Service for Prometheus, no node auto-upgrade, no spot nodes, and 2× `c3-standard-4` nodes.
+  OpenTelemetry, Managed Service for Prometheus, no node auto-upgrade, no spot nodes, and 2× `c3-standard-4` nodes. If you
+  don't have a cluster yet, the "Setup" section creates one with these settings.
 - Familiarity with Kubernetes. You don't need prior Substrate knowledge.
 
 ## Setup
 
 The goal of this section is to point the workshop at your Google Cloud project, create the cloud resources that Substrate needs,
 and start the Substrate installation in the background. The installation runs while you take the architecture tour.
+If you create your own cluster in this section, plan for about 20 minutes.
 
 ### What you need
 - A Google Cloud project where you have the **Owner** role, and a GKE **1.37+** cluster in that project. The cluster requires Workload Identity,
@@ -70,9 +75,13 @@ and start the Substrate installation in the background. The installation runs wh
      --add-maintenance-exclusion-end "$(date -u -d '+2 days' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+2d +%Y-%m-%dT%H:%M:%SZ)" \
      --add-maintenance-exclusion-scope no_minor_or_node_upgrades
    </ql-code-block>
+   Creating the cluster takes several minutes. While you wait, follow its progress in the Google Cloud console under
+   **Kubernetes Engine** > **Clusters**, and read the next section, "Architecture tour", up to "Look around", which needs the
+   installation from step 8.
 4. **Configure the environment.** Copy the example environment file and set `PROJECT_ID` (<ql-variable key="project_0.project_id" placeHolder="YOUR_PROJECT_ID"></ql-variable>), `REGION` (<ql-variable key="project_0.default_region" placeHolder="us-central1"></ql-variable>), and `CLUSTER_LOCATION` to your cluster's exact zone or
    region from `gcloud container clusters list` (a zonal cluster such as `us-central1-a` won't match
-   `us-central1`). If your cluster isn't named `ate-cluster`, set `CLUSTER_NAME` as well. Every other
+   `us-central1`). If your cluster isn't named `ate-cluster`, set `CLUSTER_NAME` as well. `REGION` is a region, not a zone:
+   it sets where the snapshot bucket and the Artifact Registry repository live. Every other
    variable has a working default.
    <ql-code-block bash templated noWrap>
    gcloud container clusters list --project {{{project_0.project_id | YOUR_PROJECT_ID }}}    # NAME and LOCATION
@@ -98,6 +107,8 @@ and start the Substrate installation in the background. The installation runs wh
    ```
    This setting applies only to your current terminal session. To persist it, add the same line with the absolute repository path instead of `$PWD` to
    `~/.zshrc` or `~/.bashrc`. If you use direnv, add `PATH_add bin` to an `.envrc` file at the repository root.
+   If Cloud Shell reconnects or you open a new tab, `cd` into the repository and run `source scripts/env.sh`: it loads
+   `workshop.env` and puts `bin/` back on your `PATH`.
 8. **Start the installation in the background.** This target clones Substrate at `SUBSTRATE_REF`, builds `kubectl ate`,
    deploys `ate-system`, pins a worker image that matches the control plane, and
    increases the router's parked-request budget and shutdown grace period.
