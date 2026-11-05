@@ -666,15 +666,16 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
    make load
    ```
-3. **Run queries in the Prometheus UI** (`http://localhost:9090` → **Graph**, or Web Preview `:9090` in Cloud Shell). Copy each query from
-   [observability/queries.md](observability/queries.md) (if your `CLUSTER_NAME` in `workshop.env` isn't
+3. **Run queries in the Prometheus UI** (`http://localhost:9090` → **Graph**, or Web Preview `:9090` in Cloud Shell). More queries
+   are in [observability/queries.md](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/observability/queries.md). Copy each query below (if your `CLUSTER_NAME` in `workshop.env` isn't
    `ate-cluster`, replace `cluster="ate-cluster"` to match):
    - **How many workers are busy vs. idle?** `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="agents", cluster="ate-cluster"})`
      (Use `max` rather than `sum` because each `ateapi` replica reports the entire pool.) A busy worker appears as `partial` rather than
      `at_capacity` because the state counts actor slots (`1` of the default `1000`), not CPU utilization.
-   - **How often did the router resume a suspended actor?** Run the `"ate.router.resume"` query.
-   - **How long does a resume take?** Run the lifecycle P95 latency query.
-   - **What are the chat turn outcomes and active actor counts?** Run the gateway metric queries.
+   - **How often did the router resume a suspended actor?** `sum by ("ate.router.resume") (rate({"atenet.router.route.duration_count", top_level_controller_name="atenet-router", cluster="ate-cluster"}[2m]))`
+   - **How long does a resume take?** `histogram_quantile(0.95, sum by (le, "ate.actor.operation.name") (rate({"ate.actor.lifecycle.operation.duration_bucket", cluster="ate-cluster"}[5m])))`
+   - **What are the chat turn outcomes and active actor counts?** `sum by (outcome) (rate(workshop_chat_turns_total{cluster="ate-cluster"}[2m]))`
+     and `max(workshop_actors_awake{cluster="ate-cluster"})`
 
    Data points appear **1–3 minutes** after the traffic that produces them. If a chart is empty, wait a minute and run the query again.
 4. **View dashboards in the Google Cloud console.** Open
@@ -683,7 +684,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    - Substrate's **gRPC**, **E2E latency**, and **Snapshot** dashboards: provide the platform maintainers' operational views.
 
    While `make load` runs, watch active actors track worker capacity, resumed requests rise, and idle suspends follow each traffic burst.
-5. **Follow a single actor across workers.** Because an actor isn't tied to a single Pod, its logs aren't tied to a single Pod either. In this step, you
+5. **Follow a single actor across workers.** Because an actor isn't tied to a single Pod, its logs aren't tied to a single Pod either. In steps 5 and 6, you
    wake `buddy`, let it suspend again, and delete the worker Pod it ran on so that the next resume lands
    on a different Pod. First, stop `make load` if it is still running. In one terminal, stream `buddy`'s logs:
    ```bash
@@ -702,8 +703,9 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    kubectl ate get actors -a workshop
    kubectl ate get workers -n workshop
    ```
-   Deleting a worker Pod terminates any actor still running on it, so always verify that the worker is empty first. Next, delete the
-   worker Pod and resume `buddy` with tracing enabled:
+6. **Move `buddy` to a new worker and trace the resume.** Deleting a worker Pod terminates any actor still running on it, so
+   continue only if step 5 showed `0/1000` actors on that worker. In the second terminal, delete the worker Pod and resume
+   `buddy` with tracing enabled:
    ```bash
    kubectl -n workshop delete pod "$FIRST"
    kubectl ate --trace resume actor buddy -a workshop     # prints: Tracing enabled. Trace ID: <id>
@@ -713,7 +715,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    The `Actor restoring` and `Actor restored` log entries include a `trace_id` field that matches the
    trace ID printed by the CLI.
 
-   `kubectl ate logs` streams logs only from the Pod that currently hosts the actor. To view the complete history across Pods, open Logs Explorer in the Google Cloud console (replace `ate-cluster` if your `CLUSTER_NAME` differs):
+7. **View the actor's history in Logs Explorer.** `kubectl ate logs` streams logs only from the Pod that currently hosts the actor. To view the complete history across Pods, open Logs Explorer in the Google Cloud console and run this query (replace `ate-cluster` if your `CLUSTER_NAME` differs):
    ```
    resource.type="k8s_container"
    resource.labels.cluster_name="ate-cluster"
@@ -724,7 +726,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    your agent's own log lines. Include both clauses in the `OR` filter: `ateapi` and `atelet` write actor identity into `jsonPayload` rather than
    `labels`, so filtering only on `labels` misses the state transitions.
 
-   Next, replace the filter with `jsonPayload.trace_id="<id>"`, using the trace ID from the `--trace` resume command. This query isolates that
+8. **Follow one request by its trace ID.** In Logs Explorer, replace the filter with `jsonPayload.trace_id="<id>"`, using the trace ID from the `--trace` resume command in step 6. This query isolates that
    single request across `ateapi`, `atelet`, and `ateworker`. Paste the same ID into **Cloud Trace** → **Trace Explorer** to
    inspect the request as a waterfall of spans.
 
@@ -735,7 +737,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
 - `make dashboards` is idempotent: edit the JSON file and run the command again to update the dashboards.
 - **Managed Prometheus doesn't scrape actors directly.** Actors share a generic hostname and IP address inside the sandbox, and pushing OTLP metrics directly from an actor
   requires an `http` `EgressPolicy` rule for the OpenTelemetry collector (`docs/observability.md`). Instead, all application-level
-  metrics in this section come from the always-on gateway, while per-actor details live in Cloud Logging (step 5).
+  metrics in this section come from the always-on gateway, while per-actor details live in Cloud Logging (step 7).
 - Metrics omit actor identity to avoid creating a separate time series per actor. Logs and traces include actor identity, and a
   `trace_id` links them together: the CLI prints the ID, every Substrate log entry for that request includes it, and Cloud
   Trace visualizes the end-to-end spans.
@@ -2089,3 +2091,7 @@ kubectl ate delete actor fetch1 -a workshop
 kubectl ate delete actor-template agent-fetch-v1 -a workshop
 kubectl delete namespace workshop-secrets --ignore-not-found
 ```
+
+### When you're done
+
+After the optional labs, run the "Clean up" steps in the Wrap-up section.
