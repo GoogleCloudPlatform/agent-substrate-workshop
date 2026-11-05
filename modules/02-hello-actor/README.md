@@ -29,17 +29,21 @@ an actor, and send requests to it through the router.
    probe, the snapshot fidelity (`preferredFidelity`), resource limits (`cpuMillicores`, `memoryBytes`), and one durable directory.
    ```bash
    scripts/render.sh modules/02-hello-actor/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
-   kubectl ate get actor-template agent-v1 -a workshop            # repeat until GOLDEN TAG appears
+   until kubectl ate get actor-template agent-v1 -a workshop -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus.goldenTag.name' >/dev/null; do sleep 3; done
+   kubectl ate get actor-template agent-v1 -a workshop
    kubectl ate get actor-template agent-v1 -a workshop -o yaml    # inspect status.goldenSnapshotStatus.goldenTag.name
    ```
+   The `until` loop returns once the golden snapshot exists, and the next command shows it in the `GOLDEN TAG` column.
+   If it hasn't returned in about 5 minutes, press Ctrl+C and check the [troubleshooting guide](../../instructor/troubleshooting.md).
    Substrate starts your container once on a free worker, waits for its `wakeupProbe` (`/readyz`) to pass, and snapshots it.
    That **golden snapshot** serves as the starting point for every actor created from this template. Creating an actor
    restores this snapshot instead of cold-booting a process.
 5. **Create an actor.**
    ```bash
    kubectl ate create actor hello --template=agent-v1 -a workshop
-   kubectl ate get actors -a workshop       # SUSPENDED: the record exists, but it isn't running on a worker
+   kubectl ate get actors -a workshop
    ```
+   The `STATE` column shows `ACTOR_STATE_SUSPENDED`: the record exists, but it isn't running on a worker yet.
 6. **Send requests to the actor.** The router selects the target actor from the `ate-target-actor` header.
    ```bash
    make forward-router                      # port-forwards atenet-router to localhost:8080

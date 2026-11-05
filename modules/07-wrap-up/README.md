@@ -24,11 +24,14 @@ gRPC services (`ax ssh`) inside a declarative `Task`, `Workspace`, and `Model` c
 
 For comparison, **agent-sandbox** (`kubernetes-sigs/agent-sandbox`) addresses a similar use case — running a
 Pod per agent session — with no Substrate integration. Its `SandboxTemplate` corresponds to
-`ActorTemplate` and `SandboxWarmPool` corresponds to `WorkerPool`, but suspending a Sandbox deletes the Pod, whereas suspending an
-actor checkpoints memory so it can resume on any worker. See the "Architecture tour" section for the full comparison table.
+`ActorTemplate` and `SandboxWarmPool` corresponds to `WorkerPool`, and both projects can suspend and resume. The difference is that many actors share a few generic workers,
+and a suspended actor resumes from its memory and disk snapshot on any of them. See the "Architecture tour" section for the full comparison table.
 
 ## Limits to know before you build
 - **Authorization inside an atespace is role-based (`AccessPolicy`).** Any principal granted `editor` or `admin` on an atespace can act on all actors in that atespace (there are no per-actor ACLs).
+- **Without `--token-file`, `kubectl ate` acts as the shared `ate-client` identity**, which the installer makes a global owner.
+  Substrate's authorization guide says not to keep that setup outside development. On a shared install, pass `--token-file` so
+  that each person acts as themselves.
 - **`CRASHED` actors require intervention** (from a human or your controller): `resume` rejects crashed actors, so run `kubectl ate revert actor X -a Y`
   to roll the actor back to `SUSPENDED` at its last snapshot before resuming, or delete it with `kubectl ate delete actor X -a Y`.
 - **Idle detection is your application's responsibility** (see "Density and idle"), and so is `WorkerPool` sizing (see optional lab G).

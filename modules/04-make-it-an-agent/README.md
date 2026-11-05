@@ -23,15 +23,21 @@ model access, and a deny-by-default **egress policy** lets the actor reach the g
    `backend` shows which model answered (`gemini`). If a Gemini call fails (for example, with a `403` error while the Workload Identity
    binding propagates), the gateway answers that request from a mock fallback instead: `backend` is `mock-fallback`
    and `upstreamError` reports what the platform returned. As a result, the `502` response from the agent in step 3 comes from
-   egress blocking, not the model.
-2. **Free a worker, then configure the agent to call the model.** Suspend `memo` so that the new template's golden-snapshot
-   actor has a free worker. In `app/cmd/agent/main.go`, find `WORKSHOP(module-4)` and set `ModelURL: os.Getenv("MODEL_URL")`.
+   egress blocking, not the model. `make verify MODULE=4` fails if the reply comes from `mock-fallback`, so check `upstreamError`,
+   or switch to the mock on purpose (see "If the model isn't available").
+2. **Configure the agent to call the model, then free a worker.** First, open `app/cmd/agent/main.go`, find the
+   `WORKSHOP(module-4)` comment, and change the line below it from `ModelURL: "",` to:
+   ```go
+   ModelURL: os.Getenv("MODEL_URL"),
+   ```
+   Save the file. Then suspend `memo` so that the new template's golden-snapshot actor has a free worker, and build the image.
+   If `make build-agent` warns that the image is the same as your last build, the edit isn't saved yet.
    ```bash
    kubectl ate suspend actor memo -a workshop
    make build-agent
    cat modules/04-make-it-an-agent/manifests/template.yaml.tmpl     # note the MODEL_URL environment variable
    scripts/render.sh modules/04-make-it-an-agent/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
-   kubectl ate get actor-template agent-v3 -a workshop -o yaml | grep -A2 goldenTag   # repeat until set
+   until kubectl ate get actor-template agent-v3 -a workshop -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus.goldenTag.name' >/dev/null; do sleep 3; done
    kubectl ate create actor buddy --template=agent-v3 -a workshop
    ```
 3. **Send a chat request and watch it fail.**
@@ -39,9 +45,8 @@ model access, and a deny-by-default **egress policy** lets the actor reach the g
    curl -s localhost:8081/chat/buddy -d '{"message":"What is Agent Substrate?"}'; echo
    ```
    The request returns a `502` error: `model call failed: …`. The agent tried to reach the gateway, but **egress is deny-by-default**
-   and `buddy` has no policy. Without a policy, Substrate doesn't open an outbound tunnel at all, which is why the error
-   reads `connection reset by peer` rather than "denied": the proxy drops the connection before anything can
-   refuse it.
+   and `buddy` has no policy. The error ends in `no such host` rather than "denied": the sandbox's DNS answers NXDOMAIN for
+   any hostname that the actor's policy doesn't allow, so the agent can't look up the gateway's address.
 4. **Allow traffic to the gateway only.**
    ```bash
    cat modules/04-make-it-an-agent/manifests/egress-gateway.yaml

@@ -46,7 +46,7 @@ with **VOLUMES** fidelity (`SNAPSHOT_FIDELITY_VOLUMES`): Substrate saves only th
    kubectl ate suspend actor hello -a workshop 2>/dev/null; kubectl ate get actors -a workshop
    diff modules/02-hello-actor/manifests/template.yaml.tmpl modules/03-suspend-resume/manifests/template.yaml.tmpl
    scripts/render.sh modules/03-suspend-resume/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
-   kubectl ate get actor-template agent-v2 -a workshop -o yaml | grep -A2 goldenTag   # repeat until set
+   until kubectl ate get actor-template agent-v2 -a workshop -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus.goldenTag.name' >/dev/null; do sleep 3; done
    kubectl ate create actor memo --template=agent-v2 -a workshop
    ```
 6. Follow the actor's logs in a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`). The log stream follows the actor across workers and restarts:

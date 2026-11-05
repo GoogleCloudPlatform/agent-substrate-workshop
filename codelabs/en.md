@@ -2,11 +2,11 @@
 id: agent-substrate
 summary: Build and operate your own fleet of AI agents on Agent Substrate, starting from a bare GKE cluster.
 authors: Mofi Rahman, Olivier Bourgeois
-categories: GKE, Vertex AI, Agent Substrate
+categories: GKE, Gemini Enterprise Agent Platform, Agent Substrate
 tags: GKE, Gemini, Agent Substrate
 feedback_link: https://github.com/googlecodelabs/feedback/issues/new?title=[agent-substrate]:&labels[]=content-platform&labels[]=cloud
 analytics_account: UA-66226300-1
-keywords: event:KubeConNA2026,docType:Codelab,skill:Intermediate,language:Python,category:Cloud,category:AiAndMachineLearning,product:GoogleKubernetesEngine,product:VertexAi
+keywords: event:KubeConNA2026,docType:Codelab,skill:Intermediate,language:Python,category:Cloud,category:AiAndMachineLearning,product:GoogleKubernetesEngine,product:GeminiEnterpriseAgentPlatform
 
 ---
 
@@ -179,7 +179,7 @@ many actors.
 > | SandboxTemplate | ActorTemplate | Substrate takes a **golden snapshot** of the template |
 > | SandboxWarmPool | WorkerPool | Workers are generic; any worker runs any actor of a matching template |
 > | SandboxClaim | create / resume actor | Resume restores memory, not just disk |
-> | Suspend = delete the Pod | Suspend = checkpoint memory and disk to Cloud Storage | Resume on *any* worker |
+> | Suspend = scale to 0: the Pod is deleted, and the PVC is kept and reattached on resume | Suspend = checkpoint memory and disk to Cloud Storage | Many actors share a few generic workers, and a suspended actor resumes on *any* of them |
 >
 > Note the naming overlap: Substrate also has a `SandboxConfig` CRD, which configures gVisor and microVM runtimes.
 >
@@ -205,6 +205,7 @@ many actors.
 | **atenet-egress** | Proxies every outbound connection from an actor. **Denies traffic by default**; `EgressPolicy` opens specific destinations. |
 | **k8s-credential-provider** | Resolves `ate-secret://k8s.io/…` references from Kubernetes Secrets for `atenet-egress` when an `https` `EgressPolicy` rule injects headers (optional lab J). Denies access by default until you grant specific namespaces. |
 | **podcertcontroller** | Issues certificates so actors and components have cryptographic identities. Clients trust `ateapi` through a `ClusterTrustBundle`. |
+| **ate-idp-server** | Serves the public OIDC discovery document and JWKS that relying parties use to verify actor JWTs. |
 
 **CRDs vs. records**
 
@@ -235,6 +236,10 @@ cat .workshop/worker-image                       # the worker build that matches
 
 Right after the installation finishes, you might see an extra `atenet-router` Pod in the `Terminating` state. That Pod is the previous instance draining:
 the installer patches the router with a longer parked-request budget and a 120-second grace period, which triggers a rolling update.
+
+Every `kubectl ate` command prints `Warning: no --token-file given; acting as the shared identity system:serviceaccount:ate-system:ate-client rather than as yourself. Pass --token-file to act as yourself.`
+That's expected in this workshop: without `--token-file`, `kubectl ate` acts as the shared `ate-client` ServiceAccount, which the
+installer makes a global owner so that the demos work.
 
 ### What just happened
 - You inspected the control plane (`ateapi`, `atecontroller`, Postgres), the data plane (`atelet` in each worker, the router, and the egress proxy),
@@ -280,17 +285,21 @@ an actor, and send requests to it through the router.
    probe, the snapshot fidelity (`preferredFidelity`), resource limits (`cpuMillicores`, `memoryBytes`), and one durable directory.
    ```bash
    scripts/render.sh modules/02-hello-actor/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
-   kubectl ate get actor-template agent-v1 -a workshop            # repeat until GOLDEN TAG appears
+   until kubectl ate get actor-template agent-v1 -a workshop -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus.goldenTag.name' >/dev/null; do sleep 3; done
+   kubectl ate get actor-template agent-v1 -a workshop
    kubectl ate get actor-template agent-v1 -a workshop -o yaml    # inspect status.goldenSnapshotStatus.goldenTag.name
    ```
+   The `until` loop returns once the golden snapshot exists, and the next command shows it in the `GOLDEN TAG` column.
+   If it hasn't returned in about 5 minutes, press Ctrl+C and check the [troubleshooting guide](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/instructor/troubleshooting.md).
    Substrate starts your container once on a free worker, waits for its `wakeupProbe` (`/readyz`) to pass, and snapshots it.
    That **golden snapshot** serves as the starting point for every actor created from this template. Creating an actor
    restores this snapshot instead of cold-booting a process.
 5. **Create an actor.**
    ```bash
    kubectl ate create actor hello --template=agent-v1 -a workshop
-   kubectl ate get actors -a workshop       # SUSPENDED: the record exists, but it isn't running on a worker
+   kubectl ate get actors -a workshop
    ```
+   The `STATE` column shows `ACTOR_STATE_SUSPENDED`: the record exists, but it isn't running on a worker yet.
 6. **Send requests to the actor.** The router selects the target actor from the `ate-target-actor` header.
    ```bash
    make forward-router                      # port-forwards atenet-router to localhost:8080
@@ -371,7 +380,7 @@ with **VOLUMES** fidelity (`SNAPSHOT_FIDELITY_VOLUMES`): Substrate saves only th
    kubectl ate suspend actor hello -a workshop 2>/dev/null; kubectl ate get actors -a workshop
    diff modules/02-hello-actor/manifests/template.yaml.tmpl modules/03-suspend-resume/manifests/template.yaml.tmpl
    scripts/render.sh modules/03-suspend-resume/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
-   kubectl ate get actor-template agent-v2 -a workshop -o yaml | grep -A2 goldenTag   # repeat until set
+   until kubectl ate get actor-template agent-v2 -a workshop -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus.goldenTag.name' >/dev/null; do sleep 3; done
    kubectl ate create actor memo --template=agent-v2 -a workshop
    ```
 6. Follow the actor's logs in a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`). The log stream follows the actor across workers and restarts:
@@ -442,15 +451,21 @@ model access, and a deny-by-default **egress policy** lets the actor reach the g
    `backend` shows which model answered (`gemini`). If a Gemini call fails (for example, with a `403` error while the Workload Identity
    binding propagates), the gateway answers that request from a mock fallback instead: `backend` is `mock-fallback`
    and `upstreamError` reports what the platform returned. As a result, the `502` response from the agent in step 3 comes from
-   egress blocking, not the model.
-2. **Free a worker, then configure the agent to call the model.** Suspend `memo` so that the new template's golden-snapshot
-   actor has a free worker. In `app/cmd/agent/main.go`, find `WORKSHOP(module-4)` and set `ModelURL: os.Getenv("MODEL_URL")`.
+   egress blocking, not the model. `make verify MODULE=4` fails if the reply comes from `mock-fallback`, so check `upstreamError`,
+   or switch to the mock on purpose (see "If the model isn't available").
+2. **Configure the agent to call the model, then free a worker.** First, open `app/cmd/agent/main.go`, find the
+   `WORKSHOP(module-4)` comment, and change the line below it from `ModelURL: "",` to:
+   ```go
+   ModelURL: os.Getenv("MODEL_URL"),
+   ```
+   Save the file. Then suspend `memo` so that the new template's golden-snapshot actor has a free worker, and build the image.
+   If `make build-agent` warns that the image is the same as your last build, the edit isn't saved yet.
    ```bash
    kubectl ate suspend actor memo -a workshop
    make build-agent
    cat modules/04-make-it-an-agent/manifests/template.yaml.tmpl     # note the MODEL_URL environment variable
    scripts/render.sh modules/04-make-it-an-agent/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
-   kubectl ate get actor-template agent-v3 -a workshop -o yaml | grep -A2 goldenTag   # repeat until set
+   until kubectl ate get actor-template agent-v3 -a workshop -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus.goldenTag.name' >/dev/null; do sleep 3; done
    kubectl ate create actor buddy --template=agent-v3 -a workshop
    ```
 3. **Send a chat request and watch it fail.**
@@ -458,9 +473,8 @@ model access, and a deny-by-default **egress policy** lets the actor reach the g
    curl -s localhost:8081/chat/buddy -d '{"message":"What is Agent Substrate?"}'; echo
    ```
    The request returns a `502` error: `model call failed: …`. The agent tried to reach the gateway, but **egress is deny-by-default**
-   and `buddy` has no policy. Without a policy, Substrate doesn't open an outbound tunnel at all, which is why the error
-   reads `connection reset by peer` rather than "denied": the proxy drops the connection before anything can
-   refuse it.
+   and `buddy` has no policy. The error ends in `no such host` rather than "denied": the sandbox's DNS answers NXDOMAIN for
+   any hostname that the actor's policy doesn't allow, so the agent can't look up the gateway's address.
 4. **Allow traffic to the gateway only.**
    ```bash
    cat modules/04-make-it-an-agent/manifests/egress-gateway.yaml
@@ -539,8 +553,9 @@ the one piece that Substrate leaves to your application: **deciding when an acto
    ```bash
    curl -s localhost:8081/chat/swarm-01 -d '{"message":"hi"}' | jq -c '{turn, backend}'
    curl -s localhost:8081/chat/swarm-02 -d '{"message":"hi"}' | jq -c '{turn, backend}'
-   kubectl ate get workers -n workshop           # both workers are busy
+   kubectl ate get workers -n workshop
    ```
+   Both workers are now busy: each one shows `1/1000` in the `ACTORS` column and `1000/1000` in the `CPU(MILLICORES)` column.
 4. **Send a request to a third actor.** *(Optional: in an instructor-led session, your instructor might demonstrate or describe this step.)*
    ```bash
    time curl -s localhost:8081/chat/swarm-03 -d '{"message":"hi"}'; echo
@@ -758,11 +773,14 @@ gRPC services (`ax ssh`) inside a declarative `Task`, `Workspace`, and `Model` c
 
 For comparison, **agent-sandbox** (`kubernetes-sigs/agent-sandbox`) addresses a similar use case — running a
 Pod per agent session — with no Substrate integration. Its `SandboxTemplate` corresponds to
-`ActorTemplate` and `SandboxWarmPool` corresponds to `WorkerPool`, but suspending a Sandbox deletes the Pod, whereas suspending an
-actor checkpoints memory so it can resume on any worker. See the "Architecture tour" section for the full comparison table.
+`ActorTemplate` and `SandboxWarmPool` corresponds to `WorkerPool`, and both projects can suspend and resume. The difference is that many actors share a few generic workers,
+and a suspended actor resumes from its memory and disk snapshot on any of them. See the "Architecture tour" section for the full comparison table.
 
 ### Limits to know before you build
 - **Authorization inside an atespace is role-based (`AccessPolicy`).** Any principal granted `editor` or `admin` on an atespace can act on all actors in that atespace (there are no per-actor ACLs).
+- **Without `--token-file`, `kubectl ate` acts as the shared `ate-client` identity**, which the installer makes a global owner.
+  Substrate's authorization guide says not to keep that setup outside development. On a shared install, pass `--token-file` so
+  that each person acts as themselves.
 - **`CRASHED` actors require intervention** (from a human or your controller): `resume` rejects crashed actors, so run `kubectl ate revert actor X -a Y`
   to roll the actor back to `SUSPENDED` at its last snapshot before resuming, or delete it with `kubectl ate delete actor X -a Y`.
 - **Idle detection is your application's responsibility** (see "Density and idle"), and so is `WorkerPool` sizing (see optional lab G).

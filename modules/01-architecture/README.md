@@ -20,7 +20,7 @@ many actors.
 > | SandboxTemplate | ActorTemplate | Substrate takes a **golden snapshot** of the template |
 > | SandboxWarmPool | WorkerPool | Workers are generic; any worker runs any actor of a matching template |
 > | SandboxClaim | create / resume actor | Resume restores memory, not just disk |
-> | Suspend = delete the Pod | Suspend = checkpoint memory and disk to Cloud Storage | Resume on *any* worker |
+> | Suspend = scale to 0: the Pod is deleted, and the PVC is kept and reattached on resume | Suspend = checkpoint memory and disk to Cloud Storage | Many actors share a few generic workers, and a suspended actor resumes on *any* of them |
 >
 > Note the naming overlap: Substrate also has a `SandboxConfig` CRD, which configures gVisor and microVM runtimes.
 >
@@ -46,6 +46,7 @@ many actors.
 | **atenet-egress** | Proxies every outbound connection from an actor. **Denies traffic by default**; `EgressPolicy` opens specific destinations. |
 | **k8s-credential-provider** | Resolves `ate-secret://k8s.io/…` references from Kubernetes Secrets for `atenet-egress` when an `https` `EgressPolicy` rule injects headers (optional lab J). Denies access by default until you grant specific namespaces. |
 | **podcertcontroller** | Issues certificates so actors and components have cryptographic identities. Clients trust `ateapi` through a `ClusterTrustBundle`. |
+| **ate-idp-server** | Serves the public OIDC discovery document and JWKS that relying parties use to verify actor JWTs. |
 
 **CRDs vs. records**
 
@@ -76,6 +77,10 @@ cat .workshop/worker-image                       # the worker build that matches
 
 Right after the installation finishes, you might see an extra `atenet-router` Pod in the `Terminating` state. That Pod is the previous instance draining:
 the installer patches the router with a longer parked-request budget and a 120-second grace period, which triggers a rolling update.
+
+Every `kubectl ate` command prints `Warning: no --token-file given; acting as the shared identity system:serviceaccount:ate-system:ate-client rather than as yourself. Pass --token-file to act as yourself.`
+That's expected in this workshop: without `--token-file`, `kubectl ate` acts as the shared `ate-client` ServiceAccount, which the
+installer makes a global owner so that the demos work.
 
 ## What just happened
 - You inspected the control plane (`ateapi`, `atecontroller`, Postgres), the data plane (`atelet` in each worker, the router, and the egress proxy),
