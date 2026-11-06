@@ -268,7 +268,7 @@ an actor, and send requests to it through the router.
    probe, the snapshot fidelity (`preferredFidelity`), resource limits (`cpuMillicores`, `memoryBytes`), and one durable directory.
    ```bash
    scripts/render.sh modules/02-hello-actor/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
-   until kubectl ate get actor-template agent-v1 -a workshop -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus.goldenTag.name' >/dev/null; do sleep 3; done
+   until kubectl ate get actor-template agent-v1 -a workshop -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus | (.goldenTag.name // .errorMessage)' >/dev/null; do sleep 3; done
    kubectl ate get actor-template agent-v1 -a workshop
    kubectl ate get actor-template agent-v1 -a workshop -o yaml    # inspect status.goldenSnapshotStatus.goldenTag.name
    ```
