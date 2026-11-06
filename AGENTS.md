@@ -36,6 +36,7 @@ Whenever you add, edit, or remove instructions, commands, explanations, or diagr
 - **Intentional Codelabs/Qwiklabs-specific differences**:
   - `## Introduction` in [`codelabs/en.md`](codelabs/en.md) and [`qwiklabs/en.md`](qwiklabs/en.md) is a condensed version of [`README.md`](README.md) (it omits the agenda table, quick start, and teardown sections that duplicate step navigation).
   - In [`qwiklabs/en.md`](qwiklabs/en.md), `## Setup` uses Qwiklabs variable tags (`<ql-variable key="project_0.project_id" placeHolder="YOUR_PROJECT_ID"></ql-variable>` and `<ql-variable key="project_0.default_region" placeHolder="us-central1"></ql-variable>`) and `<ql-code-block bash templated noWrap>` (`{{{project_0.project_id | YOUR_PROJECT_ID }}}` and `{{{project_0.default_region | us-central1 }}}`) so project ID and region are automatically populated by the Qwiklabs environment.
+  - [`codelabs/en.md`](codelabs/en.md) ends the `## Appendix: Optional content` step with a Codelab-only `### When you're done` section that points back to the Wrap-up "Clean up" steps. It has no counterpart in `optional/`; keep it last in the Appendix when you sync optional labs.
 
 ---
 

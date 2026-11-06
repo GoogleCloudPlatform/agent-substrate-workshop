@@ -6,7 +6,7 @@ categories: GKE, Gemini Enterprise Agent Platform, Agent Substrate
 tags: GKE, Gemini, Agent Substrate
 feedback_link: https://github.com/googlecodelabs/feedback/issues/new?title=[agent-substrate]:&labels[]=content-platform&labels[]=cloud
 analytics_account: UA-66226300-1
-keywords: event:KubeConNA2026,docType:Codelab,skill:Intermediate,language:Python,category:Cloud,category:AiAndMachineLearning,product:GoogleKubernetesEngine,product:GeminiEnterpriseAgentPlatform
+keywords: event:KubeConNA2026,docType:Codelab,skill:Intermediate,language:GoLang,category:Cloud,category:AiAndMachineLearning,product:GoogleKubernetesEngine,product:AgentPlatform
 
 ---
 
