@@ -727,7 +727,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    your agent's own log lines. Include both clauses in the `OR` filter: `ateapi` and `atelet` write actor identity into `jsonPayload` rather than
    `labels`, so filtering only on `labels` misses the state transitions.
 
-8. **Follow one request by its trace ID.** In Logs Explorer, replace the filter with `jsonPayload.trace_id="<id>"`, using the trace ID from the `--trace` resume command in step 6. This query isolates that
+8. **Follow one request by its trace ID.** In Logs Explorer, replace the filter with `jsonPayload.trace_id="YOUR_TRACE_ID"`, using the trace ID from the `--trace` resume command in step 6. This query isolates that
    single request across `ateapi`, `atelet`, and `ateworker`. Paste the same ID into **Cloud Trace** → **Trace Explorer** to
    inspect the request as a waterfall of spans.
 
