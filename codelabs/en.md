@@ -849,7 +849,7 @@ We checked every env tag and `main`:
 | env ref | substrate pin (`go.mod`) | compatibility with `v1.0.0` |
 |---|---|---|
 | `v0.0.7`–`v0.0.10` | `v0.0.0-20260717234919-a2d55e99e02e` (2026-07-17) | Pre-`v0.2.0` (`readyz`, `snapshotsConfig`) |
-| `2c780cd` | `go.ate.dev/substrate v0.5.1-0.20261018212731-ddb46651d605` (2026-10-18) | Matches `v1.0.0` with [`patch-env-v060.py`](./patch-env-v060.py) (`ServiceAccount/ate-env-api`, `ate-env manifest access-policy`, `workerSelector` without `sandboxConfig`, `ate.dev/v1` `WorkerPool`, `go.ate.dev/substrate/api/ateapi/v1`, cluster-default snapshot storage location, and integer `cpuMillicores`/`memoryBytes` limits) |
+| `2c780cd` | `go.ate.dev/substrate v0.5.1-0.20261018212731-ddb46651d605` (2026-10-18) | Matches `v1.0.0` with [`patch-env-v060.py`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/A-env/patch-env-v060.py) (`ServiceAccount/ate-env-api`, `ate-env manifest access-policy`, `workerSelector` without `sandboxConfig`, `ate.dev/v1` `WorkerPool`, `go.ate.dev/substrate/api/ateapi/v1`, cluster-default snapshot storage location, and integer `cpuMillicores`/`memoryBytes` limits) |
 
 This lab pins `env` at:
 
@@ -857,7 +857,7 @@ This lab pins `env` at:
 ENV_REF=2c780cd94891c134cd10375a30a5e1e662ee2c2d   # env, 2026-10-18
 ```
 
-A small idempotent patch script ([`patch-env-v060.py`](./patch-env-v060.py)) updates the `ateapi`/`v1` imports, `ResourceRequirements`, and `SnapshotConfig` and bumps `go.ate.dev/substrate` to `v1.0.0`.
+A small idempotent patch script ([`patch-env-v060.py`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/A-env/patch-env-v060.py)) updates the `ateapi`/`v1` imports, `ResourceRequirements`, and `SnapshotConfig` and bumps `go.ate.dev/substrate` to `v1.0.0`.
 
 #### Two things to know before you start
 
@@ -1038,7 +1038,7 @@ make stop-forwards   # stops step 2's ate-env-api forward (and the workshop's ot
 
 #### Next
 
-Continue to [Optional lab B — Declarative tasks and workspaces with `google/ax`](#9) (which embeds `env`'s guest gRPC server inside `ax-task-runner` to power `ax ssh`), or back to [Module 7 — Wrap-up](../../modules/07-wrap-up/README.md) for the rest of the optional labs.
+Continue to [Optional lab B — Declarative tasks and workspaces with `google/ax`](#9) (which embeds `env`'s guest gRPC server inside `ax-task-runner` to power `ax ssh`), or back to [Module 7 — Wrap-up](#8) for the rest of the optional labs.
 
 ### Optional lab B — Declarative tasks and workspaces with `google/ax` (30–45 min)
 
@@ -1071,11 +1071,11 @@ Upstream `google/ax` pins an older Substrate commit (`v0.0.0-20260918201817-944a
 AX_REF=ac2332829f22360ff97b0ba34d94dd0dd782f17e   # google/ax main, 2026-10-12
 ```
 
-Step 1 runs [`optional/B-ax/patch-ax-v040.py`](patch-ax-v040.py) to bring it up to `v1.0.0` before building:
+Step 1 runs [`optional/B-ax/patch-ax-v040.py`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/B-ax/patch-ax-v040.py) to bring it up to `v1.0.0` before building:
 
 1. **Substrate `v1.0.0` proto and module path changes**: `github.com/agent-substrate/substrate/pkg/proto/ateapipb` → `go.ate.dev/substrate/api/ateapi/v1` (`v1.0.0`), `ContainerReadyz` → `WakeupProbe` + `HttpGetAction` (pointed at `/healthz` so the actor transitions to `RUNNING` as soon as the runner's HTTP server starts, while `TaskReconciler` polls `/readyz?check=workspace`), `SnapshotsConfig` (with `OnPause`/`OnResume`) → `SnapshotConfig` (`PreferredFidelity: SNAPSHOT_FIDELITY_VOLUMES`, omitting `StorageLocation` so the cluster's `--snapshot-location` is used), `SandboxConfig` removed from `ActorTemplate` (the `WorkerPool` determines the sandbox class), `ResourceRequirements.Limits` (`CpuMillicores: 1000`, `MemoryBytes: 536870912`), `WorkerPodIp` → `WorkerPodIps`, `DeleteActorRequest.AnyState` removed, `GetAtespace` checked before `CreateAtespace` (so an `editor` on a pre-created atespace does not need `can_create_atespace` on `global:root`), and a retry in `EnsureActor` while the template's golden snapshot finishes (`FailedPrecondition`).
 2. **`ko`-built runner path**: AX's `.ko.yaml` already configures `cmd/ax-task-runner` to use `alpine/git:latest` (Alpine + `git`, `sh`, `wget`), which lets `ko build` produce a `@sha256:` digest-pinned runner image without Docker. The patch switches `DefaultGuestCommand` in `internal/substrate/client.go` from `/usr/local/bin/ax-task-runner` to `/ko-app/ax-task-runner` where `ko` places the binary.
-3. **`WorkerSelector`, `VOLUMES`-fidelity marker path, and namespace-scoped RBAC**: adds `workerSelector: {workload: ax-worker}` so AX tasks run on their own `ax-workers` pool instead of the workshop's `agents` pool, moves AX's maiden-run marker directory (`DefaultAXDir` in `internal/workspace/setup.go`) from `/ax` to `/workspace/.ax` so it lives inside the `/workspace` `durableDir` and survives a `SNAPSHOT_FIDELITY_VOLUMES` suspend/resume ([Module 3 Part B](../../modules/03-suspend-resume/README.md#part-b-disk-only-suspend-template-agent-v2)), labels `Namespace/ax-system` with `ate.dev/api-access: "true"`, and removes the cluster-wide Secret `ClusterRole` and `ClusterRoleBinding` from `deploy/ax-server.yaml` so the deployment stays strictly namespace-scoped to `ax-system`.
+3. **`WorkerSelector`, `VOLUMES`-fidelity marker path, and namespace-scoped RBAC**: adds `workerSelector: {workload: ax-worker}` so AX tasks run on their own `ax-workers` pool instead of the workshop's `agents` pool, moves AX's maiden-run marker directory (`DefaultAXDir` in `internal/workspace/setup.go`) from `/ax` to `/workspace/.ax` so it lives inside the `/workspace` `durableDir` and survives a `SNAPSHOT_FIDELITY_VOLUMES` suspend/resume ([Module 3 Part B](#4)), labels `Namespace/ax-system` with `ate.dev/api-access: "true"`, and removes the cluster-wide Secret `ClusterRole` and `ClusterRoleBinding` from `deploy/ax-server.yaml` so the deployment stays strictly namespace-scoped to `ax-system`.
 
 #### 1. Build and deploy AX (you build every image)
 
@@ -1118,7 +1118,7 @@ Look at `.workshop/ax/deploy/ax-server.yaml`: `ax-server` mounts the same `servi
 
 #### 2. Declare a Workspace and a Task
 
-Read [`optional/B-ax/task.yaml.tmpl`](task.yaml.tmpl): it declares a `Workspace` (`demo-workspace`) that seeds `AGENTS.md` and `hello.sh`, and a `Task` (`demo-task`) that mounts it at `/workspace`, runs `/bin/sh hello.sh`, and sets `debug: true` so `ax ssh` works.
+Read [`optional/B-ax/task.yaml.tmpl`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/B-ax/task.yaml.tmpl): it declares a `Workspace` (`demo-workspace`) that seeds `AGENTS.md` and `hello.sh`, and a `Task` (`demo-task`) that mounts it at `/workspace`, runs `/bin/sh hello.sh`, and sets `debug: true` so `ax ssh` works.
 
 ```bash
 scripts/render.sh optional/B-ax/task.yaml.tmpl | ax apply -f -
@@ -1144,7 +1144,7 @@ kubectl ate get actor-template "$TMPL" -a ax-workshop -o yaml
 
 Compare that generated `ActorTemplate` with the ones you wrote by hand in Modules 2–4:
 
-- **Name (`demo-task-tmpl-<hash>`)**: `TaskReconciler` (`internal/controller/reconciler.go`) hashes the image and environment variables into the template name. Because both AX `Task`s and Substrate `ActorTemplate`s are immutable ([Module 3](../../modules/03-suspend-resume/README.md#templates-are-immutable)), changing a task's spec requires either a new task name or deleting and recreating the task (`ax delete task …` then `ax apply -f …`, which discards the previous actor state and generates a fresh template digest).
+- **Name (`demo-task-tmpl-<hash>`)**: `TaskReconciler` (`internal/controller/reconciler.go`) hashes the image and environment variables into the template name. Because both AX `Task`s and Substrate `ActorTemplate`s are immutable ([Module 3](#4)), changing a task's spec requires either a new task name or deleting and recreating the task (`ax delete task …` then `ax apply -f …`, which discards the previous actor state and generates a fresh template digest).
 - **Entrypoint (`/ko-app/ax-task-runner`)**: AX never sets your `spec.command` as the container entrypoint. Instead, it injects the task and workspace YAML into `AX_TASK_YAML` and `AX_WORKSPACES_YAML` env vars and boots `ax-task-runner` as PID 1 on port 80 (`wakeupProbe: /healthz`, with `/readyz` reporting `200 OK` once `SetupWorkspace` finishes).
 - **Storage (`preferredFidelity: SNAPSHOT_FIDELITY_VOLUMES`, `durableDir: /workspace`)**: AX uses the disk-only snapshot fidelity from Module 3 Part B. Only `/workspace` is saved to GCS on suspend; on resume, `ax-task-runner` cold-boots, sees `/workspace/.ax/initialized-workspace`, skips workspace setup, and starts your command against the restored files.
 
@@ -1190,9 +1190,9 @@ Notice two things in the output:
 
 #### 5. Clone a Git repository and lock down egress
 
-A `Workspace` can also clone Git repositories (`spec.git`) before the task reports `WorkspaceReady`. Because an actor has **deny-by-default egress** ([Module 4](../../modules/04-make-it-an-agent/README.md)) and AX does not yet attach an `EgressPolicy` automatically, a task that clones from GitHub needs an `EgressPolicy` before its first resume.
+A `Workspace` can also clone Git repositories (`spec.git`) before the task reports `WorkspaceReady`. Because an actor has **deny-by-default egress** ([Module 4](#5)) and AX does not yet attach an `EgressPolicy` automatically, a task that clones from GitHub needs an `EgressPolicy` before its first resume.
 
-Because `ax apply` creates tasks in `Suspended` phase, you can apply the task, attach [`optional/B-ax/egress-github.yaml`](egress-github.yaml) to its actor while it is still asleep, and then resume it:
+Because `ax apply` creates tasks in `Suspended` phase, you can apply the task, attach [`optional/B-ax/egress-github.yaml`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/B-ax/egress-github.yaml) to its actor while it is still asleep, and then resume it:
 
 ```bash
 ax suspend task demo-task -a ax-workshop
@@ -1215,7 +1215,7 @@ ax ssh repo-task -a ax-workshop -- sh -c '
 
 #### 6. Find it on the dashboard
 
-Use the same signals from [Module 6](../../modules/06-observe/README.md), filtered to the `ax-workers` pool and `ax-workshop` atespace (replace `ate-cluster` if your `CLUSTER_NAME` in `workshop.env` differs):
+Use the same signals from [Module 6](#7), filtered to the `ax-workers` pool and `ax-workshop` atespace (replace `ate-cluster` if your `CLUSTER_NAME` in `workshop.env` differs):
 
 ```bash
 make prometheus-ui   # http://localhost:9090
@@ -1260,7 +1260,7 @@ kubectl delete namespace ax-system --ignore-not-found
 
 #### Next
 
-Back to [Module 7 — Wrap-up](../../modules/07-wrap-up/README.md) for the rest of the optional labs.
+Back to [Module 7 — Wrap-up](#8) for the rest of the optional labs.
 
 ### Optional lab C — What counts as idle? (20 min)
 
@@ -1380,7 +1380,7 @@ Keep `Heartbeat: true` or set it back: agent-v3's golden snapshot doesn't change
 
 #### Next
 
-Back to [Module 7 — Wrap-up](../../modules/07-wrap-up/README.md) for the rest of the optional labs.
+Back to [Module 7 — Wrap-up](#8) for the rest of the optional labs.
 
 ### Optional lab D — Tags, clone, revert (20 min)
 
@@ -1469,7 +1469,7 @@ kubectl ate delete tag knows-pineapple -a workshop
 suspend, and substrate doesn't yet stop you from deleting a tag out from under a clone that still needs it.)
 
 #### Next
-Back to [Module 7 — Wrap-up](../../modules/07-wrap-up/README.md) for the rest of the optional labs.
+Back to [Module 7 — Wrap-up](#8) for the rest of the optional labs.
 
 ### Optional lab E — Your own gRPC client (outline)
 
@@ -1524,7 +1524,7 @@ Starts from the end of Module 6 (`make catch-up MODULE=7`).
 #### 1. Alerts on what the fleet already tells you
 
 Two of these come straight from the canned queries in `observability/queries.md`; the other two are the
-signals [Module 6](../../modules/06-observe/README.md) already teaches as the gaps to watch: crashes (the actor
+signals [Module 6](#7) already teaches as the gaps to watch: crashes (the actor
 loses everything since its last snapshot until someone runs `kubectl ate revert actor`) and a WorkerPool whose ready workers never catch up with desired.
 
 The policy files use `${CLUSTER_NAME}` and `${ATESPACE}` (from `workshop.env`), so `scripts/render.sh` fills
@@ -1700,7 +1700,7 @@ gcloud logging metrics delete actor_usage_events --project "$PROJECT_ID" --quiet
 ```
 
 #### Next
-Back to [Module 7 — Wrap-up](../../modules/07-wrap-up/README.md) for the rest of the optional labs.
+Back to [Module 7 — Wrap-up](#8) for the rest of the optional labs.
 
 ### Optional lab G — Autoscale the WorkerPool (30 min)
 
@@ -1795,7 +1795,7 @@ kubectl -n workshop patch workerpool agents --type merge -p '{"spec":{"replicas"
 ```
 
 #### Next
-Back to [Module 7 — Wrap-up](../../modules/07-wrap-up/README.md) for the rest of the optional labs.
+Back to [Module 7 — Wrap-up](#8) for the rest of the optional labs.
 
 ### Optional lab H — agent-swarm at 50:20 (30 min)
 
@@ -1809,7 +1809,7 @@ back through the router. Compare that with Module 4's gateway-only-egress patter
 
 Each `conf-workers` pod hosts `DEMO_CONF_ACTORS_PER_WORKER` actors at once (default 4). `hack/deploy.sh` sets
 the worker's CPU limit to that many CPUs plus 500m, and each actor asks for 1 CPU, so the limit decides the
-seat count (the shared-budget rule from [Module 5](../../modules/05-density-idle/README.md)). At the default
+seat count (the shared-budget rule from [Module 5](#6)). At the default
 maximum of 5 workers, 20 of the 50 attendees run at once and the rest wait suspended. An HPA scales the pool
 on worker demand: workers that are `partial` or `at_capacity`, plus one worker for every
 `DEMO_CONF_ACTORS_PER_WORKER` requests parked at the router.
@@ -1906,7 +1906,7 @@ Pick one of the two `hack/deploy.sh up` lines, not both.
   In Logs Explorer, swap the atespace label the way lab A does:
   `resource.type="k8s_container"`, `"Actor state changed"`, `jsonPayload."ate.atespace"="ate-demo-conf"` (ateapi writes the atespace in `jsonPayload`, not `labels`).
 - `substrate-gaps.md`: the maintainers' list of what Substrate doesn't do yet — worth comparing against
-  [Module 7](../../modules/07-wrap-up/README.md#limits-to-know-before-you-build)'s own limits list.
+  [Module 7](#8)'s own limits list.
 
 #### Clean up
 ```bash
@@ -1918,7 +1918,7 @@ cd "$REPO_ROOT" && make stop-forwards
 place — it prints the `gcloud` commands to remove them if you want them gone.
 
 #### Next
-Back to [Module 7 — Wrap-up](../../modules/07-wrap-up/README.md) for the rest of the optional labs.
+Back to [Module 7 — Wrap-up](#8) for the rest of the optional labs.
 
 ### Optional lab I — microVM sandbox class (45–60 min)
 
@@ -1970,9 +1970,9 @@ source scripts/env.sh    # workshop.env into this shell (bash or zsh): PROJECT_I
    `.workshop/substrate/manifests/ate-install/sandboxconfig-microvm.yaml.tmpl` explain each field.
 3. **A microVM worker pool and template.** The WorkerPool needs substrate's `ateworker-microvm` worker image:
    `make install` built only `ateworker-gvisor`. Build it the way `scripts/install-substrate.sh` builds the
-   gVisor one, then apply [`workerpool.yaml.tmpl`](workerpool.yaml.tmpl) (Module 2's pool plus
+   gVisor one, then apply [`workerpool.yaml.tmpl`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/I-microvm/workerpool.yaml.tmpl) (Module 2's pool plus
    `sandboxClasses: [{name: microvm, configRef: {name: microvm}}]`, the node pool's label, and a toleration for its taint) and
-   [`template.yaml.tmpl`](template.yaml.tmpl) (`agent-v3` with `workerSelector` matching `workshop-agent-vm`):
+   [`template.yaml.tmpl`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/I-microvm/template.yaml.tmpl) (`agent-v3` with `workerSelector` matching `workshop-agent-vm`):
    ```bash
    export MICROVM_WORKER_IMAGE="$(cd .workshop/substrate && export GOWORK=off KO_DOCKER_REPO KO_DEFAULTPLATFORMS &&
      ver="$(git describe --tags --always --dirty)" &&
@@ -2058,11 +2058,11 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
 4. Extend `egress-gateway.yaml` with an `https` rule whose `effects.replaceHeaders` replaces the
    `Authorization` header (`prefix: "Bearer "`) with the credential from
    `ate-secret://k8s.io/default/workshop-secrets/example-api/token`. `effects` belongs to the `https` rule,
-   next to `hostnames`; [`egress-fetch.yaml`](egress-fetch.yaml) has the finished shape.
+   next to `hostnames`; [`egress-fetch.yaml`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/J-credential-injection/egress-fetch.yaml) has the finished shape.
 5. Add a `/fetch` route to a copy of the agent that calls the API with a placeholder `Authorization: Bearer placeholder` header
-   ([`app/cmd/agent-fetch`](../../app/cmd/agent-fetch/main.go) is a finished version). The actor also needs to
+   ([`app/cmd/agent-fetch`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/app/cmd/agent-fetch/main.go) is a finished version). The actor also needs to
    trust both the egress gateway's MITM CA (`egress-mitm.ate.dev`) and public root CAs (`system-roots.ate.dev`).
-   [`template.yaml.tmpl`](template.yaml.tmpl) is agent-v3 plus a `systemInfo` volume with
+   [`template.yaml.tmpl`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/J-credential-injection/template.yaml.tmpl) is agent-v3 plus a `systemInfo` volume with
    `trustBundle.names: [egress-mitm.ate.dev, system-roots.ate.dev]` and `SSL_CERT_FILE`
    (substrate's `docs/egress-trust-bundle.md` explains both):
    ```bash
