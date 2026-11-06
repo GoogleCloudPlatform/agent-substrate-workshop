@@ -35,6 +35,8 @@ published and source install modes (`make e2e` passed with real Gemini; optional
    patch once upstream `main` catches up to `SUBSTRATE_REF`).
    **For optional lab H** (`moficodes/agent-swarm`, which must be public before the event): pick a commit whose `go.mod` substrate version is
    exactly `SUBSTRATE_REF`. Its `hack/deploy.sh` refuses to deploy onto a cluster running any other version.
+   **For `ko`** (pinned to `github.com/google/ko@v0.19.1` in Setup and the preflight hint): bump the pin only to a release
+   whose `go.mod` Go version is at or below Cloud Shell's Go version.
 6. **Provision attendee projects and clusters.** Each attendee is Owner on their own GCP project, with a
    bare GKE cluster that has, at creation:
    - GKE **1.37+** (the minimum the workshop is validated on; `make preflight` rejects older). GKE 1.37 serves

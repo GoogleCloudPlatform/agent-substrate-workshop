@@ -26,7 +26,7 @@ need() { if "$@"; then ok "$CHECK"; else warn "$CHECK — $HINT"; failures=$((fa
 step "Tools"
 for t in gcloud kubectl go ko jq envsubst curl git python3; do
   case "$t" in
-    ko)       hint="install ko: go install github.com/google/ko@latest (then make sure \$(go env GOPATH)/bin is on PATH)" ;;
+    ko)       hint="install ko: go install github.com/google/ko@v0.19.1 (then make sure \$(go env GOPATH)/bin is on PATH)" ;;
     envsubst) hint="install envsubst (gettext: brew install gettext / apt install gettext-base)" ;;
     *)        hint="install $t" ;;
   esac

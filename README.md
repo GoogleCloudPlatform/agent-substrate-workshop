@@ -43,7 +43,7 @@ doesn't break an earlier one (see [Wrap-up](modules/07-wrap-up/README.md#keep-go
   with these settings.
 - Local tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst`, `curl`, `git`, `python3`, and, only to
   build Substrate from source, a running Docker daemon with `buildx`. Cloud Shell includes all of these tools except `ko`
-  (`go install github.com/google/ko@latest`).
+  (`go install github.com/google/ko@v0.19.1`).
 - Familiarity with Kubernetes. You don't need prior Substrate knowledge.
 
 For comparison, [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) solves a

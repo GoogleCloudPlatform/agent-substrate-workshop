@@ -10,14 +10,14 @@ If you create your own cluster in this section, plan for about 20 minutes.
 - `kubectl` configured to point at that cluster (`kubectl config current-context`).
 - Locally installed tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `curl`, `git`, `python3`.
   You need a running **Docker** daemon with `buildx` only to build Substrate from source (empty `SUBSTRATE_IMAGE_REPO`).
-  Cloud Shell includes all of these tools except `ko`: run `go install github.com/google/ko@latest`.
+  Cloud Shell includes all of these tools except `ko`: run `go install github.com/google/ko@v0.19.1`.
 
 ## Steps
 
 1. **Activate Cloud Shell.** Open the Google Cloud console and click **Activate Cloud Shell** in the top-right
    toolbar to launch Cloud Shell — a self-contained VM in your browser with all the required tools except `ko` — and run all the commands in this lab from there. Install `ko` first:
    ```bash
-   go install github.com/google/ko@latest
+   go install github.com/google/ko@v0.19.1
    ```
 2. **Clone the workshop repository.** Clone the repository and move into its root directory:
    ```bash
