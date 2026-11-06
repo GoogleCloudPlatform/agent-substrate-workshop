@@ -842,14 +842,14 @@ It's the pattern you built in Modules 4–5 (an always-on API in front of suspen
 
 #### Which env commit, and why
 
-Our `SUBSTRATE_REF` is `v1.0.0-rc.2` (pinned in `app/go.mod` as `go.ate.dev/substrate v1.0.0-rc.2`).
+Our `SUBSTRATE_REF` is `v1.0.0` (pinned in `app/go.mod` as `go.ate.dev/substrate v1.0.0`).
 
 We checked every env tag and `main`:
 
-| env ref | substrate pin (`go.mod`) | compatibility with `v1.0.0-rc.2` |
+| env ref | substrate pin (`go.mod`) | compatibility with `v1.0.0` |
 |---|---|---|
 | `v0.0.7`–`v0.0.10` | `v0.0.0-20260717234919-a2d55e99e02e` (2026-07-17) | Pre-`v0.2.0` (`readyz`, `snapshotsConfig`) |
-| `2c780cd` | `go.ate.dev/substrate v0.5.1-0.20261018212731-ddb46651d605` (2026-10-18) | Matches `v1.0.0-rc.2` with [`patch-env-v060.py`](./patch-env-v060.py) (`ServiceAccount/ate-env-api`, `ate-env manifest access-policy`, `workerSelector` without `sandboxConfig`, `ate.dev/v1` `WorkerPool`, `go.ate.dev/substrate/api/ateapi/v1`, cluster-default snapshot storage location, and integer `cpuMillicores`/`memoryBytes` limits) |
+| `2c780cd` | `go.ate.dev/substrate v0.5.1-0.20261018212731-ddb46651d605` (2026-10-18) | Matches `v1.0.0` with [`patch-env-v060.py`](./patch-env-v060.py) (`ServiceAccount/ate-env-api`, `ate-env manifest access-policy`, `workerSelector` without `sandboxConfig`, `ate.dev/v1` `WorkerPool`, `go.ate.dev/substrate/api/ateapi/v1`, cluster-default snapshot storage location, and integer `cpuMillicores`/`memoryBytes` limits) |
 
 This lab pins `env` at:
 
@@ -857,7 +857,7 @@ This lab pins `env` at:
 ENV_REF=2c780cd94891c134cd10375a30a5e1e662ee2c2d   # env, 2026-10-18
 ```
 
-A small idempotent patch script ([`patch-env-v060.py`](./patch-env-v060.py)) updates the `ateapi`/`v1` imports, `ResourceRequirements`, and `SnapshotConfig` and bumps `go.ate.dev/substrate` to `v1.0.0-rc.2`.
+A small idempotent patch script ([`patch-env-v060.py`](./patch-env-v060.py)) updates the `ateapi`/`v1` imports, `ResourceRequirements`, and `SnapshotConfig` and bumps `go.ate.dev/substrate` to `v1.0.0`.
 
 #### Two things to know before you start
 
@@ -1063,7 +1063,7 @@ flowchart LR
 
 #### Which AX commit, and why
 
-Our `SUBSTRATE_REF` is `v1.0.0-rc.2` (pinned in `app/go.mod` as `go.ate.dev/substrate v1.0.0-rc.2`).
+Our `SUBSTRATE_REF` is `v1.0.0` (pinned in `app/go.mod` as `go.ate.dev/substrate v1.0.0`).
 
 Upstream `google/ax` pins an older Substrate commit (`v0.0.0-20260918201817-944abe3278b8` in `go.mod`). This lab pins AX at:
 
@@ -1071,9 +1071,9 @@ Upstream `google/ax` pins an older Substrate commit (`v0.0.0-20260918201817-944a
 AX_REF=ac2332829f22360ff97b0ba34d94dd0dd782f17e   # google/ax main, 2026-10-12
 ```
 
-Step 1 runs [`optional/B-ax/patch-ax-v040.py`](patch-ax-v040.py) to bring it up to `v1.0.0-rc.2` before building:
+Step 1 runs [`optional/B-ax/patch-ax-v040.py`](patch-ax-v040.py) to bring it up to `v1.0.0` before building:
 
-1. **Substrate `v1.0.0-rc.2` proto and module path changes**: `github.com/agent-substrate/substrate/pkg/proto/ateapipb` → `go.ate.dev/substrate/api/ateapi/v1` (`v1.0.0-rc.2`), `ContainerReadyz` → `WakeupProbe` + `HttpGetAction` (pointed at `/healthz` so the actor transitions to `RUNNING` as soon as the runner's HTTP server starts, while `TaskReconciler` polls `/readyz?check=workspace`), `SnapshotsConfig` (with `OnPause`/`OnResume`) → `SnapshotConfig` (`PreferredFidelity: SNAPSHOT_FIDELITY_VOLUMES`, omitting `StorageLocation` so the cluster's `--snapshot-location` is used), `SandboxConfig` removed from `ActorTemplate` (the `WorkerPool` determines the sandbox class), `ResourceRequirements.Limits` (`CpuMillicores: 1000`, `MemoryBytes: 536870912`), `WorkerPodIp` → `WorkerPodIps`, `DeleteActorRequest.AnyState` removed, `GetAtespace` checked before `CreateAtespace` (so an `editor` on a pre-created atespace does not need `can_create_atespace` on `global:root`), and a retry in `EnsureActor` while the template's golden snapshot finishes (`FailedPrecondition`).
+1. **Substrate `v1.0.0` proto and module path changes**: `github.com/agent-substrate/substrate/pkg/proto/ateapipb` → `go.ate.dev/substrate/api/ateapi/v1` (`v1.0.0`), `ContainerReadyz` → `WakeupProbe` + `HttpGetAction` (pointed at `/healthz` so the actor transitions to `RUNNING` as soon as the runner's HTTP server starts, while `TaskReconciler` polls `/readyz?check=workspace`), `SnapshotsConfig` (with `OnPause`/`OnResume`) → `SnapshotConfig` (`PreferredFidelity: SNAPSHOT_FIDELITY_VOLUMES`, omitting `StorageLocation` so the cluster's `--snapshot-location` is used), `SandboxConfig` removed from `ActorTemplate` (the `WorkerPool` determines the sandbox class), `ResourceRequirements.Limits` (`CpuMillicores: 1000`, `MemoryBytes: 536870912`), `WorkerPodIp` → `WorkerPodIps`, `DeleteActorRequest.AnyState` removed, `GetAtespace` checked before `CreateAtespace` (so an `editor` on a pre-created atespace does not need `can_create_atespace` on `global:root`), and a retry in `EnsureActor` while the template's golden snapshot finishes (`FailedPrecondition`).
 2. **`ko`-built runner path**: AX's `.ko.yaml` already configures `cmd/ax-task-runner` to use `alpine/git:latest` (Alpine + `git`, `sh`, `wget`), which lets `ko build` produce a `@sha256:` digest-pinned runner image without Docker. The patch switches `DefaultGuestCommand` in `internal/substrate/client.go` from `/usr/local/bin/ax-task-runner` to `/ko-app/ax-task-runner` where `ko` places the binary.
 3. **`WorkerSelector`, `VOLUMES`-fidelity marker path, and namespace-scoped RBAC**: adds `workerSelector: {workload: ax-worker}` so AX tasks run on their own `ax-workers` pool instead of the workshop's `agents` pool, moves AX's maiden-run marker directory (`DefaultAXDir` in `internal/workspace/setup.go`) from `/ax` to `/workspace/.ax` so it lives inside the `/workspace` `durableDir` and survives a `SNAPSHOT_FIDELITY_VOLUMES` suspend/resume ([Module 3 Part B](../../modules/03-suspend-resume/README.md#part-b-disk-only-suspend-template-agent-v2)), labels `Namespace/ax-system` with `ate.dev/api-access: "true"`, and removes the cluster-wide Secret `ClusterRole` and `ClusterRoleBinding` from `deploy/ax-server.yaml` so the deployment stays strictly namespace-scoped to `ax-system`.
 
@@ -1816,7 +1816,7 @@ on worker demand: workers that are `partial` or `at_capacity`, plus one worker f
 
 > **Fact-checked against an agent-swarm checkout** — its `README.md`,
 > `hack/deploy.sh`, `manifests/workerpool.yaml.tmpl`, `manifests/actortemplate.yaml.tmpl`, and `go.mod`:
-> - agent-swarm must pin `go.ate.dev/substrate v1.0.0-rc.2`, the same as this workshop's
+> - agent-swarm must pin `go.ate.dev/substrate v1.0.0`, the same as this workshop's
 >   `SUBSTRATE_REF`, with `manifests/workerpool.yaml.tmpl` (`apiVersion: ate.dev/v1`, `sandboxClasses`), `manifests/actortemplate.yaml.tmpl` (`preferredFidelity: SNAPSHOT_FIDELITY_MEMORY`, `cpuMillicores`/`memoryBytes`, no `sandboxConfig` or `storageLocation`), and an OpenFGA `access-policy` for `conf-gateway`.
 > - The gateway image is built with **`docker buildx`**, not `ko` (`hack/deploy.sh`'s `conf_build_gateway`
 >   runs `docker buildx build --platform=linux/amd64 --push`). Only the *worker* image
@@ -1837,7 +1837,7 @@ agent-swarm refuses to deploy unless your cluster runs the substrate version pin
 `main` moves, so re-check the pin against `SUBSTRATE_REF` before each event:
 ```bash
 git clone https://github.com/moficodes/agent-swarm .workshop/agent-swarm
-grep 'substrate ' .workshop/agent-swarm/go.mod     # expect v1.0.0-rc.2, the SUBSTRATE_REF in workshop.env
+grep 'substrate ' .workshop/agent-swarm/go.mod     # expect v1.0.0, the SUBSTRATE_REF in workshop.env
 ```
 If they differ, `hack/deploy.sh up` stops and prints the pin and the cluster's version (agent-swarm's
 README has a "Bumping Substrate" section). Use an agent-swarm commit whose pin matches rather than bumping
@@ -2014,7 +2014,7 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
 (`api/ateapi/v1/ateapi.proto`, `CredentialHeader`), resolved at request time by dialing a
 **credential provider**, a small gRPC service (`api/credprovider/v1/credprovider.proto`).
 
-> **Fact-checked against the substrate checkout at `SUBSTRATE_REF` (v1.0.0-rc.2):** substrate ships the built-in
+> **Fact-checked against the substrate checkout at `SUBSTRATE_REF` (v1.0.0):** substrate ships the built-in
 > `k8s.io` provider (`cmd/credential-provider/kubernetes-secrets`) with manifests in
 > `manifests/egress-credential-injection/` and a guide in `docs/egress-credential-injection.md`. It resolves
 > `ate-secret://k8s.io/default/<namespace>/<secret>/<key>` from a Kubernetes Secret, and it denies by default:

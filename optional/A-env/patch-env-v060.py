@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Idempotently patches agent-substrate/env (.workshop/env) for Agent Substrate v1.0.0-rc.2 compatibility."""
+"""Idempotently patches agent-substrate/env (.workshop/env) for Agent Substrate v1.0.0 compatibility."""
 
 import os
 import subprocess
@@ -147,7 +147,7 @@ def patch_go_mod(env_dir: str) -> None:
     env = os.environ.copy()
     env["GOWORK"] = "off"
     subprocess.run(
-        ["go", "get", "go.ate.dev/substrate@v1.0.0-rc.2"],
+        ["go", "get", "go.ate.dev/substrate@v1.0.0"],
         cwd=env_dir,
         env=env,
         check=True,

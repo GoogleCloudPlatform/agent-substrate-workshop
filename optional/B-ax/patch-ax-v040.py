@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Idempotently patches google/ax (.workshop/ax) for Agent Substrate v1.0.0-rc.2 compatibility."""
+"""Idempotently patches google/ax (.workshop/ax) for Agent Substrate v1.0.0 compatibility."""
 
 import os
 import subprocess
@@ -41,7 +41,7 @@ def patch_go_mod(ax_dir: str) -> None:
     env = os.environ.copy()
     env["GOWORK"] = "off"
     subprocess.run(
-        ["go", "get", "go.ate.dev/substrate@v1.0.0-rc.2"],
+        ["go", "get", "go.ate.dev/substrate@v1.0.0"],
         cwd=ax_dir,
         env=env,
         check=True,
@@ -273,7 +273,7 @@ def main() -> int:
     patch_workspace_setup(ax_dir)
     patch_ax_cli_timeout(ax_dir)
     patch_deploy_manifest(ax_dir)
-    print(f"Patched AX at {ax_dir} for Agent Substrate v1.0.0-rc.2.")
+    print(f"Patched AX at {ax_dir} for Agent Substrate v1.0.0.")
     return 0
 
 
