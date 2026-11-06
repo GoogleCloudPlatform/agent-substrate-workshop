@@ -2,11 +2,11 @@
 id: agent-substrate
 summary: Build and operate your own fleet of AI agents on Agent Substrate, starting from a bare GKE cluster.
 authors: Mofi Rahman, Olivier Bourgeois
-categories: GKE, Vertex AI, Agent Substrate
+categories: GKE, Gemini Enterprise Agent Platform, Agent Substrate
 tags: GKE, Gemini, Agent Substrate
 feedback_link: https://github.com/googlecodelabs/feedback/issues/new?title=[agent-substrate]:&labels[]=content-platform&labels[]=cloud
 analytics_account: UA-66226300-1
-keywords: event:KubeConNA2026,docType:Codelab,skill:Intermediate,language:Python,category:Cloud,category:AiAndMachineLearning,product:GoogleKubernetesEngine,product:VertexAi
+keywords: event:KubeConNA2026,docType:Codelab,skill:Intermediate,language:GoLang,category:Cloud,category:AiAndMachineLearning,product:GoogleKubernetesEngine,product:AgentPlatform
 
 ---
 
@@ -26,9 +26,14 @@ starting from a bare GKE cluster. In about 85 minutes, you:
 
 You build everything you deploy: the agent, the gateway, and (in source mode) Substrate itself go into your own Artifact Registry repository.
 
+This workshop uses billable resources: a GKE cluster with two `c3-standard-4` nodes and a 500 GiB persistent disk for
+Substrate's bundled Postgres, plus Cloud Monitoring, Cloud Storage, and Artifact Registry. Use a dedicated project that you
+can delete when you finish; the "Clean up" steps in the Wrap-up section show how.
+
 ### Prerequisites
 - A Google Cloud project where you have the **Owner** role, with a GKE **1.37+** cluster that has Workload Identity, managed
-  OpenTelemetry, Managed Service for Prometheus, no node auto-upgrade, no spot nodes, and 2× `c3-standard-4` nodes.
+  OpenTelemetry, Managed Service for Prometheus, no node auto-upgrade, no spot nodes, and 2× `c3-standard-4` nodes. If you
+  don't have a cluster yet, the "Setup" section creates one with these settings.
 - Familiarity with Kubernetes. You don't need prior Substrate knowledge.
 
 ## Setup
@@ -36,6 +41,7 @@ Duration: 10:00
 
 The goal of this section is to point the workshop at your Google Cloud project, create the cloud resources that Substrate needs,
 and start the Substrate installation in the background. The installation runs while you take the architecture tour.
+If you create your own cluster in this section, plan for about 20 minutes.
 
 ### What you need
 - A Google Cloud project where you have the **Owner** role, and a GKE **1.37+** cluster in that project. The cluster requires Workload Identity,
@@ -43,14 +49,14 @@ and start the Substrate installation in the background. The installation runs wh
 - `kubectl` configured to point at that cluster (`kubectl config current-context`).
 - Locally installed tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `curl`, `git`, `python3`.
   You need a running **Docker** daemon with `buildx` only to build Substrate from source (empty `SUBSTRATE_IMAGE_REPO`).
-  Cloud Shell includes all of these tools except `ko`: run `go install github.com/google/ko@latest`.
+  Cloud Shell includes all of these tools except `ko`: run `go install github.com/google/ko@v0.19.1`.
 
 ### Steps
 
 1. **Activate Cloud Shell.** Open the Google Cloud console and click **Activate Cloud Shell** in the top-right
    toolbar to launch Cloud Shell — a self-contained VM in your browser with all the required tools except `ko` — and run all the commands in this lab from there. Install `ko` first:
    ```bash
-   go install github.com/google/ko@latest
+   go install github.com/google/ko@v0.19.1
    ```
 2. **Clone the workshop repository.** Clone the repository and move into its root directory:
    ```bash
@@ -83,9 +89,13 @@ and start the Substrate installation in the background. The installation runs wh
      --add-maintenance-exclusion-end "$(date -u -d '+2 days' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+2d +%Y-%m-%dT%H:%M:%SZ)" \
      --add-maintenance-exclusion-scope no_minor_or_node_upgrades
    ```
+   Creating the cluster takes several minutes. While you wait, follow its progress in the Google Cloud console under
+   **Kubernetes Engine** > **Clusters**, and read the next section, "Architecture tour", up to "Look around", which needs the
+   installation from step 8.
 4. **Configure the environment.** Copy the example environment file and set `PROJECT_ID` and `CLUSTER_LOCATION` to your cluster's exact zone or
    region from `gcloud container clusters list` (a zonal cluster such as `us-central1-a` won't match
-   `us-central1`). If your cluster isn't named `ate-cluster`, set `CLUSTER_NAME` as well. Every other
+   `us-central1`). If your cluster isn't named `ate-cluster`, set `CLUSTER_NAME` as well. Leave `REGION` as `us-central1`:
+   it's a region, not a zone, and it sets where the snapshot bucket and the Artifact Registry repository live. Every other
    variable has a working default.
    ```bash
    gcloud container clusters list --project YOUR_PROJECT_ID    # NAME and LOCATION
@@ -111,6 +121,8 @@ and start the Substrate installation in the background. The installation runs wh
    ```
    This setting applies only to your current terminal session. To persist it, add the same line with the absolute repository path instead of `$PWD` to
    `~/.zshrc` or `~/.bashrc`. If you use direnv, add `PATH_add bin` to an `.envrc` file at the repository root.
+   If Cloud Shell reconnects or you open a new tab, `cd` into the repository and run `source scripts/env.sh`: it loads
+   `workshop.env` and puts `bin/` back on your `PATH`.
 8. **Start the installation in the background.** This target clones Substrate at `SUBSTRATE_REF`, builds `kubectl ate`,
    deploys `ate-system`, pins a worker image that matches the control plane, and
    increases the router's parked-request budget and shutdown grace period.
@@ -142,7 +154,7 @@ make verify MODULE=0
 ```
 
 **Stuck?** Run `make catch-up MODULE=1` to run all of these steps in the foreground, and see
-[troubleshooting](instructor/troubleshooting.md).
+[troubleshooting](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/instructor/troubleshooting.md).
 
 ## Architecture tour
 Duration: 10:00
@@ -167,7 +179,7 @@ many actors.
 > | SandboxTemplate | ActorTemplate | Substrate takes a **golden snapshot** of the template |
 > | SandboxWarmPool | WorkerPool | Workers are generic; any worker runs any actor of a matching template |
 > | SandboxClaim | create / resume actor | Resume restores memory, not just disk |
-> | Suspend = delete the Pod | Suspend = checkpoint memory and disk to Cloud Storage | Resume on *any* worker |
+> | Suspend = scale to 0: the Pod is deleted, and the PVC is kept and reattached on resume | Suspend = checkpoint memory and disk to Cloud Storage | Many actors share a few generic workers, and a suspended actor resumes on *any* of them |
 >
 > Note the naming overlap: Substrate also has a `SandboxConfig` CRD, which configures gVisor and microVM runtimes.
 >
@@ -193,6 +205,7 @@ many actors.
 | **atenet-egress** | Proxies every outbound connection from an actor. **Denies traffic by default**; `EgressPolicy` opens specific destinations. |
 | **k8s-credential-provider** | Resolves `ate-secret://k8s.io/…` references from Kubernetes Secrets for `atenet-egress` when an `https` `EgressPolicy` rule injects headers (optional lab J). Denies access by default until you grant specific namespaces. |
 | **podcertcontroller** | Issues certificates so actors and components have cryptographic identities. Clients trust `ateapi` through a `ClusterTrustBundle`. |
+| **ate-idp-server** | Serves the public OIDC discovery document and JWKS that relying parties use to verify actor JWTs. |
 
 **CRDs vs. records**
 
@@ -223,6 +236,10 @@ cat .workshop/worker-image                       # the worker build that matches
 
 Right after the installation finishes, you might see an extra `atenet-router` Pod in the `Terminating` state. That Pod is the previous instance draining:
 the installer patches the router with a longer parked-request budget and a 120-second grace period, which triggers a rolling update.
+
+Every `kubectl ate` command prints `Warning: no --token-file given; acting as the shared identity system:serviceaccount:ate-system:ate-client rather than as yourself. Pass --token-file to act as yourself.`
+That's expected in this workshop: without `--token-file`, `kubectl ate` acts as the shared `ate-client` ServiceAccount, which the
+installer makes a global owner so that the demos work.
 
 ### What just happened
 - You inspected the control plane (`ateapi`, `atecontroller`, Postgres), the data plane (`atelet` in each worker, the router, and the egress proxy),
@@ -268,17 +285,21 @@ an actor, and send requests to it through the router.
    probe, the snapshot fidelity (`preferredFidelity`), resource limits (`cpuMillicores`, `memoryBytes`), and one durable directory.
    ```bash
    scripts/render.sh modules/02-hello-actor/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
-   kubectl ate get actor-template agent-v1 -a workshop            # repeat until GOLDEN TAG appears
+   until kubectl ate get actor-template agent-v1 -a workshop -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus | (.goldenTag.name // .errorMessage)' >/dev/null; do sleep 3; done
+   kubectl ate get actor-template agent-v1 -a workshop
    kubectl ate get actor-template agent-v1 -a workshop -o yaml    # inspect status.goldenSnapshotStatus.goldenTag.name
    ```
+   The `until` loop returns once the golden snapshot exists, and the next command shows it in the `GOLDEN TAG` column.
+   If it hasn't returned in about 5 minutes, press Ctrl+C and check the [troubleshooting guide](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/instructor/troubleshooting.md).
    Substrate starts your container once on a free worker, waits for its `wakeupProbe` (`/readyz`) to pass, and snapshots it.
    That **golden snapshot** serves as the starting point for every actor created from this template. Creating an actor
    restores this snapshot instead of cold-booting a process.
 5. **Create an actor.**
    ```bash
    kubectl ate create actor hello --template=agent-v1 -a workshop
-   kubectl ate get actors -a workshop       # SUSPENDED: the record exists, but it isn't running on a worker
+   kubectl ate get actors -a workshop
    ```
+   The `STATE` column shows `ACTOR_STATE_SUSPENDED`: the record exists, but it isn't running on a worker yet.
 6. **Send requests to the actor.** The router selects the target actor from the `ate-target-actor` header.
    ```bash
    make forward-router                      # port-forwards atenet-router to localhost:8080
@@ -353,13 +374,14 @@ with **VOLUMES** fidelity (`SNAPSHOT_FIDELITY_VOLUMES`): Substrate saves only th
    ```bash
    make build-agent
    ```
-5. Keep `hello` suspended. Creating a new template requires a **free worker** to run its golden-snapshot actor, and your pool has two workers.
+5. Suspend `hello` again. Creating a new template requires a **free worker** to run its golden-snapshot actor, and your pool has two workers.
    Create the new template and an actor:
    ```bash
    kubectl ate suspend actor hello -a workshop 2>/dev/null; kubectl ate get actors -a workshop
    diff modules/02-hello-actor/manifests/template.yaml.tmpl modules/03-suspend-resume/manifests/template.yaml.tmpl
    scripts/render.sh modules/03-suspend-resume/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
-   kubectl ate get actor-template agent-v2 -a workshop -o yaml | grep -A2 goldenTag   # repeat until set
+   until kubectl ate get actor-template agent-v2 -a workshop -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus | (.goldenTag.name // .errorMessage)' >/dev/null; do sleep 3; done
+   kubectl ate get actor-template agent-v2 -a workshop
    kubectl ate create actor memo --template=agent-v2 -a workshop
    ```
 6. Follow the actor's logs in a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`). The log stream follows the actor across workers and restarts:
@@ -430,15 +452,22 @@ model access, and a deny-by-default **egress policy** lets the actor reach the g
    `backend` shows which model answered (`gemini`). If a Gemini call fails (for example, with a `403` error while the Workload Identity
    binding propagates), the gateway answers that request from a mock fallback instead: `backend` is `mock-fallback`
    and `upstreamError` reports what the platform returned. As a result, the `502` response from the agent in step 3 comes from
-   egress blocking, not the model.
-2. **Free a worker, then configure the agent to call the model.** Suspend `memo` so that the new template's golden-snapshot
-   actor has a free worker. In `app/cmd/agent/main.go`, find `WORKSHOP(module-4)` and set `ModelURL: os.Getenv("MODEL_URL")`.
+   egress blocking, not the model. `make verify MODULE=4` fails if the reply comes from `mock-fallback`, so check `upstreamError`,
+   or switch to the mock on purpose (see "If the model isn't available").
+2. **Configure the agent to call the model, then free a worker.** First, open `app/cmd/agent/main.go`, find the
+   `WORKSHOP(module-4)` comment, and change the line below it from `ModelURL: "",` to:
+   ```go
+   ModelURL: os.Getenv("MODEL_URL"),
+   ```
+   Save the file. Then suspend `memo` so that the new template's golden-snapshot actor has a free worker, and build the image.
+   If `make build-agent` warns that the image is the same as your last build, the edit isn't saved yet.
    ```bash
    kubectl ate suspend actor memo -a workshop
    make build-agent
    cat modules/04-make-it-an-agent/manifests/template.yaml.tmpl     # note the MODEL_URL environment variable
    scripts/render.sh modules/04-make-it-an-agent/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
-   kubectl ate get actor-template agent-v3 -a workshop -o yaml | grep -A2 goldenTag   # repeat until set
+   until kubectl ate get actor-template agent-v3 -a workshop -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus | (.goldenTag.name // .errorMessage)' >/dev/null; do sleep 3; done
+   kubectl ate get actor-template agent-v3 -a workshop
    kubectl ate create actor buddy --template=agent-v3 -a workshop
    ```
 3. **Send a chat request and watch it fail.**
@@ -446,9 +475,8 @@ model access, and a deny-by-default **egress policy** lets the actor reach the g
    curl -s localhost:8081/chat/buddy -d '{"message":"What is Agent Substrate?"}'; echo
    ```
    The request returns a `502` error: `model call failed: …`. The agent tried to reach the gateway, but **egress is deny-by-default**
-   and `buddy` has no policy. Without a policy, Substrate doesn't open an outbound tunnel at all, which is why the error
-   reads `connection reset by peer` rather than "denied": the proxy drops the connection before anything can
-   refuse it.
+   and `buddy` has no policy. The error ends in `no such host` rather than "denied": the sandbox's DNS answers NXDOMAIN for
+   any hostname that the actor's policy doesn't allow, so the agent can't look up the gateway's address.
 4. **Allow traffic to the gateway only.**
    ```bash
    cat modules/04-make-it-an-agent/manifests/egress-gateway.yaml
@@ -527,8 +555,9 @@ the one piece that Substrate leaves to your application: **deciding when an acto
    ```bash
    curl -s localhost:8081/chat/swarm-01 -d '{"message":"hi"}' | jq -c '{turn, backend}'
    curl -s localhost:8081/chat/swarm-02 -d '{"message":"hi"}' | jq -c '{turn, backend}'
-   kubectl ate get workers -n workshop           # both workers are busy
+   kubectl ate get workers -n workshop
    ```
+   Both workers are now busy: each one shows `1/1000` in the `ACTORS` column and `1000/1000` in the `CPU(MILLICORES)` column.
 4. **Send a request to a third actor.** *(Optional: in an instructor-led session, your instructor might demonstrate or describe this step.)*
    ```bash
    time curl -s localhost:8081/chat/swarm-03 -d '{"message":"hi"}'; echo
@@ -639,15 +668,16 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
    make load
    ```
-3. **Run queries in the Prometheus UI** (`http://localhost:9090` → **Graph**, or Web Preview `:9090` in Cloud Shell). Copy each query from
-   [observability/queries.md](observability/queries.md) (if your `CLUSTER_NAME` in `workshop.env` isn't
+3. **Run queries in the Prometheus UI** (`http://localhost:9090` → **Graph**, or Web Preview `:9090` in Cloud Shell). More queries
+   are in [observability/queries.md](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/observability/queries.md). Copy each query below (if your `CLUSTER_NAME` in `workshop.env` isn't
    `ate-cluster`, replace `cluster="ate-cluster"` to match):
    - **How many workers are busy vs. idle?** `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="agents", cluster="ate-cluster"})`
      (Use `max` rather than `sum` because each `ateapi` replica reports the entire pool.) A busy worker appears as `partial` rather than
      `at_capacity` because the state counts actor slots (`1` of the default `1000`), not CPU utilization.
-   - **How often did the router resume a suspended actor?** Run the `"ate.router.resume"` query.
-   - **How long does a resume take?** Run the lifecycle P95 latency query.
-   - **What are the chat turn outcomes and active actor counts?** Run the gateway metric queries.
+   - **How often did the router resume a suspended actor?** `sum by ("ate.router.resume") (rate({"atenet.router.route.duration_count", top_level_controller_name="atenet-router", cluster="ate-cluster"}[2m]))`
+   - **How long does a resume take?** `histogram_quantile(0.95, sum by (le, "ate.actor.operation.name") (rate({"ate.actor.lifecycle.operation.duration_bucket", cluster="ate-cluster"}[5m])))`
+   - **What are the chat turn outcomes and active actor counts?** `sum by (outcome) (rate(workshop_chat_turns_total{cluster="ate-cluster"}[2m]))`
+     and `max(workshop_actors_awake{cluster="ate-cluster"})`
 
    Data points appear **1–3 minutes** after the traffic that produces them. If a chart is empty, wait a minute and run the query again.
 4. **View dashboards in the Google Cloud console.** Open
@@ -656,7 +686,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    - Substrate's **gRPC**, **E2E latency**, and **Snapshot** dashboards: provide the platform maintainers' operational views.
 
    While `make load` runs, watch active actors track worker capacity, resumed requests rise, and idle suspends follow each traffic burst.
-5. **Follow a single actor across workers.** Because an actor isn't tied to a single Pod, its logs aren't tied to a single Pod either. In this step, you
+5. **Follow a single actor across workers.** Because an actor isn't tied to a single Pod, its logs aren't tied to a single Pod either. In steps 5 and 6, you
    wake `buddy`, let it suspend again, and delete the worker Pod it ran on so that the next resume lands
    on a different Pod. First, stop `make load` if it is still running. In one terminal, stream `buddy`'s logs:
    ```bash
@@ -675,8 +705,9 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    kubectl ate get actors -a workshop
    kubectl ate get workers -n workshop
    ```
-   Deleting a worker Pod terminates any actor still running on it, so always verify that the worker is empty first. Next, delete the
-   worker Pod and resume `buddy` with tracing enabled:
+6. **Move `buddy` to a new worker and trace the resume.** Deleting a worker Pod terminates any actor still running on it, so
+   continue only if step 5 showed `0/1000` actors on that worker. In the second terminal, delete the worker Pod and resume
+   `buddy` with tracing enabled:
    ```bash
    kubectl -n workshop delete pod "$FIRST"
    kubectl ate --trace resume actor buddy -a workshop     # prints: Tracing enabled. Trace ID: <id>
@@ -686,7 +717,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    The `Actor restoring` and `Actor restored` log entries include a `trace_id` field that matches the
    trace ID printed by the CLI.
 
-   `kubectl ate logs` streams logs only from the Pod that currently hosts the actor. To view the complete history across Pods, open Logs Explorer in the Google Cloud console (replace `ate-cluster` if your `CLUSTER_NAME` differs):
+7. **View the actor's history in Logs Explorer.** `kubectl ate logs` streams logs only from the Pod that currently hosts the actor. To view the complete history across Pods, open Logs Explorer in the Google Cloud console and run this query (replace `ate-cluster` if your `CLUSTER_NAME` differs):
    ```
    resource.type="k8s_container"
    resource.labels.cluster_name="ate-cluster"
@@ -697,7 +728,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    your agent's own log lines. Include both clauses in the `OR` filter: `ateapi` and `atelet` write actor identity into `jsonPayload` rather than
    `labels`, so filtering only on `labels` misses the state transitions.
 
-   Next, replace the filter with `jsonPayload.trace_id="<id>"`, using the trace ID from the `--trace` resume command. This query isolates that
+8. **Follow one request by its trace ID.** In Logs Explorer, replace the filter with `jsonPayload.trace_id="YOUR_TRACE_ID"`, using the trace ID from the `--trace` resume command in step 6. This query isolates that
    single request across `ateapi`, `atelet`, and `ateworker`. Paste the same ID into **Cloud Trace** → **Trace Explorer** to
    inspect the request as a waterfall of spans.
 
@@ -708,7 +739,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
 - `make dashboards` is idempotent: edit the JSON file and run the command again to update the dashboards.
 - **Managed Prometheus doesn't scrape actors directly.** Actors share a generic hostname and IP address inside the sandbox, and pushing OTLP metrics directly from an actor
   requires an `http` `EgressPolicy` rule for the OpenTelemetry collector (`docs/observability.md`). Instead, all application-level
-  metrics in this section come from the always-on gateway, while per-actor details live in Cloud Logging (step 5).
+  metrics in this section come from the always-on gateway, while per-actor details live in Cloud Logging (step 7).
 - Metrics omit actor identity to avoid creating a separate time series per actor. Logs and traces include actor identity, and a
   `trace_id` links them together: the CLI prints the ID, every Substrate log entry for that request includes it, and Cloud
   Trace visualizes the end-to-end spans.
@@ -746,11 +777,14 @@ gRPC services (`ax ssh`) inside a declarative `Task`, `Workspace`, and `Model` c
 
 For comparison, **agent-sandbox** (`kubernetes-sigs/agent-sandbox`) addresses a similar use case — running a
 Pod per agent session — with no Substrate integration. Its `SandboxTemplate` corresponds to
-`ActorTemplate` and `SandboxWarmPool` corresponds to `WorkerPool`, but suspending a Sandbox deletes the Pod, whereas suspending an
-actor checkpoints memory so it can resume on any worker. See the "Architecture tour" section for the full comparison table.
+`ActorTemplate` and `SandboxWarmPool` corresponds to `WorkerPool`, and both projects can suspend and resume. The difference is that many actors share a few generic workers,
+and a suspended actor resumes from its memory and disk snapshot on any of them. See the "Architecture tour" section for the full comparison table.
 
 ### Limits to know before you build
 - **Authorization inside an atespace is role-based (`AccessPolicy`).** Any principal granted `editor` or `admin` on an atespace can act on all actors in that atespace (there are no per-actor ACLs).
+- **Without `--token-file`, `kubectl ate` acts as the shared `ate-client` identity**, which the installer makes a global owner.
+  Substrate's authorization guide says not to keep that setup outside development. On a shared install, pass `--token-file` so
+  that each person acts as themselves.
 - **`CRASHED` actors require intervention** (from a human or your controller): `resume` rejects crashed actors, so run `kubectl ate revert actor X -a Y`
   to roll the actor back to `SUSPENDED` at its last snapshot before resuming, or delete it with `kubectl ate delete actor X -a Y`.
 - **Idle detection is your application's responsibility** (see "Density and idle"), and so is `WorkerPool` sizing (see optional lab G).
@@ -810,14 +844,14 @@ It's the pattern you built in Modules 4–5 (an always-on API in front of suspen
 
 #### Which env commit, and why
 
-Our `SUBSTRATE_REF` is `v1.0.0-rc.2` (pinned in `app/go.mod` as `go.ate.dev/substrate v1.0.0-rc.2`).
+Our `SUBSTRATE_REF` is `v1.0.0` (pinned in `app/go.mod` as `go.ate.dev/substrate v1.0.0`).
 
 We checked every env tag and `main`:
 
-| env ref | substrate pin (`go.mod`) | compatibility with `v1.0.0-rc.2` |
+| env ref | substrate pin (`go.mod`) | compatibility with `v1.0.0` |
 |---|---|---|
 | `v0.0.7`–`v0.0.10` | `v0.0.0-20260717234919-a2d55e99e02e` (2026-07-17) | Pre-`v0.2.0` (`readyz`, `snapshotsConfig`) |
-| `2c780cd` | `go.ate.dev/substrate v0.5.1-0.20261018212731-ddb46651d605` (2026-10-18) | Matches `v1.0.0-rc.2` with [`patch-env-v060.py`](./patch-env-v060.py) (`ServiceAccount/ate-env-api`, `ate-env manifest access-policy`, `workerSelector` without `sandboxConfig`, `ate.dev/v1` `WorkerPool`, `go.ate.dev/substrate/api/ateapi/v1`, cluster-default snapshot storage location, and integer `cpuMillicores`/`memoryBytes` limits) |
+| `2c780cd` | `go.ate.dev/substrate v0.5.1-0.20261018212731-ddb46651d605` (2026-10-18) | Matches `v1.0.0` with [`patch-env-v060.py`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/A-env/patch-env-v060.py) (`ServiceAccount/ate-env-api`, `ate-env manifest access-policy`, `workerSelector` without `sandboxConfig`, `ate.dev/v1` `WorkerPool`, `go.ate.dev/substrate/api/ateapi/v1`, cluster-default snapshot storage location, and integer `cpuMillicores`/`memoryBytes` limits) |
 
 This lab pins `env` at:
 
@@ -825,7 +859,7 @@ This lab pins `env` at:
 ENV_REF=2c780cd94891c134cd10375a30a5e1e662ee2c2d   # env, 2026-10-18
 ```
 
-A small idempotent patch script ([`patch-env-v060.py`](./patch-env-v060.py)) updates the `ateapi`/`v1` imports, `ResourceRequirements`, and `SnapshotConfig` and bumps `go.ate.dev/substrate` to `v1.0.0-rc.2`.
+A small idempotent patch script ([`patch-env-v060.py`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/A-env/patch-env-v060.py)) updates the `ateapi`/`v1` imports, `ResourceRequirements`, and `SnapshotConfig` and bumps `go.ate.dev/substrate` to `v1.0.0`.
 
 #### Two things to know before you start
 
@@ -1006,7 +1040,7 @@ make stop-forwards   # stops step 2's ate-env-api forward (and the workshop's ot
 
 #### Next
 
-Continue to [Optional lab B — Declarative tasks and workspaces with `google/ax`](#9) (which embeds `env`'s guest gRPC server inside `ax-task-runner` to power `ax ssh`), or back to [Module 7 — Wrap-up](../../modules/07-wrap-up/README.md) for the rest of the optional labs.
+Continue to [Optional lab B — Declarative tasks and workspaces with `google/ax`](#9) (which embeds `env`'s guest gRPC server inside `ax-task-runner` to power `ax ssh`), or back to [Module 7 — Wrap-up](#8) for the rest of the optional labs.
 
 ### Optional lab B — Declarative tasks and workspaces with `google/ax` (30–45 min)
 
@@ -1031,7 +1065,7 @@ flowchart LR
 
 #### Which AX commit, and why
 
-Our `SUBSTRATE_REF` is `v1.0.0-rc.2` (pinned in `app/go.mod` as `go.ate.dev/substrate v1.0.0-rc.2`).
+Our `SUBSTRATE_REF` is `v1.0.0` (pinned in `app/go.mod` as `go.ate.dev/substrate v1.0.0`).
 
 Upstream `google/ax` pins an older Substrate commit (`v0.0.0-20260918201817-944abe3278b8` in `go.mod`). This lab pins AX at:
 
@@ -1039,11 +1073,11 @@ Upstream `google/ax` pins an older Substrate commit (`v0.0.0-20260918201817-944a
 AX_REF=ac2332829f22360ff97b0ba34d94dd0dd782f17e   # google/ax main, 2026-10-12
 ```
 
-Step 1 runs [`optional/B-ax/patch-ax-v040.py`](patch-ax-v040.py) to bring it up to `v1.0.0-rc.2` before building:
+Step 1 runs [`optional/B-ax/patch-ax-v040.py`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/B-ax/patch-ax-v040.py) to bring it up to `v1.0.0` before building:
 
-1. **Substrate `v1.0.0-rc.2` proto and module path changes**: `github.com/agent-substrate/substrate/pkg/proto/ateapipb` → `go.ate.dev/substrate/api/ateapi/v1` (`v1.0.0-rc.2`), `ContainerReadyz` → `WakeupProbe` + `HttpGetAction` (pointed at `/healthz` so the actor transitions to `RUNNING` as soon as the runner's HTTP server starts, while `TaskReconciler` polls `/readyz?check=workspace`), `SnapshotsConfig` (with `OnPause`/`OnResume`) → `SnapshotConfig` (`PreferredFidelity: SNAPSHOT_FIDELITY_VOLUMES`, omitting `StorageLocation` so the cluster's `--snapshot-location` is used), `SandboxConfig` removed from `ActorTemplate` (the `WorkerPool` determines the sandbox class), `ResourceRequirements.Limits` (`CpuMillicores: 1000`, `MemoryBytes: 536870912`), `WorkerPodIp` → `WorkerPodIps`, `DeleteActorRequest.AnyState` removed, `GetAtespace` checked before `CreateAtespace` (so an `editor` on a pre-created atespace does not need `can_create_atespace` on `global:root`), and a retry in `EnsureActor` while the template's golden snapshot finishes (`FailedPrecondition`).
+1. **Substrate `v1.0.0` proto and module path changes**: `github.com/agent-substrate/substrate/pkg/proto/ateapipb` → `go.ate.dev/substrate/api/ateapi/v1` (`v1.0.0`), `ContainerReadyz` → `WakeupProbe` + `HttpGetAction` (pointed at `/healthz` so the actor transitions to `RUNNING` as soon as the runner's HTTP server starts, while `TaskReconciler` polls `/readyz?check=workspace`), `SnapshotsConfig` (with `OnPause`/`OnResume`) → `SnapshotConfig` (`PreferredFidelity: SNAPSHOT_FIDELITY_VOLUMES`, omitting `StorageLocation` so the cluster's `--snapshot-location` is used), `SandboxConfig` removed from `ActorTemplate` (the `WorkerPool` determines the sandbox class), `ResourceRequirements.Limits` (`CpuMillicores: 1000`, `MemoryBytes: 536870912`), `WorkerPodIp` → `WorkerPodIps`, `DeleteActorRequest.AnyState` removed, `GetAtespace` checked before `CreateAtespace` (so an `editor` on a pre-created atespace does not need `can_create_atespace` on `global:root`), and a retry in `EnsureActor` while the template's golden snapshot finishes (`FailedPrecondition`).
 2. **`ko`-built runner path**: AX's `.ko.yaml` already configures `cmd/ax-task-runner` to use `alpine/git:latest` (Alpine + `git`, `sh`, `wget`), which lets `ko build` produce a `@sha256:` digest-pinned runner image without Docker. The patch switches `DefaultGuestCommand` in `internal/substrate/client.go` from `/usr/local/bin/ax-task-runner` to `/ko-app/ax-task-runner` where `ko` places the binary.
-3. **`WorkerSelector`, `VOLUMES`-fidelity marker path, and namespace-scoped RBAC**: adds `workerSelector: {workload: ax-worker}` so AX tasks run on their own `ax-workers` pool instead of the workshop's `agents` pool, moves AX's maiden-run marker directory (`DefaultAXDir` in `internal/workspace/setup.go`) from `/ax` to `/workspace/.ax` so it lives inside the `/workspace` `durableDir` and survives a `SNAPSHOT_FIDELITY_VOLUMES` suspend/resume ([Module 3 Part B](../../modules/03-suspend-resume/README.md#part-b-disk-only-suspend-template-agent-v2)), labels `Namespace/ax-system` with `ate.dev/api-access: "true"`, and removes the cluster-wide Secret `ClusterRole` and `ClusterRoleBinding` from `deploy/ax-server.yaml` so the deployment stays strictly namespace-scoped to `ax-system`.
+3. **`WorkerSelector`, `VOLUMES`-fidelity marker path, and namespace-scoped RBAC**: adds `workerSelector: {workload: ax-worker}` so AX tasks run on their own `ax-workers` pool instead of the workshop's `agents` pool, moves AX's maiden-run marker directory (`DefaultAXDir` in `internal/workspace/setup.go`) from `/ax` to `/workspace/.ax` so it lives inside the `/workspace` `durableDir` and survives a `SNAPSHOT_FIDELITY_VOLUMES` suspend/resume ([Module 3 Part B](#4)), labels `Namespace/ax-system` with `ate.dev/api-access: "true"`, and removes the cluster-wide Secret `ClusterRole` and `ClusterRoleBinding` from `deploy/ax-server.yaml` so the deployment stays strictly namespace-scoped to `ax-system`.
 
 #### 1. Build and deploy AX (you build every image)
 
@@ -1086,7 +1120,7 @@ Look at `.workshop/ax/deploy/ax-server.yaml`: `ax-server` mounts the same `servi
 
 #### 2. Declare a Workspace and a Task
 
-Read [`optional/B-ax/task.yaml.tmpl`](task.yaml.tmpl): it declares a `Workspace` (`demo-workspace`) that seeds `AGENTS.md` and `hello.sh`, and a `Task` (`demo-task`) that mounts it at `/workspace`, runs `/bin/sh hello.sh`, and sets `debug: true` so `ax ssh` works.
+Read [`optional/B-ax/task.yaml.tmpl`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/B-ax/task.yaml.tmpl): it declares a `Workspace` (`demo-workspace`) that seeds `AGENTS.md` and `hello.sh`, and a `Task` (`demo-task`) that mounts it at `/workspace`, runs `/bin/sh hello.sh`, and sets `debug: true` so `ax ssh` works.
 
 ```bash
 scripts/render.sh optional/B-ax/task.yaml.tmpl | ax apply -f -
@@ -1112,7 +1146,7 @@ kubectl ate get actor-template "$TMPL" -a ax-workshop -o yaml
 
 Compare that generated `ActorTemplate` with the ones you wrote by hand in Modules 2–4:
 
-- **Name (`demo-task-tmpl-<hash>`)**: `TaskReconciler` (`internal/controller/reconciler.go`) hashes the image and environment variables into the template name. Because both AX `Task`s and Substrate `ActorTemplate`s are immutable ([Module 3](../../modules/03-suspend-resume/README.md#templates-are-immutable)), changing a task's spec requires either a new task name or deleting and recreating the task (`ax delete task …` then `ax apply -f …`, which discards the previous actor state and generates a fresh template digest).
+- **Name (`demo-task-tmpl-<hash>`)**: `TaskReconciler` (`internal/controller/reconciler.go`) hashes the image and environment variables into the template name. Because both AX `Task`s and Substrate `ActorTemplate`s are immutable ([Module 3](#4)), changing a task's spec requires either a new task name or deleting and recreating the task (`ax delete task …` then `ax apply -f …`, which discards the previous actor state and generates a fresh template digest).
 - **Entrypoint (`/ko-app/ax-task-runner`)**: AX never sets your `spec.command` as the container entrypoint. Instead, it injects the task and workspace YAML into `AX_TASK_YAML` and `AX_WORKSPACES_YAML` env vars and boots `ax-task-runner` as PID 1 on port 80 (`wakeupProbe: /healthz`, with `/readyz` reporting `200 OK` once `SetupWorkspace` finishes).
 - **Storage (`preferredFidelity: SNAPSHOT_FIDELITY_VOLUMES`, `durableDir: /workspace`)**: AX uses the disk-only snapshot fidelity from Module 3 Part B. Only `/workspace` is saved to GCS on suspend; on resume, `ax-task-runner` cold-boots, sees `/workspace/.ax/initialized-workspace`, skips workspace setup, and starts your command against the restored files.
 
@@ -1158,9 +1192,9 @@ Notice two things in the output:
 
 #### 5. Clone a Git repository and lock down egress
 
-A `Workspace` can also clone Git repositories (`spec.git`) before the task reports `WorkspaceReady`. Because an actor has **deny-by-default egress** ([Module 4](../../modules/04-make-it-an-agent/README.md)) and AX does not yet attach an `EgressPolicy` automatically, a task that clones from GitHub needs an `EgressPolicy` before its first resume.
+A `Workspace` can also clone Git repositories (`spec.git`) before the task reports `WorkspaceReady`. Because an actor has **deny-by-default egress** ([Module 4](#5)) and AX does not yet attach an `EgressPolicy` automatically, a task that clones from GitHub needs an `EgressPolicy` before its first resume.
 
-Because `ax apply` creates tasks in `Suspended` phase, you can apply the task, attach [`optional/B-ax/egress-github.yaml`](egress-github.yaml) to its actor while it is still asleep, and then resume it:
+Because `ax apply` creates tasks in `Suspended` phase, you can apply the task, attach [`optional/B-ax/egress-github.yaml`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/B-ax/egress-github.yaml) to its actor while it is still asleep, and then resume it:
 
 ```bash
 ax suspend task demo-task -a ax-workshop
@@ -1183,7 +1217,7 @@ ax ssh repo-task -a ax-workshop -- sh -c '
 
 #### 6. Find it on the dashboard
 
-Use the same signals from [Module 6](../../modules/06-observe/README.md), filtered to the `ax-workers` pool and `ax-workshop` atespace (replace `ate-cluster` if your `CLUSTER_NAME` in `workshop.env` differs):
+Use the same signals from [Module 6](#7), filtered to the `ax-workers` pool and `ax-workshop` atespace (replace `ate-cluster` if your `CLUSTER_NAME` in `workshop.env` differs):
 
 ```bash
 make prometheus-ui   # http://localhost:9090
@@ -1228,7 +1262,7 @@ kubectl delete namespace ax-system --ignore-not-found
 
 #### Next
 
-Back to [Module 7 — Wrap-up](../../modules/07-wrap-up/README.md) for the rest of the optional labs.
+Back to [Module 7 — Wrap-up](#8) for the rest of the optional labs.
 
 ### Optional lab C — What counts as idle? (20 min)
 
@@ -1348,7 +1382,7 @@ Keep `Heartbeat: true` or set it back: agent-v3's golden snapshot doesn't change
 
 #### Next
 
-Back to [Module 7 — Wrap-up](../../modules/07-wrap-up/README.md) for the rest of the optional labs.
+Back to [Module 7 — Wrap-up](#8) for the rest of the optional labs.
 
 ### Optional lab D — Tags, clone, revert (20 min)
 
@@ -1437,7 +1471,7 @@ kubectl ate delete tag knows-pineapple -a workshop
 suspend, and substrate doesn't yet stop you from deleting a tag out from under a clone that still needs it.)
 
 #### Next
-Back to [Module 7 — Wrap-up](../../modules/07-wrap-up/README.md) for the rest of the optional labs.
+Back to [Module 7 — Wrap-up](#8) for the rest of the optional labs.
 
 ### Optional lab E — Your own gRPC client (outline)
 
@@ -1492,7 +1526,7 @@ Starts from the end of Module 6 (`make catch-up MODULE=7`).
 #### 1. Alerts on what the fleet already tells you
 
 Two of these come straight from the canned queries in `observability/queries.md`; the other two are the
-signals [Module 6](../../modules/06-observe/README.md) already teaches as the gaps to watch: crashes (the actor
+signals [Module 6](#7) already teaches as the gaps to watch: crashes (the actor
 loses everything since its last snapshot until someone runs `kubectl ate revert actor`) and a WorkerPool whose ready workers never catch up with desired.
 
 The policy files use `${CLUSTER_NAME}` and `${ATESPACE}` (from `workshop.env`), so `scripts/render.sh` fills
@@ -1668,7 +1702,7 @@ gcloud logging metrics delete actor_usage_events --project "$PROJECT_ID" --quiet
 ```
 
 #### Next
-Back to [Module 7 — Wrap-up](../../modules/07-wrap-up/README.md) for the rest of the optional labs.
+Back to [Module 7 — Wrap-up](#8) for the rest of the optional labs.
 
 ### Optional lab G — Autoscale the WorkerPool (30 min)
 
@@ -1763,7 +1797,7 @@ kubectl -n workshop patch workerpool agents --type merge -p '{"spec":{"replicas"
 ```
 
 #### Next
-Back to [Module 7 — Wrap-up](../../modules/07-wrap-up/README.md) for the rest of the optional labs.
+Back to [Module 7 — Wrap-up](#8) for the rest of the optional labs.
 
 ### Optional lab H — agent-swarm at 50:20 (30 min)
 
@@ -1777,14 +1811,14 @@ back through the router. Compare that with Module 4's gateway-only-egress patter
 
 Each `conf-workers` pod hosts `DEMO_CONF_ACTORS_PER_WORKER` actors at once (default 4). `hack/deploy.sh` sets
 the worker's CPU limit to that many CPUs plus 500m, and each actor asks for 1 CPU, so the limit decides the
-seat count (the shared-budget rule from [Module 5](../../modules/05-density-idle/README.md)). At the default
+seat count (the shared-budget rule from [Module 5](#6)). At the default
 maximum of 5 workers, 20 of the 50 attendees run at once and the rest wait suspended. An HPA scales the pool
 on worker demand: workers that are `partial` or `at_capacity`, plus one worker for every
 `DEMO_CONF_ACTORS_PER_WORKER` requests parked at the router.
 
 > **Fact-checked against an agent-swarm checkout** — its `README.md`,
 > `hack/deploy.sh`, `manifests/workerpool.yaml.tmpl`, `manifests/actortemplate.yaml.tmpl`, and `go.mod`:
-> - agent-swarm must pin `go.ate.dev/substrate v1.0.0-rc.2`, the same as this workshop's
+> - agent-swarm must pin `go.ate.dev/substrate v1.0.0`, the same as this workshop's
 >   `SUBSTRATE_REF`, with `manifests/workerpool.yaml.tmpl` (`apiVersion: ate.dev/v1`, `sandboxClasses`), `manifests/actortemplate.yaml.tmpl` (`preferredFidelity: SNAPSHOT_FIDELITY_MEMORY`, `cpuMillicores`/`memoryBytes`, no `sandboxConfig` or `storageLocation`), and an OpenFGA `access-policy` for `conf-gateway`.
 > - The gateway image is built with **`docker buildx`**, not `ko` (`hack/deploy.sh`'s `conf_build_gateway`
 >   runs `docker buildx build --platform=linux/amd64 --push`). Only the *worker* image
@@ -1805,7 +1839,7 @@ agent-swarm refuses to deploy unless your cluster runs the substrate version pin
 `main` moves, so re-check the pin against `SUBSTRATE_REF` before each event:
 ```bash
 git clone https://github.com/moficodes/agent-swarm .workshop/agent-swarm
-grep 'substrate ' .workshop/agent-swarm/go.mod     # expect v1.0.0-rc.2, the SUBSTRATE_REF in workshop.env
+grep 'substrate ' .workshop/agent-swarm/go.mod     # expect v1.0.0, the SUBSTRATE_REF in workshop.env
 ```
 If they differ, `hack/deploy.sh up` stops and prints the pin and the cluster's version (agent-swarm's
 README has a "Bumping Substrate" section). Use an agent-swarm commit whose pin matches rather than bumping
@@ -1874,7 +1908,7 @@ Pick one of the two `hack/deploy.sh up` lines, not both.
   In Logs Explorer, swap the atespace label the way lab A does:
   `resource.type="k8s_container"`, `"Actor state changed"`, `jsonPayload."ate.atespace"="ate-demo-conf"` (ateapi writes the atespace in `jsonPayload`, not `labels`).
 - `substrate-gaps.md`: the maintainers' list of what Substrate doesn't do yet — worth comparing against
-  [Module 7](../../modules/07-wrap-up/README.md#limits-to-know-before-you-build)'s own limits list.
+  [Module 7](#8)'s own limits list.
 
 #### Clean up
 ```bash
@@ -1886,7 +1920,7 @@ cd "$REPO_ROOT" && make stop-forwards
 place — it prints the `gcloud` commands to remove them if you want them gone.
 
 #### Next
-Back to [Module 7 — Wrap-up](../../modules/07-wrap-up/README.md) for the rest of the optional labs.
+Back to [Module 7 — Wrap-up](#8) for the rest of the optional labs.
 
 ### Optional lab I — microVM sandbox class (45–60 min)
 
@@ -1938,9 +1972,9 @@ source scripts/env.sh    # workshop.env into this shell (bash or zsh): PROJECT_I
    `.workshop/substrate/manifests/ate-install/sandboxconfig-microvm.yaml.tmpl` explain each field.
 3. **A microVM worker pool and template.** The WorkerPool needs substrate's `ateworker-microvm` worker image:
    `make install` built only `ateworker-gvisor`. Build it the way `scripts/install-substrate.sh` builds the
-   gVisor one, then apply [`workerpool.yaml.tmpl`](workerpool.yaml.tmpl) (Module 2's pool plus
+   gVisor one, then apply [`workerpool.yaml.tmpl`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/I-microvm/workerpool.yaml.tmpl) (Module 2's pool plus
    `sandboxClasses: [{name: microvm, configRef: {name: microvm}}]`, the node pool's label, and a toleration for its taint) and
-   [`template.yaml.tmpl`](template.yaml.tmpl) (`agent-v3` with `workerSelector` matching `workshop-agent-vm`):
+   [`template.yaml.tmpl`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/I-microvm/template.yaml.tmpl) (`agent-v3` with `workerSelector` matching `workshop-agent-vm`):
    ```bash
    export MICROVM_WORKER_IMAGE="$(cd .workshop/substrate && export GOWORK=off KO_DOCKER_REPO KO_DEFAULTPLATFORMS &&
      ver="$(git describe --tags --always --dirty)" &&
@@ -1982,7 +2016,7 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
 (`api/ateapi/v1/ateapi.proto`, `CredentialHeader`), resolved at request time by dialing a
 **credential provider**, a small gRPC service (`api/credprovider/v1/credprovider.proto`).
 
-> **Fact-checked against the substrate checkout at `SUBSTRATE_REF` (v1.0.0-rc.2):** substrate ships the built-in
+> **Fact-checked against the substrate checkout at `SUBSTRATE_REF` (v1.0.0):** substrate ships the built-in
 > `k8s.io` provider (`cmd/credential-provider/kubernetes-secrets`) with manifests in
 > `manifests/egress-credential-injection/` and a guide in `docs/egress-credential-injection.md`. It resolves
 > `ate-secret://k8s.io/default/<namespace>/<secret>/<key>` from a Kubernetes Secret, and it denies by default:
@@ -2026,11 +2060,11 @@ from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
 4. Extend `egress-gateway.yaml` with an `https` rule whose `effects.replaceHeaders` replaces the
    `Authorization` header (`prefix: "Bearer "`) with the credential from
    `ate-secret://k8s.io/default/workshop-secrets/example-api/token`. `effects` belongs to the `https` rule,
-   next to `hostnames`; [`egress-fetch.yaml`](egress-fetch.yaml) has the finished shape.
+   next to `hostnames`; [`egress-fetch.yaml`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/J-credential-injection/egress-fetch.yaml) has the finished shape.
 5. Add a `/fetch` route to a copy of the agent that calls the API with a placeholder `Authorization: Bearer placeholder` header
-   ([`app/cmd/agent-fetch`](../../app/cmd/agent-fetch/main.go) is a finished version). The actor also needs to
+   ([`app/cmd/agent-fetch`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/app/cmd/agent-fetch/main.go) is a finished version). The actor also needs to
    trust both the egress gateway's MITM CA (`egress-mitm.ate.dev`) and public root CAs (`system-roots.ate.dev`).
-   [`template.yaml.tmpl`](template.yaml.tmpl) is agent-v3 plus a `systemInfo` volume with
+   [`template.yaml.tmpl`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/optional/J-credential-injection/template.yaml.tmpl) is agent-v3 plus a `systemInfo` volume with
    `trustBundle.names: [egress-mitm.ate.dev, system-roots.ate.dev]` and `SSL_CERT_FILE`
    (substrate's `docs/egress-trust-bundle.md` explains both):
    ```bash
@@ -2059,3 +2093,7 @@ kubectl ate delete actor fetch1 -a workshop
 kubectl ate delete actor-template agent-fetch-v1 -a workshop
 kubectl delete namespace workshop-secrets --ignore-not-found
 ```
+
+### When you're done
+
+After the optional labs, run the "Clean up" steps in the Wrap-up section.

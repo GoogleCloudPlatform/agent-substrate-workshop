@@ -23,8 +23,9 @@ the one piece that Substrate leaves to your application: **deciding when an acto
    ```bash
    curl -s localhost:8081/chat/swarm-01 -d '{"message":"hi"}' | jq -c '{turn, backend}'
    curl -s localhost:8081/chat/swarm-02 -d '{"message":"hi"}' | jq -c '{turn, backend}'
-   kubectl ate get workers -n workshop           # both workers are busy
+   kubectl ate get workers -n workshop
    ```
+   Both workers are now busy: each one shows `1/1000` in the `ACTORS` column and `1000/1000` in the `CPU(MILLICORES)` column.
 4. **Send a request to a third actor.** *(Optional: in an instructor-led session, your instructor might demonstrate or describe this step.)*
    ```bash
    time curl -s localhost:8081/chat/swarm-03 -d '{"message":"hi"}'; echo

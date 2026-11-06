@@ -13,15 +13,20 @@ starting from a bare GKE cluster. In about 85 minutes, you:
 
 You build everything you deploy: the agent, the gateway, and (in source mode) Substrate itself go into your own Artifact Registry repository.
 
+This lab uses a GKE cluster with two `c3-standard-4` nodes and a 500 GiB persistent disk for Substrate's bundled Postgres,
+plus Cloud Monitoring, Cloud Storage, and Artifact Registry, all in the project that the lab provides.
+
 ### Prerequisites
 - A Google Cloud project where you have the **Owner** role, with a GKE **1.37+** cluster that has Workload Identity, managed
-  OpenTelemetry, Managed Service for Prometheus, no node auto-upgrade, no spot nodes, and 2× `c3-standard-4` nodes.
+  OpenTelemetry, Managed Service for Prometheus, no node auto-upgrade, no spot nodes, and 2× `c3-standard-4` nodes. If you
+  don't have a cluster yet, the "Setup" section creates one with these settings.
 - Familiarity with Kubernetes. You don't need prior Substrate knowledge.
 
 ## Setup
 
 The goal of this section is to point the workshop at your Google Cloud project, create the cloud resources that Substrate needs,
 and start the Substrate installation in the background. The installation runs while you take the architecture tour.
+If you create your own cluster in this section, plan for about 20 minutes.
 
 ### What you need
 - A Google Cloud project where you have the **Owner** role, and a GKE **1.37+** cluster in that project. The cluster requires Workload Identity,
@@ -29,14 +34,14 @@ and start the Substrate installation in the background. The installation runs wh
 - `kubectl` configured to point at that cluster (`kubectl config current-context`).
 - Locally installed tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `curl`, `git`, `python3`.
   You need a running **Docker** daemon with `buildx` only to build Substrate from source (empty `SUBSTRATE_IMAGE_REPO`).
-  Cloud Shell includes all of these tools except `ko`: run `go install github.com/google/ko@latest`.
+  Cloud Shell includes all of these tools except `ko`: run `go install github.com/google/ko@v0.19.1`.
 
 ### Steps
 
 1. **Activate Cloud Shell.** Open the Google Cloud console and click **Activate Cloud Shell** in the top-right
    toolbar to launch Cloud Shell — a self-contained VM in your browser with all the required tools except `ko` — and run all the commands in this lab from there. Install `ko` first:
    ```bash
-   go install github.com/google/ko@latest
+   go install github.com/google/ko@v0.19.1
    ```
 2. **Clone the workshop repository.** Clone the repository and move into its root directory:
    ```bash
@@ -70,9 +75,13 @@ and start the Substrate installation in the background. The installation runs wh
      --add-maintenance-exclusion-end "$(date -u -d '+2 days' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+2d +%Y-%m-%dT%H:%M:%SZ)" \
      --add-maintenance-exclusion-scope no_minor_or_node_upgrades
    </ql-code-block>
+   Creating the cluster takes several minutes. While you wait, follow its progress in the Google Cloud console under
+   **Kubernetes Engine** > **Clusters**, and read the next section, "Architecture tour", up to "Look around", which needs the
+   installation from step 8.
 4. **Configure the environment.** Copy the example environment file and set `PROJECT_ID` (<ql-variable key="project_0.project_id" placeHolder="YOUR_PROJECT_ID"></ql-variable>), `REGION` (<ql-variable key="project_0.default_region" placeHolder="us-central1"></ql-variable>), and `CLUSTER_LOCATION` to your cluster's exact zone or
    region from `gcloud container clusters list` (a zonal cluster such as `us-central1-a` won't match
-   `us-central1`). If your cluster isn't named `ate-cluster`, set `CLUSTER_NAME` as well. Every other
+   `us-central1`). If your cluster isn't named `ate-cluster`, set `CLUSTER_NAME` as well. `REGION` is a region, not a zone:
+   it sets where the snapshot bucket and the Artifact Registry repository live. Every other
    variable has a working default.
    <ql-code-block bash templated noWrap>
    gcloud container clusters list --project {{{project_0.project_id | YOUR_PROJECT_ID }}}    # NAME and LOCATION
@@ -98,6 +107,8 @@ and start the Substrate installation in the background. The installation runs wh
    ```
    This setting applies only to your current terminal session. To persist it, add the same line with the absolute repository path instead of `$PWD` to
    `~/.zshrc` or `~/.bashrc`. If you use direnv, add `PATH_add bin` to an `.envrc` file at the repository root.
+   If Cloud Shell reconnects or you open a new tab, `cd` into the repository and run `source scripts/env.sh`: it loads
+   `workshop.env` and puts `bin/` back on your `PATH`.
 8. **Start the installation in the background.** This target clones Substrate at `SUBSTRATE_REF`, builds `kubectl ate`,
    deploys `ate-system`, pins a worker image that matches the control plane, and
    increases the router's parked-request budget and shutdown grace period.
@@ -153,7 +164,7 @@ many actors.
 > | SandboxTemplate | ActorTemplate | Substrate takes a **golden snapshot** of the template |
 > | SandboxWarmPool | WorkerPool | Workers are generic; any worker runs any actor of a matching template |
 > | SandboxClaim | create / resume actor | Resume restores memory, not just disk |
-> | Suspend = delete the Pod | Suspend = checkpoint memory and disk to Cloud Storage | Resume on *any* worker |
+> | Suspend = scale to 0: the Pod is deleted, and the PVC is kept and reattached on resume | Suspend = checkpoint memory and disk to Cloud Storage | Many actors share a few generic workers, and a suspended actor resumes on *any* of them |
 >
 > Note the naming overlap: Substrate also has a `SandboxConfig` CRD, which configures gVisor and microVM runtimes.
 >
@@ -178,6 +189,7 @@ many actors.
 | **atenet-egress** | Proxies every outbound connection from an actor. **Denies traffic by default**; `EgressPolicy` opens specific destinations. |
 | **k8s-credential-provider** | Resolves `ate-secret://k8s.io/…` references from Kubernetes Secrets for `atenet-egress` when an `https` `EgressPolicy` rule injects headers. Denies access by default until you grant specific namespaces. |
 | **podcertcontroller** | Issues certificates so actors and components have cryptographic identities. Clients trust `ateapi` through a `ClusterTrustBundle`. |
+| **ate-idp-server** | Serves the public OIDC discovery document and JWKS that relying parties use to verify actor JWTs. |
 
 **CRDs vs. records**
 
@@ -208,6 +220,10 @@ cat .workshop/worker-image                       # the worker build that matches
 
 Right after the installation finishes, you might see an extra `atenet-router` Pod in the `Terminating` state. That Pod is the previous instance draining:
 the installer patches the router with a longer parked-request budget and a 120-second grace period, which triggers a rolling update.
+
+Every `kubectl ate` command prints `Warning: no --token-file given; acting as the shared identity system:serviceaccount:ate-system:ate-client rather than as yourself. Pass --token-file to act as yourself.`
+That's expected in this workshop: without `--token-file`, `kubectl ate` acts as the shared `ate-client` ServiceAccount, which the
+installer makes a global owner so that the demos work.
 
 ### What just happened
 - You inspected the control plane (`ateapi`, `atecontroller`, Postgres), the data plane (`atelet` in each worker, the router, and the egress proxy),
@@ -252,17 +268,21 @@ an actor, and send requests to it through the router.
    probe, the snapshot fidelity (`preferredFidelity`), resource limits (`cpuMillicores`, `memoryBytes`), and one durable directory.
    ```bash
    scripts/render.sh modules/02-hello-actor/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
-   kubectl ate get actor-template agent-v1 -a workshop            # repeat until GOLDEN TAG appears
+   until kubectl ate get actor-template agent-v1 -a workshop -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus | (.goldenTag.name // .errorMessage)' >/dev/null; do sleep 3; done
+   kubectl ate get actor-template agent-v1 -a workshop
    kubectl ate get actor-template agent-v1 -a workshop -o yaml    # inspect status.goldenSnapshotStatus.goldenTag.name
    ```
+   The `until` loop returns once the golden snapshot exists, and the next command shows it in the `GOLDEN TAG` column.
+   If it hasn't returned in about 5 minutes, press Ctrl+C and check the [troubleshooting guide](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/instructor/troubleshooting.md).
    Substrate starts your container once on a free worker, waits for its `wakeupProbe` (`/readyz`) to pass, and snapshots it.
    That **golden snapshot** serves as the starting point for every actor created from this template. Creating an actor
    restores this snapshot instead of cold-booting a process.
 5. **Create an actor.**
    ```bash
    kubectl ate create actor hello --template=agent-v1 -a workshop
-   kubectl ate get actors -a workshop       # SUSPENDED: the record exists, but it isn't running on a worker
+   kubectl ate get actors -a workshop
    ```
+   The `STATE` column shows `ACTOR_STATE_SUSPENDED`: the record exists, but it isn't running on a worker yet.
 6. **Send requests to the actor.** The router selects the target actor from the `ate-target-actor` header.
    ```bash
    make forward-router                      # port-forwards atenet-router to localhost:8080
@@ -336,13 +356,14 @@ with **VOLUMES** fidelity (`SNAPSHOT_FIDELITY_VOLUMES`): Substrate saves only th
    ```bash
    make build-agent
    ```
-5. Keep `hello` suspended. Creating a new template requires a **free worker** to run its golden-snapshot actor, and your pool has two workers.
+5. Suspend `hello` again. Creating a new template requires a **free worker** to run its golden-snapshot actor, and your pool has two workers.
    Create the new template and an actor:
    ```bash
    kubectl ate suspend actor hello -a workshop 2>/dev/null; kubectl ate get actors -a workshop
    diff modules/02-hello-actor/manifests/template.yaml.tmpl modules/03-suspend-resume/manifests/template.yaml.tmpl
    scripts/render.sh modules/03-suspend-resume/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
-   kubectl ate get actor-template agent-v2 -a workshop -o yaml | grep -A2 goldenTag   # repeat until set
+   until kubectl ate get actor-template agent-v2 -a workshop -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus | (.goldenTag.name // .errorMessage)' >/dev/null; do sleep 3; done
+   kubectl ate get actor-template agent-v2 -a workshop
    kubectl ate create actor memo --template=agent-v2 -a workshop
    ```
 6. Follow the actor's logs in a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`). The log stream follows the actor across workers and restarts:
@@ -412,15 +433,22 @@ model access, and a deny-by-default **egress policy** lets the actor reach the g
    `backend` shows which model answered (`gemini`). If a Gemini call fails (for example, with a `403` error while the Workload Identity
    binding propagates), the gateway answers that request from a mock fallback instead: `backend` is `mock-fallback`
    and `upstreamError` reports what the platform returned. As a result, the `502` response from the agent in step 3 comes from
-   egress blocking, not the model.
-2. **Free a worker, then configure the agent to call the model.** Suspend `memo` so that the new template's golden-snapshot
-   actor has a free worker. In `app/cmd/agent/main.go`, find `WORKSHOP(module-4)` and set `ModelURL: os.Getenv("MODEL_URL")`.
+   egress blocking, not the model. `make verify MODULE=4` fails if the reply comes from `mock-fallback`, so check `upstreamError`,
+   or switch to the mock on purpose (see "If the model isn't available").
+2. **Configure the agent to call the model, then free a worker.** First, open `app/cmd/agent/main.go`, find the
+   `WORKSHOP(module-4)` comment, and change the line below it from `ModelURL: "",` to:
+   ```go
+   ModelURL: os.Getenv("MODEL_URL"),
+   ```
+   Save the file. Then suspend `memo` so that the new template's golden-snapshot actor has a free worker, and build the image.
+   If `make build-agent` warns that the image is the same as your last build, the edit isn't saved yet.
    ```bash
    kubectl ate suspend actor memo -a workshop
    make build-agent
    cat modules/04-make-it-an-agent/manifests/template.yaml.tmpl     # note the MODEL_URL environment variable
    scripts/render.sh modules/04-make-it-an-agent/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
-   kubectl ate get actor-template agent-v3 -a workshop -o yaml | grep -A2 goldenTag   # repeat until set
+   until kubectl ate get actor-template agent-v3 -a workshop -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus | (.goldenTag.name // .errorMessage)' >/dev/null; do sleep 3; done
+   kubectl ate get actor-template agent-v3 -a workshop
    kubectl ate create actor buddy --template=agent-v3 -a workshop
    ```
 3. **Send a chat request and watch it fail.**
@@ -428,9 +456,8 @@ model access, and a deny-by-default **egress policy** lets the actor reach the g
    curl -s localhost:8081/chat/buddy -d '{"message":"What is Agent Substrate?"}'; echo
    ```
    The request returns a `502` error: `model call failed: …`. The agent tried to reach the gateway, but **egress is deny-by-default**
-   and `buddy` has no policy. Without a policy, Substrate doesn't open an outbound tunnel at all, which is why the error
-   reads `connection reset by peer` rather than "denied": the proxy drops the connection before anything can
-   refuse it.
+   and `buddy` has no policy. The error ends in `no such host` rather than "denied": the sandbox's DNS answers NXDOMAIN for
+   any hostname that the actor's policy doesn't allow, so the agent can't look up the gateway's address.
 4. **Allow traffic to the gateway only.**
    ```bash
    cat modules/04-make-it-an-agent/manifests/egress-gateway.yaml
@@ -508,8 +535,9 @@ the one piece that Substrate leaves to your application: **deciding when an acto
    ```bash
    curl -s localhost:8081/chat/swarm-01 -d '{"message":"hi"}' | jq -c '{turn, backend}'
    curl -s localhost:8081/chat/swarm-02 -d '{"message":"hi"}' | jq -c '{turn, backend}'
-   kubectl ate get workers -n workshop           # both workers are busy
+   kubectl ate get workers -n workshop
    ```
+   Both workers are now busy: each one shows `1/1000` in the `ACTORS` column and `1000/1000` in the `CPU(MILLICORES)` column.
 4. **Send a request to a third actor.** *(Optional: in an instructor-led session, your instructor might demonstrate or describe this step.)*
    ```bash
    time curl -s localhost:8081/chat/swarm-03 -d '{"message":"hi"}'; echo
@@ -619,15 +647,16 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
    make load
    ```
-3. **Run queries in the Prometheus UI** (`http://localhost:9090` → **Graph**, or Web Preview `:9090` in Cloud Shell). Copy each query from
-   [observability/queries.md](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/observability/queries.md) (if your `CLUSTER_NAME` in `workshop.env` isn't
+3. **Run queries in the Prometheus UI** (`http://localhost:9090` → **Graph**, or Web Preview `:9090` in Cloud Shell). More queries
+   are in [observability/queries.md](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/observability/queries.md). Copy each query below (if your `CLUSTER_NAME` in `workshop.env` isn't
    `ate-cluster`, replace `cluster="ate-cluster"` to match):
    - **How many workers are busy vs. idle?** `max by ("ate.worker.state") ({"ate.workerpool.workers", "ate.workerpool.name"="agents", cluster="ate-cluster"})`
      (Use `max` rather than `sum` because each `ateapi` replica reports the entire pool.) A busy worker appears as `partial` rather than
      `at_capacity` because the state counts actor slots (`1` of the default `1000`), not CPU utilization.
-   - **How often did the router resume a suspended actor?** Run the `"ate.router.resume"` query.
-   - **How long does a resume take?** Run the lifecycle P95 latency query.
-   - **What are the chat turn outcomes and active actor counts?** Run the gateway metric queries.
+   - **How often did the router resume a suspended actor?** `sum by ("ate.router.resume") (rate({"atenet.router.route.duration_count", top_level_controller_name="atenet-router", cluster="ate-cluster"}[2m]))`
+   - **How long does a resume take?** `histogram_quantile(0.95, sum by (le, "ate.actor.operation.name") (rate({"ate.actor.lifecycle.operation.duration_bucket", cluster="ate-cluster"}[5m])))`
+   - **What are the chat turn outcomes and active actor counts?** `sum by (outcome) (rate(workshop_chat_turns_total{cluster="ate-cluster"}[2m]))`
+     and `max(workshop_actors_awake{cluster="ate-cluster"})`
 
    Data points appear **1–3 minutes** after the traffic that produces them. If a chart is empty, wait a minute and run the query again.
 4. **View dashboards in the Google Cloud console.** Open
@@ -636,7 +665,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    - Substrate's **gRPC**, **E2E latency**, and **Snapshot** dashboards: provide the platform maintainers' operational views.
 
    While `make load` runs, watch active actors track worker capacity, resumed requests rise, and idle suspends follow each traffic burst.
-5. **Follow a single actor across workers.** Because an actor isn't tied to a single Pod, its logs aren't tied to a single Pod either. In this step, you
+5. **Follow a single actor across workers.** Because an actor isn't tied to a single Pod, its logs aren't tied to a single Pod either. In steps 5 and 6, you
    wake `buddy`, let it suspend again, and delete the worker Pod it ran on so that the next resume lands
    on a different Pod. First, stop `make load` if it is still running. In one terminal, stream `buddy`'s logs:
    ```bash
@@ -655,8 +684,9 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    kubectl ate get actors -a workshop
    kubectl ate get workers -n workshop
    ```
-   Deleting a worker Pod terminates any actor still running on it, so always verify that the worker is empty first. Next, delete the
-   worker Pod and resume `buddy` with tracing enabled:
+6. **Move `buddy` to a new worker and trace the resume.** Deleting a worker Pod terminates any actor still running on it, so
+   continue only if step 5 showed `0/1000` actors on that worker. In the second terminal, delete the worker Pod and resume
+   `buddy` with tracing enabled:
    ```bash
    kubectl -n workshop delete pod "$FIRST"
    kubectl ate --trace resume actor buddy -a workshop     # prints: Tracing enabled. Trace ID: <id>
@@ -666,7 +696,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    The `Actor restoring` and `Actor restored` log entries include a `trace_id` field that matches the
    trace ID printed by the CLI.
 
-   `kubectl ate logs` streams logs only from the Pod that currently hosts the actor. To view the complete history across Pods, open Logs Explorer in the Google Cloud console (replace `ate-cluster` if your `CLUSTER_NAME` differs):
+7. **View the actor's history in Logs Explorer.** `kubectl ate logs` streams logs only from the Pod that currently hosts the actor. To view the complete history across Pods, open Logs Explorer in the Google Cloud console and run this query (replace `ate-cluster` if your `CLUSTER_NAME` differs):
    ```
    resource.type="k8s_container"
    resource.labels.cluster_name="ate-cluster"
@@ -677,7 +707,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    your agent's own log lines. Include both clauses in the `OR` filter: `ateapi` and `atelet` write actor identity into `jsonPayload` rather than
    `labels`, so filtering only on `labels` misses the state transitions.
 
-   Next, replace the filter with `jsonPayload.trace_id="<id>"`, using the trace ID from the `--trace` resume command. This query isolates that
+8. **Follow one request by its trace ID.** In Logs Explorer, replace the filter with `jsonPayload.trace_id="YOUR_TRACE_ID"`, using the trace ID from the `--trace` resume command in step 6. This query isolates that
    single request across `ateapi`, `atelet`, and `ateworker`. Paste the same ID into **Cloud Trace** → **Trace Explorer** to
    inspect the request as a waterfall of spans.
 
@@ -688,7 +718,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
 - `make dashboards` is idempotent: edit the JSON file and run the command again to update the dashboards.
 - **Managed Prometheus doesn't scrape actors directly.** Actors share a generic hostname and IP address inside the sandbox, and pushing OTLP metrics directly from an actor
   requires an `http` `EgressPolicy` rule for the OpenTelemetry collector (`docs/observability.md`). Instead, all application-level
-  metrics in this section come from the always-on gateway, while per-actor details live in Cloud Logging (step 5).
+  metrics in this section come from the always-on gateway, while per-actor details live in Cloud Logging (step 7).
 - Metrics omit actor identity to avoid creating a separate time series per actor. Logs and traces include actor identity, and a
   `trace_id` links them together: the CLI prints the ID, every Substrate log entry for that request includes it, and Cloud
   Trace visualizes the end-to-end spans.
@@ -725,11 +755,14 @@ gRPC services (`ax ssh`) inside a declarative `Task`, `Workspace`, and `Model` c
 
 For comparison, **agent-sandbox** (`kubernetes-sigs/agent-sandbox`) addresses a similar use case — running a
 Pod per agent session — with no Substrate integration. Its `SandboxTemplate` corresponds to
-`ActorTemplate` and `SandboxWarmPool` corresponds to `WorkerPool`, but suspending a Sandbox deletes the Pod, whereas suspending an
-actor checkpoints memory so it can resume on any worker. See the "Architecture tour" section for the full comparison table.
+`ActorTemplate` and `SandboxWarmPool` corresponds to `WorkerPool`, and both projects can suspend and resume. The difference is that many actors share a few generic workers,
+and a suspended actor resumes from its memory and disk snapshot on any of them. See the "Architecture tour" section for the full comparison table.
 
 ### Limits to know before you build
 - **Authorization inside an atespace is role-based (`AccessPolicy`).** Any principal granted `editor` or `admin` on an atespace can act on all actors in that atespace (there are no per-actor ACLs).
+- **Without `--token-file`, `kubectl ate` acts as the shared `ate-client` identity**, which the installer makes a global owner.
+  Substrate's authorization guide says not to keep that setup outside development. On a shared install, pass `--token-file` so
+  that each person acts as themselves.
 - **`CRASHED` actors require intervention** (from a human or your controller): `resume` rejects crashed actors, so run `kubectl ate revert actor X -a Y`
   to roll the actor back to `SUSPENDED` at its last snapshot before resuming, or delete it with `kubectl ate delete actor X -a Y`.
 - **Idle detection is your application's responsibility** (see "Density and idle"), and so is `WorkerPool` sizing.

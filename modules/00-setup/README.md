@@ -2,6 +2,7 @@
 
 The goal of this section is to point the workshop at your Google Cloud project, create the cloud resources that Substrate needs,
 and start the Substrate installation in the background. The installation runs while you take the architecture tour.
+If you create your own cluster in this section, plan for about 20 minutes.
 
 ## What you need
 - A Google Cloud project where you have the **Owner** role, and a GKE **1.37+** cluster in that project. The cluster requires Workload Identity,
@@ -9,14 +10,14 @@ and start the Substrate installation in the background. The installation runs wh
 - `kubectl` configured to point at that cluster (`kubectl config current-context`).
 - Locally installed tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `curl`, `git`, `python3`.
   You need a running **Docker** daemon with `buildx` only to build Substrate from source (empty `SUBSTRATE_IMAGE_REPO`).
-  Cloud Shell includes all of these tools except `ko`: run `go install github.com/google/ko@latest`.
+  Cloud Shell includes all of these tools except `ko`: run `go install github.com/google/ko@v0.19.1`.
 
 ## Steps
 
 1. **Activate Cloud Shell.** Open the Google Cloud console and click **Activate Cloud Shell** in the top-right
    toolbar to launch Cloud Shell — a self-contained VM in your browser with all the required tools except `ko` — and run all the commands in this lab from there. Install `ko` first:
    ```bash
-   go install github.com/google/ko@latest
+   go install github.com/google/ko@v0.19.1
    ```
 2. **Clone the workshop repository.** Clone the repository and move into its root directory:
    ```bash
@@ -49,9 +50,13 @@ and start the Substrate installation in the background. The installation runs wh
      --add-maintenance-exclusion-end "$(date -u -d '+2 days' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+2d +%Y-%m-%dT%H:%M:%SZ)" \
      --add-maintenance-exclusion-scope no_minor_or_node_upgrades
    ```
+   Creating the cluster takes several minutes. While you wait, follow its progress in the Google Cloud console under
+   **Kubernetes Engine** > **Clusters**, and read the next section, "Architecture tour", up to "Look around", which needs the
+   installation from step 8.
 4. **Configure the environment.** Copy the example environment file and set `PROJECT_ID` and `CLUSTER_LOCATION` to your cluster's exact zone or
    region from `gcloud container clusters list` (a zonal cluster such as `us-central1-a` won't match
-   `us-central1`). If your cluster isn't named `ate-cluster`, set `CLUSTER_NAME` as well. Every other
+   `us-central1`). If your cluster isn't named `ate-cluster`, set `CLUSTER_NAME` as well. Leave `REGION` as `us-central1`:
+   it's a region, not a zone, and it sets where the snapshot bucket and the Artifact Registry repository live. Every other
    variable has a working default.
    ```bash
    gcloud container clusters list --project YOUR_PROJECT_ID    # NAME and LOCATION
@@ -77,6 +82,8 @@ and start the Substrate installation in the background. The installation runs wh
    ```
    This setting applies only to your current terminal session. To persist it, add the same line with the absolute repository path instead of `$PWD` to
    `~/.zshrc` or `~/.bashrc`. If you use direnv, add `PATH_add bin` to an `.envrc` file at the repository root.
+   If Cloud Shell reconnects or you open a new tab, `cd` into the repository and run `source scripts/env.sh`: it loads
+   `workshop.env` and puts `bin/` back on your `PATH`.
 8. **Start the installation in the background.** This target clones Substrate at `SUBSTRATE_REF`, builds `kubectl ate`,
    deploys `ate-system`, pins a worker image that matches the control plane, and
    increases the router's parked-request budget and shutdown grace period.
