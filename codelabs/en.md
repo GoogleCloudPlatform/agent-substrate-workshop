@@ -374,7 +374,7 @@ with **VOLUMES** fidelity (`SNAPSHOT_FIDELITY_VOLUMES`): Substrate saves only th
    ```bash
    make build-agent
    ```
-5. Keep `hello` suspended. Creating a new template requires a **free worker** to run its golden-snapshot actor, and your pool has two workers.
+5. Suspend `hello` again. Creating a new template requires a **free worker** to run its golden-snapshot actor, and your pool has two workers.
    Create the new template and an actor:
    ```bash
    kubectl ate suspend actor hello -a workshop 2>/dev/null; kubectl ate get actors -a workshop
@@ -466,7 +466,8 @@ model access, and a deny-by-default **egress policy** lets the actor reach the g
    make build-agent
    cat modules/04-make-it-an-agent/manifests/template.yaml.tmpl     # note the MODEL_URL environment variable
    scripts/render.sh modules/04-make-it-an-agent/manifests/template.yaml.tmpl | kubectl ate create actor-template -f -
-   until kubectl ate get actor-template agent-v3 -a workshop -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus.goldenTag.name' >/dev/null; do sleep 3; done
+   until kubectl ate get actor-template agent-v3 -a workshop -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus | (.goldenTag.name // .errorMessage)' >/dev/null; do sleep 3; done
+   kubectl ate get actor-template agent-v3 -a workshop
    kubectl ate create actor buddy --template=agent-v3 -a workshop
    ```
 3. **Send a chat request and watch it fail.**

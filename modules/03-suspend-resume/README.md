@@ -40,7 +40,7 @@ with **VOLUMES** fidelity (`SNAPSHOT_FIDELITY_VOLUMES`): Substrate saves only th
    ```bash
    make build-agent
    ```
-5. Keep `hello` suspended. Creating a new template requires a **free worker** to run its golden-snapshot actor, and your pool has two workers.
+5. Suspend `hello` again. Creating a new template requires a **free worker** to run its golden-snapshot actor, and your pool has two workers.
    Create the new template and an actor:
    ```bash
    kubectl ate suspend actor hello -a workshop 2>/dev/null; kubectl ate get actors -a workshop
