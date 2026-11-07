@@ -48,96 +48,10 @@ ok "bin/kubectl-ate (kubectl ate …)"
 user_has_ate || path_hint
 
 step "Deploy ate-system"
-# Clusters upgraded from Substrate < v1.0.0-rc.2 may have:
-# - a version-suffixed atelet DaemonSet (e.g. atelet-v0-4-0) holding hostPort 8085,
-# - pre-v1.0.0-rc.1 CRDs (ate.dev/v1alpha1 storedVersions on workerpools, sandboxconfigs, csidriverconfigs),
-# - an incompatible bundled Postgres PVC (pre-v0.4.0 'postgres' schema owner, pre-v0.5.0 password-auth,
-#   pre-v0.6.0 sandboxConfig wire types, pre-v1.0.0-rc.1 squashed migrations / substrate.ateapi.v1 wire package,
-#   or pre-v1.0.0-rc.2 gVisor v6 / OCI mount snapshots),
-# - a pre-v1.0.0-rc.2 node image-cache directory (layout version 1 or 2; v1.0.0-rc.2 requires version 3).
-# Clean these up before ate-setup deploys and waits for ds/atelet and sts/postgres.
-for old_ds in $(kubectl -n ate-system get ds -l app=atelet -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null); do
-  if [[ "$old_ds" != "atelet" ]]; then
-    warn "removing legacy DaemonSet $old_ds before deploying ds/atelet"
-    kubectl -n ate-system delete ds "$old_ds" --ignore-not-found --wait=true >/dev/null
-  fi
-done
-kubectl label nodes --all ate.dev/substrate-version- >/dev/null 2>&1 || true
-crd_versions="$(kubectl get crd sandboxconfigs.ate.dev -o jsonpath='{.spec.versions[*].name}' 2>/dev/null || true)"
-if [[ " $crd_versions " == *" v1alpha1 "* ]]; then
-  warn "CRDs predate v1.0.0-rc.1 (ate.dev/v1alpha1); migrating CRDs and bundled Postgres to ate.dev/v1"
-  kubectl delete workerpools.ate.dev --all -A --ignore-not-found --wait=true >/dev/null 2>&1 || true
-  kubectl delete sandboxconfigs.ate.dev --all --ignore-not-found --wait=true >/dev/null 2>&1 || true
-  kubectl delete csidriverconfigs.ate.dev --all --ignore-not-found --wait=true >/dev/null 2>&1 || true
-  kubectl delete validatingadmissionpolicy/sandboxconfig-assets validatingadmissionpolicybinding/sandboxconfig-assets --ignore-not-found >/dev/null 2>&1 || true
-  kubectl delete crd/workerpools.ate.dev crd/sandboxconfigs.ate.dev crd/csidriverconfigs.ate.dev --ignore-not-found --wait=true >/dev/null 2>&1 || true
-  kubectl -n ate-system delete sts/postgres pvc/data-postgres-0 --ignore-not-found --wait=true >/dev/null 2>&1 || true
-fi
-if [[ -f "$SRC/manifests/ate-install/sandboxconfig-validation.yaml" ]]; then
-  kubectl apply -f "$SRC/manifests/ate-install/generated/ate.dev_sandboxconfigs.yaml" \
-    -f "$SRC/manifests/ate-install/sandboxconfig-validation.yaml" >/dev/null 2>&1 || true
-fi
-if kubectl -n ate-system get configmap ate-api-authentication -o jsonpath='{.data.authentication\.yaml}' 2>/dev/null | grep -q 'actorIdentityJWTProvider'; then
-  warn "ate-api-authentication ConfigMap predates v0.6.0; deleting so ate-setup recreates it"
-  kubectl -n ate-system delete configmap/ate-api-authentication --ignore-not-found
-  kubectl -n ate-system delete pod -l app=ate-api-server --ignore-not-found >/dev/null
-fi
-if kubectl -n ate-system get sts postgres >/dev/null 2>&1; then
-  pg_vols="$(kubectl -n ate-system get sts postgres -o jsonpath='{.spec.template.spec.volumes[*].name}' 2>/dev/null || true)"
-  api_ver="$(kubectl -n ate-system exec deploy/ate-api-server -- /ko-app/ateapi --version 2>/dev/null || true)"
-  if [[ " $pg_vols " != *" postgres-ca "* ]] || ! kubectl -n ate-system get deploy ate-idp-server >/dev/null 2>&1 || [[ "$api_ver" == v0.* ]] || [[ "$api_ver" == "v1.0.0-rc.1"* ]]; then
-    warn "bundled Postgres predates v1.0.0-rc.2; resetting workerpools, sts/postgres, and pvc/data-postgres-0"
-    kubectl delete workerpools.ate.dev --all -A --ignore-not-found --wait=true >/dev/null 2>&1 || true
-    kubectl -n ate-system delete sts/postgres pvc/data-postgres-0 --ignore-not-found --wait=true
-  fi
-fi
-if kubectl -n ate-system get ds atelet >/dev/null 2>&1; then
-  atelet_caps="$(kubectl -n ate-system get ds atelet -o jsonpath='{.spec.template.spec.containers[?(@.name=="atelet")].securityContext.capabilities.add[*]}' 2>/dev/null || true)"
-  atelet_ready="$(kubectl -n ate-system get ds atelet -o jsonpath='{.status.numberReady}/{.status.desiredNumberScheduled}' 2>/dev/null || true)"
-  if [[ " $atelet_caps " != *" CHOWN "* ]] || [[ "$atelet_ready" != "${atelet_ready%/*}/${atelet_ready%/*}" ]]; then
-    warn "clearing pre-v1.0.0-rc.2 /var/lib/ate/image-cache (layout version < 3) on cluster nodes"
-    kubectl -n ate-system delete ds/atelet --ignore-not-found --wait=true >/dev/null
-    kubectl apply -f - >/dev/null <<'EOF'
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: atelet-cache-reset
-  namespace: ate-system
-spec:
-  selector:
-    matchLabels: {app: atelet-cache-reset}
-  template:
-    metadata:
-      labels: {app: atelet-cache-reset}
-    spec:
-      tolerations:
-      - {key: ate.dev/sandboxClass, operator: Exists, effect: NoSchedule}
-      - {key: cloud.google.com/compute-class, operator: Exists, effect: NoSchedule}
-      initContainers:
-      - name: reset
-        image: postgres:16
-        command: ["sh", "-c", "v=$(cat /var/lib/ate/image-cache/version 2>/dev/null || true); if [ -n \"$v\" ] && [ \"$v\" != 3 ]; then rm -rf /var/lib/ate/image-cache; fi"]
-        securityContext: {privileged: true, runAsUser: 0}
-        volumeMounts:
-        - {name: ate-base, mountPath: /var/lib/ate}
-      containers:
-      - name: pause
-        image: postgres:16
-        command: ["sh", "-c", "sleep 3600"]
-      volumes:
-      - name: ate-base
-        hostPath: {path: /var/lib/ate, type: DirectoryOrCreate}
-EOF
-    kubectl -n ate-system rollout status ds/atelet-cache-reset --timeout=180s >/dev/null
-    kubectl -n ate-system delete ds/atelet-cache-reset --ignore-not-found --wait=true >/dev/null
-  fi
-fi
-# v0.4.0+ requires an explicit --credential-provider selection on deploy ate-system / deploy atenet.
 # {"name":"k8s.io"} deploys the bundled Kubernetes Secrets provider (with a default-deny namespace policy)
 # so optional lab J works without reinstalling Substrate.
-# v0.6.0+ also requires --snapshot-location, --snapshot-transfer-gsa-name, and --ingress-allowed-spiffe-ids.
-# v1.0.0-rc.2+ defaults --sandbox-classes to gvisor,microvm; pass gvisor by default so make install
-# doesn't require a separate -assets bucket or stage Kata/Cloud Hypervisor assets until optional lab I.
+# Pass gvisor by default so make install doesn't require a separate -assets bucket or stage
+# Kata/Cloud Hypervisor assets until optional lab I.
 CREDENTIAL_PROVIDER="${ATE_CREDENTIAL_PROVIDER:-{\"name\":\"k8s.io\"}}"
 SNAPSHOT_LOCATION="${SNAPSHOT_LOCATION:-gs://${BUCKET_NAME}/}"
 SNAPSHOT_TRANSFER_GSA_NAME="${SNAPSHOT_TRANSFER_GSA_NAME:-ate-snapshot-transfer}"
@@ -177,9 +91,4 @@ kubectl -n ate-system get pods
 
 # Written last, after the router patch, so catch-up.sh can gate a skip on
 # this single marker instead of re-deriving "is the install actually done" from several checks.
-# If SUBSTRATE_REF changed since the last install, clear cached app images so catch-up rebuilds
-# the gateway and agent against the current ateapipb wire schema.
-if [[ "$(state_get install-complete)" != *"SUBSTRATE_REF=$SUBSTRATE_REF" ]]; then
-  rm -f "$STATE_DIR/gateway-image" "$STATE_DIR/agent-image"
-fi
 state_put install-complete "$(date -u +%Y-%m-%dT%H:%M:%SZ) SUBSTRATE_REF=$SUBSTRATE_REF"
