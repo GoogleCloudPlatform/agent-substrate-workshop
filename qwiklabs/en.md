@@ -3,136 +3,82 @@
 ## Introduction
 
 In this workshop, you build and operate your own fleet of AI agents on [Agent Substrate](https://github.com/agent-substrate/substrate),
-starting from a bare GKE cluster. In about 85 minutes, you:
+starting from a pre-warmed GKE cluster and Agent Substrate control plane. An agent spends most of its life waiting,
+so Substrate runs agents as *actors*: sandboxed processes that it can suspend to Cloud Storage and resume on any worker,
+with their memory intact.
 
-- Install Substrate and learn what each of its components does.
-- Build a Go agent, run it as a Substrate **actor**, and suspend and resume it across workers.
+When this lab started, Terraform created a GKE cluster (`ate-cluster`) with two `n1-standard-4` nodes, provisioned Cloud
+Storage, Artifact Registry, Workload Identity bindings, and Cloud Monitoring dashboards, and installed Agent Substrate (`v1.0.0`)
+in `ate-system` with a 500 GiB persistent disk for Postgres. In Cloud Shell, you unpack the pre-built CLI tools and
+`.workshop/` install metadata, explore the installed `ate.dev` CRDs and control plane, and build and operate your agent
+fleet across the hands-on sections where you:
+
+- Connect Cloud Shell to the pre-warmed GKE cluster and explore the Agent Substrate control plane and `ate.dev` CRDs.
+- Build a Go agent, run it as a Substrate **actor**, and suspend and resume it across workers with `MEMORY` and `VOLUMES` snapshot fidelity.
 - Connect the agent to a model (Gemini on the Gemini platform) through an always-on gateway, and lock down its egress.
-- Run 20 agents on 2 workers with request parking and idle suspend.
-- Monitor the fleet in Prometheus and Google Cloud console dashboards.
-
-You build everything you deploy: the agent, the gateway, and (in source mode) Substrate itself go into your own Artifact Registry repository.
-
-This lab uses a GKE cluster with two `c3-standard-4` nodes and a 500 GiB persistent disk for Substrate's bundled Postgres,
-plus Cloud Monitoring, Cloud Storage, and Artifact Registry, all in the project that the lab provides.
+- Run 20 agents on 2 workers with request parking and idle suspend, and monitor the fleet in Prometheus and Google Cloud console dashboards.
 
 ### Prerequisites
-- A Google Cloud project where you have the **Owner** role, with a GKE **1.37+** cluster that has Workload Identity, managed
-  OpenTelemetry, Managed Service for Prometheus, no node auto-upgrade, no spot nodes, and 2× `c3-standard-4` nodes. If you
-  don't have a cluster yet, the "Setup" section creates one with these settings.
 - Familiarity with Kubernetes. You don't need prior Substrate knowledge.
 
 ## Setup
 
-The goal of this section is to point the workshop at your Google Cloud project, create the cloud resources that Substrate needs,
-and start the Substrate installation in the background. The installation runs while you take the architecture tour.
-If you create your own cluster in this section, plan for about 20 minutes.
+When the lab started, Terraform pre-warmed your cluster and Agent Substrate installation so you can inspect the control
+plane in "Architecture tour" and build your first actor in "Hello actor":
 
-### What you need
-- A Google Cloud project where you have the **Owner** role, and a GKE **1.37+** cluster in that project. The cluster requires Workload Identity,
-  managed OpenTelemetry, Managed Service for Prometheus, no node auto-upgrade (or an active maintenance exclusion), and no spot nodes. Use the cluster that your instructor created, or create one in Step 3 below (see also the [Substrate Google Cloud guide](https://github.com/ai-on-gke/substrate-gke/tree/main/tools/setup-gcp)).
-- `kubectl` configured to point at that cluster (`kubectl config current-context`).
-- Locally installed tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `curl`, `git`, `python3`.
-  You need a running **Docker** daemon with `buildx` only to build Substrate from source (empty `SUBSTRATE_IMAGE_REPO`).
-  Cloud Shell includes all of these tools except `ko`: run `go install github.com/google/ko@v0.19.1`.
+- A zonal GKE cluster named `ate-cluster` in <ql-variable key="project_0.default_zone" placeHolder="ZONE"></ql-variable> (GKE 1.37 on the Rapid channel, two `n1-standard-4` nodes, Workload Identity, managed OpenTelemetry, Managed Service for Prometheus, and a 48-hour maintenance exclusion).
+- The Cloud Storage snapshot bucket (`<ql-variable key="project_0.project_id" placeHolder="PROJECT_ID"></ql-variable>-ate`), Artifact Registry Docker repository (`workshop`), Workload Identity bindings, and all four Cloud Monitoring dashboards.
+- Agent Substrate `v1.0.0` in `ate-system`, patched with a 60-second router parked-request budget, a 120-second shutdown grace period, and an HTTP bridge on port 80, with the matching worker image pre-pulled onto the cluster nodes.
+- Pre-built Linux tools (`kubectl-ate`, `ko`, `egressctl`) and `.workshop/` install metadata (`.workshop/worker-image` and `.workshop/install-complete`) packaged in Cloud Storage.
+
+In this section, you clone the workshop repository in Cloud Shell, configure `workshop.env`, unpack the pre-warmed tools
+and install metadata, and verify that your environment is ready to explore the cluster in "Architecture tour" and run
+your first actor in "Hello actor".
 
 ### Steps
 
 1. **Activate Cloud Shell.** Open the Google Cloud console and click **Activate Cloud Shell** in the top-right
-   toolbar to launch Cloud Shell — a self-contained VM in your browser with all the required tools except `ko` — and run all the commands in this lab from there. Install `ko` first:
-   ```bash
-   go install github.com/google/ko@v0.19.1
-   ```
+   toolbar to launch Cloud Shell — a self-contained VM in your browser — and run all the commands in this lab from there.
 2. **Clone the workshop repository.** Clone the repository and move into its root directory:
    ```bash
    git clone https://github.com/GoogleCloudPlatform/agent-substrate-workshop
    cd agent-substrate-workshop
    ```
-3. **Create a GKE cluster (if your instructor didn't pre-create one).** If your project (<ql-variable key="project_0.project_id" placeHolder="YOUR_PROJECT_ID"></ql-variable>) already has a cluster (`gcloud container clusters list`), skip to Step 4. Otherwise, create a zonal GKE 1.37 cluster in your assigned region (<ql-variable key="project_0.default_region" placeHolder="us-central1"></ql-variable>) with Workload Identity, managed OpenTelemetry, Managed Service for Prometheus, and a 48-hour maintenance exclusion to block node auto-upgrades during the workshop:
-   <ql-code-block bash templated noWrap>
-   export PROJECT_ID="{{{project_0.project_id | YOUR_PROJECT_ID }}}"
-   export REGION="{{{project_0.default_region | us-central1 }}}"
-   export CLUSTER_LOCATION="${REGION}-a"
-   export CLUSTER_NAME="ate-cluster"
-
-   gcloud services enable container.googleapis.com --project "$PROJECT_ID"
-   gcloud beta container clusters create "$CLUSTER_NAME" \
-     --project "$PROJECT_ID" \
-     --location "$CLUSTER_LOCATION" \
-     --release-channel rapid \
-     --cluster-version 1.37 \
-     --machine-type c3-standard-4 \
-     --num-nodes 2 \
-     --workload-pool "$PROJECT_ID.svc.id.goog" \
-     --enable-managed-prometheus \
-     --managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS
-
-   gcloud container clusters update "$CLUSTER_NAME" \
-     --project "$PROJECT_ID" \
-     --location "$CLUSTER_LOCATION" \
-     --add-maintenance-exclusion-name workshop-freeze \
-     --add-maintenance-exclusion-start "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-     --add-maintenance-exclusion-end "$(date -u -d '+2 days' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+2d +%Y-%m-%dT%H:%M:%SZ)" \
-     --add-maintenance-exclusion-scope no_minor_or_node_upgrades
-   </ql-code-block>
-   Creating the cluster takes several minutes. While you wait, follow its progress in the Google Cloud console under
-   **Kubernetes Engine** > **Clusters**, and read the next section, "Architecture tour", up to "Look around", which needs the
-   installation from step 8.
-4. **Configure the environment.** Copy the example environment file and set `PROJECT_ID` (<ql-variable key="project_0.project_id" placeHolder="YOUR_PROJECT_ID"></ql-variable>), `REGION` (<ql-variable key="project_0.default_region" placeHolder="us-central1"></ql-variable>), and `CLUSTER_LOCATION` to your cluster's exact zone or
-   region from `gcloud container clusters list` (a zonal cluster such as `us-central1-a` won't match
-   `us-central1`). If your cluster isn't named `ate-cluster`, set `CLUSTER_NAME` as well. `REGION` is a region, not a zone:
-   it sets where the snapshot bucket and the Artifact Registry repository live. Every other
-   variable has a working default.
-   <ql-code-block bash templated noWrap>
-   gcloud container clusters list --project {{{project_0.project_id | YOUR_PROJECT_ID }}}    # NAME and LOCATION
+3. **Configure the environment and cluster credentials.** Populate `workshop.env` with your project ID, region, and
+   cluster zone, fetch `kubectl` credentials for `ate-cluster`, and configure Docker authentication for Artifact Registry:
+   <ql-code-block language="bash" templated noWrap>
    cp workshop.env.example workshop.env
-   ${EDITOR:-nano} workshop.env
+   sed -i \
+     -e 's|^PROJECT_ID=.*|PROJECT_ID={{{project_0.project_id | "PROJECT_ID"}}}|' \
+     -e 's|^REGION=.*|REGION={{{project_0.default_region | "REGION"}}}|' \
+     -e 's|^CLUSTER_LOCATION=.*|CLUSTER_LOCATION={{{project_0.default_zone | "ZONE"}}}|' \
+     workshop.env
+   gcloud container clusters get-credentials ate-cluster \
+     --zone {{{project_0.default_zone | "ZONE"}}} \
+     --project {{{project_0.project_id | "PROJECT_ID"}}}
+   gcloud auth configure-docker {{{project_0.default_region | "REGION"}}}-docker.pkg.dev --quiet
    </ql-code-block>
-5. **Run preflight checks.** Verify your local tools and the cluster's version, Workload Identity, managed OpenTelemetry,
-   and node pool settings. Fix any issues that the script flags before you continue.
+4. **Unpack the pre-warmed tools and state.** Download the pre-warmed `bin/` binaries (`kubectl-ate`, `ko`, `egressctl`)
+   and `.workshop/` install metadata from Cloud Storage, add `$PWD/bin` to your shell `PATH`, and verify the `kubectl ate`
+   plugin:
+   <ql-code-block language="bash" templated noWrap>
+   gcloud storage cp gs://{{{project_0.project_id | "PROJECT_ID"}}}-ate/.prewarm/workshop-prewarm.tar.gz /tmp/workshop-prewarm.tar.gz
+   tar -xzf /tmp/workshop-prewarm.tar.gz
+   rm -f /tmp/workshop-prewarm.tar.gz
+   export PATH="$PWD/bin:$PATH"
+   echo 'export PATH="'"$PWD"'/bin:$PATH"' >> ~/.bashrc
+   kubectl ate --help
+   </ql-code-block>
+   If Cloud Shell reconnects or you open a new tab later, `cd` into `agent-substrate-workshop` and run `source scripts/env.sh` to load `workshop.env` and ensure `bin/` is on your `PATH`.
+5. **Run preflight checks.** Verify your local tools, cluster configuration, Workload Identity, and managed OpenTelemetry:
    ```bash
    make preflight
    ```
-6. **Create Google Cloud resources.** Create a Cloud Storage bucket for snapshots, an Artifact Registry repository for your container images,
-   and IAM bindings for Substrate's components, your gateway, and the Prometheus UI. The script grants image pull access
-   (`roles/artifactregistry.reader`) on that single repository, not the entire project.
-   ```bash
-   make gcp
-   ```
-7. **Add `bin/` to your `PATH`.** The installer builds the `kubectl ate` plugin into `bin/kubectl-ate`. The
-   `make` targets find it automatically, but `make install-status` and the "Hello actor" section onwards expect `kubectl ate`
-   on your shell's `PATH`. Run the following command from the repository root:
-   ```bash
-   export PATH="$PWD/bin:$PATH"
-   ```
-   This setting applies only to your current terminal session. To persist it, add the same line with the absolute repository path instead of `$PWD` to
-   `~/.zshrc` or `~/.bashrc`. If you use direnv, add `PATH_add bin` to an `.envrc` file at the repository root.
-   If Cloud Shell reconnects or you open a new tab, `cd` into the repository and run `source scripts/env.sh`: it loads
-   `workshop.env` and puts `bin/` back on your `PATH`.
-8. **Start the installation in the background.** This target clones Substrate at `SUBSTRATE_REF`, builds `kubectl ate`,
-   deploys `ate-system`, pins a worker image that matches the control plane, and
-   increases the router's parked-request budget and shutdown grace period.
-   ```bash
-   make install-bg
-   make install-status     # check progress at any time; the install takes about 5–10 minutes
-   ```
-   After the installation finishes, `kubectl ate --help` works. Running `make verify MODULE=0` verifies that `bin/` is on your `PATH`.
-9. **Create the dashboards.** Create the workshop dashboard and Substrate's three dashboards in Cloud Monitoring.
-   They remain empty until the "Observe the fleet" section, but creating them now ensures that data is already flowing when you get there.
-   ```bash
-   make dashboards
-   ```
-10. **Build local tools.** Build `bin/egressctl`, which you use in the "Make it an agent" section.
-    ```bash
-    make tools
-    ```
+   The first `go` invocation inside `app/` might download the Go 1.27 toolchain automatically if Cloud Shell's default Go version is older.
 
 ### What just happened
-- `workshop.env` is the only file you edit for configuration. Scripts write generated state (image
-  digests, the Substrate version, and tokens) into `.workshop/`, which Git ignores.
-- Substrate requires three things from Google Cloud: a **Cloud Storage bucket** for snapshots, **Workload Identity** so its
-  components can write to that bucket, and a **GKE cluster version** that supports Pod certificates and ClusterTrustBundles,
-  which Substrate uses to give every actor an identity.
+- `workshop.env` points the workshop scripts at your pre-warmed cluster, bucket, and Artifact Registry repository.
+- Unpacking `workshop-prewarm.tar.gz` installs `bin/kubectl-ate`, `bin/ko`, and `bin/egressctl`, along with `.workshop/worker-image` and `.workshop/install-complete`, while leaving `app/cmd/agent/main.go` untouched for "Hello actor".
 
 ### Checkpoint
 ```bash
@@ -144,8 +90,7 @@ make verify MODULE=0
 
 ## Architecture tour
 
-The goal of this section is to learn what each piece of Agent Substrate does before you use it. You inspect
-the live system while the installation finishes (`make install-status`).
+The goal of this section is to learn what each piece of Agent Substrate does and inspect the pre-warmed system in `ate-system`.
 
 ### Why not a Pod per agent?
 
@@ -198,7 +143,7 @@ many actors.
 | WorkerPool, SandboxConfig, CSIDriverConfig | Atespace, ActorTemplate, Actor, Worker, Tag |
 
 `EgressPolicy` is also a Substrate record, with one policy per actor (`kubectl ate get egress-policy NAME -a workshop`).
-In the "Make it an agent" section, you apply policies using the workshop's `egressctl` tool (built in the setup), which can apply a single policy
+In the "Make it an agent" section, you apply policies using the workshop's `egressctl` tool (unpacked in Setup), which can apply a single policy
 file to every actor at once.
 
 An **atespace** is Substrate's tenancy boundary for records, similar to a Kubernetes namespace but for actors.
@@ -207,7 +152,6 @@ It is separate from a Kubernetes namespace. Your `WorkerPool` lives in the Kuber
 ### Look around
 
 ```bash
-make install-status                              # wait for "Agent Substrate is ready"
 kubectl -n ate-system get deploy,ds,sts,svc
 kubectl get crd | grep ate.dev
 kubectl get sandboxconfigs                       # gvisor-default — the runtime profile actors use
@@ -218,8 +162,7 @@ kubectl ate get workers -n workshop              # none yet — "Hello actor" cr
 cat .workshop/worker-image                       # the worker build that matches your control plane
 ```
 
-Right after the installation finishes, you might see an extra `atenet-router` Pod in the `Terminating` state. That Pod is the previous instance draining:
-the installer patches the router with a longer parked-request budget and a 120-second grace period, which triggers a rolling update.
+Terraform already patched `atenet-router` with the 60-second parked-request budget, 120-second shutdown grace period, and HTTP bridge on port 80 during lab startup.
 
 Every `kubectl ate` command prints `Warning: no --token-file given; acting as the shared identity system:serviceaccount:ate-system:ate-client rather than as yourself. Pass --token-file to act as yourself.`
 That's expected in this workshop: without `--token-file`, `kubectl ate` acts as the shared `ate-client` ServiceAccount, which the
@@ -606,7 +549,7 @@ the one piece that Substrate leaves to your application: **deciding when an acto
 - **Request parking** absorbs traffic bursts: incoming requests wait, up to the router's timeout budget, for the target actor to acquire a worker.
 - **Idle detection belongs to your application**, because only your application knows what "idle" means. A gateway or front door that observes all traffic
   is a natural place to implement it. Production systems also autoscale the `WorkerPool` itself.
-- **Suspend early.** On this cluster configuration, a snapshot is about 1 MB (P95 is about 4 MB). Suspending takes about 0.4 seconds,
+- **Suspend early.** On the workshop's reference cluster (two `c3-standard-4` nodes), a snapshot is about 1 MB (P95 is about 4 MB). Suspending takes about 0.4 seconds,
   and restoring takes about 0.25 seconds. The five Cloud Storage writes per snapshot cost about $0.000025, whereas a `c3-standard-4` worker
   costs about $0.00006 per second. An actor that stays idle for more than a couple of seconds is cheaper to suspend, which is why
   this workshop sets `IDLE_AFTER` to `3s`. The main trade-off is how often you want the next request to wait for a
@@ -731,7 +674,7 @@ make verify MODULE=6
 
 ## Wrap-up
 
-The goal of this section is to review how the primitives you used map to real-world agent systems, cover the platform's current limits, and show how to clean up.
+The goal of this section is to review how the primitives you used map to real-world agent systems and cover the platform's current limits.
 
 ### What you built
 
@@ -772,12 +715,3 @@ and a suspended actor resumes from its memory and disk snapshot on any of them. 
   `EgressPolicy` rule (`docs/observability.md`). Per-actor details live in logs.
 - Template environment variables are literal and stored in snapshots. Keep secrets in a gateway or use egress credential injection.
 - Substrate evolves quickly. Pin `SUBSTRATE_REF` and rebuild worker images alongside the control plane.
-
-### Clean up
-If the project exists only for this workshop, deleting the project is the simplest complete cleanup. Otherwise:
-```bash
-make teardown          # deletes workshop resources; keeps the cluster, bucket, and Artifact Registry repository
-YES=1 scripts/teardown.sh --all   # also deletes the bucket, Artifact Registry repository, IAM bindings, and snapshot transfer service account
-make delete-cluster    # deletes the cluster's PersistentVolumeClaims (and their disks) first, then deletes the cluster
-```
-At an instructor-led event, check with your instructor before you delete a cluster that they provisioned.

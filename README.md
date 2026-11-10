@@ -50,13 +50,17 @@ For comparison, [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-si
 similar problem with a Pod per agent session and no Substrate integration. See the [Architecture tour](modules/01-architecture/README.md)
 for the full comparison.
 
-## Two ways to take this workshop
+## Ways to take this workshop
 - **Instructor-led:** Follow the sections in order. If you fall behind, run `make catch-up MODULE=<n>` to bring your
   environment to the start of section `n`, and continue from there.
 - **Self-paced:** Follow the same path. After each section, run `make verify MODULE=<n>` to verify your state.
   See `instructor/troubleshooting.md` for common failures. Add `bin/` to your `PATH`
   (`export PATH="$PWD/bin:$PATH"` from the repository root, as shown in the [Setup](modules/00-setup/README.md) section) before you run any `kubectl ate …`
   commands yourself; `make catch-up` doesn't modify your shell environment.
+- **Qwiklabs (`GKE004`):** Uses [`qwiklabs/en.md`](qwiklabs/en.md), where the cluster, GCP resources, dashboards, and `ate-system`
+  control plane are pre-warmed at lab startup so learners unpack `.prewarm/workshop-prewarm.tar.gz` in Setup, inspect the
+  control plane in [Architecture tour](modules/01-architecture/README.md), and start building in
+  [Hello actor](modules/02-hello-actor/README.md).
 
 ## Quick start
 ```bash
@@ -71,6 +75,8 @@ make help                                # list every target
 | Path | Description |
 |---|---|
 | `modules/NN-*/` | The guide: one README per section, the manifests it uses, and the finished `main.go` |
+| `codelabs/` | Consolidated Codelabs edition (`en.md`, including optional labs appendix) and diagrams (`img/`) |
+| `qwiklabs/` | Consolidated Qwiklabs edition (`en.md`, pre-warmed core flow) and diagrams (`img/`) |
 | `app/` | Go code: `cmd/agent` (which you edit), `cmd/gateway`, `cmd/egressctl` |
 | `scripts/` | Scripts that `make` runs; `verify/` checks each section's end state |
 | `observability/` | Dashboard JSON, PodMonitoring, Prometheus UI, canned queries |

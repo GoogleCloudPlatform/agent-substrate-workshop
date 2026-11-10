@@ -12,8 +12,8 @@ Workshop documentation is maintained in **three places** that must always be kep
    - `optional/A-env/README.md` through `optional/J-credential-injection/README.md`: Individual READMEs and supporting files for the 10 optional post-workshop labs.
 2. **Codelabs edition ([`codelabs/en.md`](codelabs/en.md))**:
    - A single consolidated Markdown file formatted for Google Codelabs (`claat`), containing the `claat` YAML frontmatter, introduction, all 8 core modules in order (with `Duration: MM:SS` metadata), and all 10 optional labs under a trailing `## Appendix: Optional content` section.
-3. **Qwiklabs edition ([`qwiklabs/en.md`](codelabs/en.md))**:
-   - A single consolidated Markdown file for Qwiklabs containing the introduction and all 8 core modules, **without** the `claat` YAML frontmatter, `Duration: MM:SS` lines, the trailing `## Appendix: Optional content` section, or any references/links to optional labs.
+3. **Qwiklabs edition ([`qwiklabs/en.md`](qwiklabs/en.md))**:
+   - A single consolidated Markdown file aligned with the pre-warmed Qwiklabs lab (`GKE004` in `CloudVLab/gcp-devrel-content`, `labs/gke004-kubecon-2026/`) containing the introduction and all 8 core modules, **without** the `claat` YAML frontmatter, `Duration: MM:SS` lines, the trailing `## Appendix: Optional content` section, references/links to optional labs, or `### Clean up` teardown commands (Qwiklabs deletes the temporary project automatically).
 
 ### Rules when editing workshop content
 
@@ -36,8 +36,22 @@ Whenever you add, edit, or remove instructions, commands, explanations, or diagr
   - In [`qwiklabs/en.md`](qwiklabs/en.md), **omit all references and links to optional labs** (including parenthetical callouts such as `(optional lab J)` or `(see optional lab G)`, the `### Keep going: optional labs` subsection in `Wrap-up`, and the `## Appendix: Optional content` step).
 - **Intentional Codelabs/Qwiklabs-specific differences**:
   - `## Introduction` in [`codelabs/en.md`](codelabs/en.md) and [`qwiklabs/en.md`](qwiklabs/en.md) is a condensed version of [`README.md`](README.md) (it omits the agenda table, quick start, and teardown sections that duplicate step navigation).
-  - In [`qwiklabs/en.md`](qwiklabs/en.md), `## Setup` uses Qwiklabs variable tags (`<ql-variable key="project_0.project_id" placeHolder="YOUR_PROJECT_ID"></ql-variable>` and `<ql-variable key="project_0.default_region" placeHolder="us-central1"></ql-variable>`) and `<ql-code-block bash templated noWrap>` (`{{{project_0.project_id | YOUR_PROJECT_ID }}}` and `{{{project_0.default_region | us-central1 }}}`) so project ID and region are automatically populated by the Qwiklabs environment.
+  - [`qwiklabs/en.md`](qwiklabs/en.md) reflects the pre-warmed `GKE004` environment (Module 0 / `ate-system` boundary): Terraform provisions `ate-cluster` (`2× n1-standard-4`), GCS/AR/IAM, all 4 dashboards, Agent Substrate (`v1.0.0`, patched router), and pre-pulls `ateworker-gvisor` onto all nodes, staging `.prewarm/workshop-prewarm.tar.gz` (`bin/{kubectl-ate,ko,egressctl}` + `.workshop/{worker-image,install-complete}`) in the snapshot bucket while leaving `app/cmd/agent/main.go` untouched.
+  - In [`qwiklabs/en.md`](qwiklabs/en.md), `## Setup` uses Qwiklabs variable tags (`<ql-variable key="project_0.project_id" placeHolder="PROJECT_ID"></ql-variable>` and `<ql-variable key="project_0.default_zone" placeHolder="ZONE"></ql-variable>`) and `<ql-code-block language="bash" templated noWrap>` (`{{{project_0.project_id | "PROJECT_ID"}}}`, `{{{project_0.default_region | "REGION"}}}`, `{{{project_0.default_zone | "ZONE"}}}`), unpacks `.prewarm/workshop-prewarm.tar.gz`, verifies `kubectl ate --help`, runs `make preflight`, and runs `make verify MODULE=0` (`make catch-up MODULE=1` fallback).
+  - In [`qwiklabs/en.md`](qwiklabs/en.md), `## Architecture tour` inspects the pre-warmed `ate-system` (omitting `make install-status` and noting Terraform's router patch); `## Hello actor` through `## Observe the fleet` remain hands-on in lockstep with `modules/` and [`codelabs/en.md`](codelabs/en.md); `## Density and idle` qualifies the reference cluster costs (`two c3-standard-4 nodes`); and `## Wrap-up` omits `### Clean up`.
   - [`codelabs/en.md`](codelabs/en.md) ends the `## Appendix: Optional content` step with a Codelab-only `### When you're done` section that points back to the Wrap-up "Clean up" steps. It has no counterpart in `optional/`; keep it last in the Appendix when you sync optional labs.
+
+### Cross-repo sync contract (`CloudVLab/gcp-devrel-content` `labs/gke004-kubecon-2026/`)
+
+Because Qwiklabs (`labs/gke004-kubecon-2026/`) clones this repository at `WORKSHOP_REF` (`main` by default) during both Terraform bootstrap (`tf/scripts/bootstrap-substrate.sh`) and Task 1, changes to the following files affect live Qwiklabs labs and must be coordinated with `gcp-devrel-content`:
+
+| File(s) here | Counterpart in `gcp-devrel-content/labs/gke004-kubecon-2026/` |
+|---|---|
+| `workshop.env.example` (`SUBSTRATE_REF`, `BUCKET_NAME`, `AR_REPO`, `NAMESPACE`, `ATESPACE`) | `tf/substrate.tf`, `tf/main.tf`, `tf/scripts/bootstrap-substrate.sh` |
+| `scripts/gcp-resources.sh` | `tf/main.tf`, `tf/gcp.tf` |
+| `scripts/install-substrate.sh`, `scripts/patch-router.sh`, `scripts/dashboards.sh`, `observability/dashboard.json` | `tf/substrate.tf`, `tf/dashboards.tf`, `tf/dashboards/`, `tf/scripts/bootstrap-substrate.sh` |
+| `app/cmd/egressctl` | `tf/scripts/bootstrap-substrate.sh` (builds `bin/egressctl` and packs `bin/` + `.workshop/{worker-image,install-complete}` into `workshop-prewarm.tar.gz`) |
+| `qwiklabs/en.md`, `qwiklabs/img/*.svg` | `instructions/en.md`, `instructions/img/*.svg` (Qwiklabs edition adds `## Task N.` headers, fragments, and `<ql-infobox>`) |
 
 ---
 
@@ -89,3 +103,5 @@ This runs:
   - [`scripts/test/dashboards_test.sh`](scripts/test/dashboards_test.sh) — validates dashboard JSON files and PromQL cluster scoping.
   - [`scripts/test/solutions_test.sh`](scripts/test/solutions_test.sh) — verifies `WORKSHOP(...)` markers and compiles every `solution/main.go` against `app/`.
   - [`scripts/test/preflight_test.sh`](scripts/test/preflight_test.sh) — tests cluster preflight check logic.
+  - [`scripts/test/delete_cluster_test.sh`](scripts/test/delete_cluster_test.sh) — tests cluster and PVC cleanup behavior.
+  - [`scripts/test/qwiklabs_test.sh`](scripts/test/qwiklabs_test.sh) — verifies `qwiklabs/en.md` formatting invariants, diagram sync, and the `GKE004` pre-warm contract.
