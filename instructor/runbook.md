@@ -78,6 +78,25 @@ published and source install modes (`make e2e` passed with real Gemini; optional
    Send each attendee their `PROJECT_ID` and `CLUSTER_LOCATION` (the example above: `us-central1-a`); both are
    required in `workshop.env`. Confirm they can `gcloud auth login` and reach the project before the day.
 
+## Qwiklabs edition (`GKE004`)
+
+In the Qwiklabs hands-on lab (`CloudVLab/gcp-devrel-content`, `labs/gke004-kubecon-2026/`), Terraform provisions a
+two-node `n1-standard-4` GKE cluster, GCP resources and Workload Identity IAM (`tf/gcp.tf`), dashboards
+(`tf/dashboards.tf`), and an in-cluster `substrate-prewarm` Job running `tf/scripts/bootstrap-substrate.sh` at lab
+startup. That bootstrapper clones this repository at `WORKSHOP_REF`, installs Agent Substrate `v1.0.0` with router
+patches, pre-pulls `ateworker-gvisor` onto the GKE nodes, builds `bin/egressctl`, and uploads
+`gs://<PROJECT_ID>-ate/.prewarm/workshop-prewarm.tar.gz` (`bin/{kubectl-ate,ko,egressctl}` +
+`.workshop/{worker-image,install-complete}`).
+
+- **Starting point & timing:** Learners unpack `.prewarm/workshop-prewarm.tar.gz` in Setup and inspect the control
+  plane in Module 1 (**Architecture tour**), saving roughly 15–20 minutes of cluster provisioning and Substrate
+  install time while leaving `app/cmd/agent/main.go` (`WORKSHOP(module-2)`) untouched and Modules 1–7 hands-on.
+- **Cross-repo compatibility:** Because Qwiklabs clones this repository at runtime and expects `SUBSTRATE_REF`,
+  `BUCKET_NAME`, `AR_REPO`, `NAMESPACE`, `ATESPACE`, `app/cmd/egressctl`, and `observability/dashboard.json` to align
+  with Terraform's pre-warmed `ate-system` state, test with `make test` (`scripts/test/qwiklabs_test.sh`) and keep
+  `qwiklabs/en.md` and `gcp-devrel-content` synchronized (and consider pinning `WORKSHOP_REF` and Task 1's
+  `git clone --branch` to an event tag before live delivery).
+
 ## Day of
 
 - Arrive with your own cluster already caught up: `make catch-up MODULE=7`. Use it to demo any step that fails
