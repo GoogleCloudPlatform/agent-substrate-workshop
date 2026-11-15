@@ -2,18 +2,18 @@
 
 Hands-on workshop curriculum for building, operating, and governing stateful AI agent fleets on [Agent Substrate](https://github.com/agent-substrate/substrate) (`v1.0.0`) on Google Kubernetes Engine (GKE).
 
-This repository contains multi-track curriculum modules:
+This repository contains two workshops:
 
-| Track | Title | Audience & Focus | Code & Guide |
+| Workshop | Title | Audience & Focus | Code & Guide |
 |---|---|---|---|
-| **101** | [Untrusted Code on Secure Runtimes: Agent Substrate on Kubernetes](101/README.md) | Platform engineers, Kubernetes operators, and AI infrastructure builders learning Substrate fundamentals. | [`101/`](101/) |
-| **301** | [Agent Substrate 301: Enterprise AI Agents with Gemini Agent Platform on GKE](301/README.md) | Enterprise SRE, platform security, and AI agent developers building governed, stateful ADK agents across the Actor Boundary. | [`301/`](301/) |
+| **Intro** | [Untrusted Code on Secure Runtimes: Agent Substrate on Kubernetes](intro/README.md) | Platform engineers, Kubernetes operators, and AI infrastructure builders learning Substrate fundamentals. | [`intro/`](intro/) |
+| **Gemini Platform** | [Enterprise AI Agents with Agent Substrate and Gemini Agent Platform on GKE](gemini-platform/README.md) | Enterprise SRE, platform security, and AI agent developers building governed, stateful ADK agents across the Actor Boundary. | [`gemini-platform/`](gemini-platform/) |
 
 ---
 
-## Curriculum Tracks
+## Workshops
 
-### [Track 101: Untrusted Code on Secure Runtimes](101/README.md)
+### [Intro: Untrusted Code on Secure Runtimes](intro/README.md)
 
 Build and operate your own fleet of AI agents on Agent Substrate, starting from a bare GKE cluster. In ~85 minutes across 8 core modules:
 - Install Agent Substrate and understand the roles of `ateapi`, `atelet`, `router`, and `egress`.
@@ -22,9 +22,9 @@ Build and operate your own fleet of AI agents on Agent Substrate, starting from 
 - Connect agents to Gemini through an always-on gateway and enforce deny-by-default egress policies.
 - Pack 20 concurrent agents onto 2 worker nodes using oversubscription, request parking, and idle auto-suspend.
 - Monitor fleet metrics and latency with Prometheus, PromQL, and Cloud Monitoring dashboards.
-- Dive deeper with 10 post-workshop optional labs in [`101/optional/`](101/optional/) covering `agent-substrate/env`, `google/ax`, custom idle triggers, snapshot branching, direct gRPC clients, HPA, agent swarms, Kata/Cloud-Hypervisor microVMs, and credential injection.
+- Dive deeper with 10 post-workshop optional labs in [`intro/optional/`](intro/optional/) covering `agent-substrate/env`, `google/ax`, custom idle triggers, snapshot branching, direct gRPC clients, HPA, agent swarms, Kata/Cloud-Hypervisor microVMs, and credential injection.
 
-### [Track 301: Enterprise AI Agents with Gemini Agent Platform on GKE](301/README.md)
+### [Gemini Platform: Enterprise AI Agents on GKE](gemini-platform/README.md)
 
 Build, upgrade, govern, trace, and evaluate a stateful **ADK Go v2** (`google.golang.org/adk/v2`) **Platform SRE Triage Agent** running inside an **Agent Substrate (`v1.0.0`)** gVisor Actor on GKE, integrated across the Actor Boundary with **Gemini Enterprise Agent Platform**. In ~90 minutes across 8 modules:
 - Enforce the **Actor Boundary**: a 100% keyless, default-deny gVisor Incident Actor communicating strictly through an always-on **Governed Broker** (`sre-gateway`) serving a Google Cloud Console-styled **Incident Console**.
@@ -38,21 +38,21 @@ Build, upgrade, govern, trace, and evaluate a stateful **ADK Go v2** (`google.go
 
 ## Quick Start
 
-Each track is self-contained with its own configuration, manifests, solutions, and tests.
+Each workshop is self-contained with its own configuration, manifests, solutions, and tests.
 
 ```bash
 # Clone the repository
 git clone https://github.com/GoogleCloudPlatform/agent-substrate-workshop
 cd agent-substrate-workshop
 
-# Work on Track 101 (Fundamentals)
-cd 101
+# Work on the Intro workshop
+cd intro
 cp workshop.env.example workshop.env
 make preflight
 make help
 
-# Or work on Track 301 (Enterprise Platform)
-cd ../301
+# Or work on the Gemini Platform workshop
+cd ../gemini-platform
 cp workshop.env.example workshop.env
 make preflight
 make help
@@ -62,15 +62,15 @@ make help
 
 ## Testing & Quality Assurance
 
-Run offline test suites across both tracks from the root directory:
+Run offline test suites across both workshops from the root directory:
 
 ```bash
-# Test both tracks
+# Test all workshops
 make test
 
-# Test individual tracks
-make test-101
-make test-301
+# Test individual workshops
+make test-intro
+make test-gemini-platform
 ```
 
 ---
@@ -80,7 +80,7 @@ make test-301
 Workshop documentation across both tracks is maintained and synchronized for three publishing formats:
 1. **Modular Guide (`modules/`)**: Markdown sources of truth with step-by-step instructions, diagrams, and solution files.
 2. **DevSite Codelabs (`codelabs/en.md`)**: Single-page `claat`-compatible codelabs with step timings and optional appendix labs.
-3. **Google Skills / Qwiklabs (`qwiklabs/en.md`)**: Pre-warmed lab guides aligned with `CloudVLab/gcp-devrel-content` (`labs/gke005-agent-substrate-intro` for Track 101; `labs/gke006-agent-substrate-platform` for Track 301).
+3. **Google Skills / Qwiklabs (`qwiklabs/en.md`)**: Pre-warmed lab guides aligned with `CloudVLab/gcp-devrel-content` (`labs/gke005-agent-substrate-intro` for the Intro workshop; `labs/gke006-agent-substrate-platform` for the Gemini Platform workshop).
 
 ---
 

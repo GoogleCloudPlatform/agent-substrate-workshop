@@ -5,8 +5,8 @@
   ],
   "gomod": {
     "fileMatch": [
-      "(^|/)101/app/go\\.mod$",
-      "(^|/)301/app/go\\.mod$"
+      "(^|/)intro/app/go\\.mod$",
+      "(^|/)gemini-platform/app/go\\.mod$"
     ]
   }
 }

@@ -12,26 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: all help test test-101 test-301
+.PHONY: all help test test-intro test-gemini-platform
 
 all: test
 
 help:
-	@echo "Agent Substrate Workshop (Multi-Track Repository)"
+	@echo "Agent Substrate Workshop"
 	@echo ""
 	@echo "Available targets:"
-	@echo "  make test       Run test suites for all tracks (101 and 301)"
-	@echo "  make test-101   Run test suite for Track 101 (Fundamentals)"
-	@echo "  make test-301   Run test suite for Track 301 (Enterprise Platform)"
+	@echo "  make test                 Run test suites for all workshops (intro and gemini-platform)"
+	@echo "  make test-intro           Run test suite for Intro workshop"
+	@echo "  make test-gemini-platform Run test suite for Gemini Platform workshop"
 	@echo ""
-	@echo "To work in a specific track, navigate to its directory:"
-	@echo "  cd 101 && make help"
-	@echo "  cd 301 && make help"
+	@echo "To work in a specific workshop, navigate to its directory:"
+	@echo "  cd intro && make help"
+	@echo "  cd gemini-platform && make help"
 
-test: test-101 test-301
+test: test-intro test-gemini-platform
 
-test-101:
-	$(MAKE) -C 101 test
+test-intro:
+	$(MAKE) -C intro test
 
-test-301:
-	$(MAKE) -C 301 test
+test-gemini-platform:
+	$(MAKE) -C gemini-platform test
