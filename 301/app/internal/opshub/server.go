@@ -29,8 +29,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/ledgersvc"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/netutil"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/ledgersvc"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/netutil"
 )
 
 const (

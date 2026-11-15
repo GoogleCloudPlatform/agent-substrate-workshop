@@ -428,7 +428,7 @@ func EncodeOTLPJSON(serviceName string, spans []SpanRecord) ([]byte, error) {
 				"scopeSpans": []map[string]any{
 					{
 						"scope": map[string]any{
-							"name": "github.com/gke-demos/substrate-agent-platform/telemetry",
+							"name": "github.com/GoogleCloudPlatform/agent-substrate-workshop/301/telemetry",
 						},
 						"spans": otlpSpans,
 					},
@@ -484,7 +484,7 @@ func spanRecordsToReadOnlySpans(serviceName string, spans []SpanRecord) []traces
 	}
 	res := resource.NewSchemaless(attribute.String("service.name", svc))
 	scope := instrumentation.Scope{
-		Name: "github.com/gke-demos/substrate-agent-platform/telemetry",
+		Name: "github.com/GoogleCloudPlatform/agent-substrate-workshop/301/telemetry",
 	}
 
 	stubs := make(tracetest.SpanStubs, 0, len(spans))

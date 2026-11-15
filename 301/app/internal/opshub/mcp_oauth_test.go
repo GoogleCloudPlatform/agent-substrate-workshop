@@ -30,8 +30,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/ledgersvc"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/opshub"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/ledgersvc"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/opshub"
 )
 
 var hiddenCSRFInput = regexp.MustCompile(`name="csrf_token"\s+value="([^"]+)"`)

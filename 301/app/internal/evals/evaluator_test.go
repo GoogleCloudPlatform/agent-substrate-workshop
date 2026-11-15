@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/evals"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/evals"
 )
 
 func TestCallGeminiJudgeIncludesExplicitRubricCriteriaAndSecurityProbeIsolation(t *testing.T) {

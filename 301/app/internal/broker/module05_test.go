@@ -39,12 +39,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/agentruntime"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/ateclient"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/ateclient/atetest"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/broker"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/ledgersvc"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/opshub"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/agentruntime"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/ateclient"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/ateclient/atetest"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/broker"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/ledgersvc"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/opshub"
 	ateapipb "go.ate.dev/substrate/api/ateapi/v1"
 )
 

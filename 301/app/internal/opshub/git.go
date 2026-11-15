@@ -29,7 +29,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/ledgerverify"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/ledgerverify"
 )
 
 const maxGitPackBytes = 10 << 20 // 10 MiB pack upload cap.

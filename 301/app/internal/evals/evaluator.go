@@ -34,7 +34,7 @@ import (
 
 	"cloud.google.com/go/auth/credentials"
 	"cloud.google.com/go/auth/httptransport"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/telemetry"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/telemetry"
 )
 
 const (

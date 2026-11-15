@@ -24,7 +24,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/opshub"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/opshub"
 )
 
 func TestApplyRemediationPRRepushesBranchAfterOpsHubRestart(t *testing.T) {

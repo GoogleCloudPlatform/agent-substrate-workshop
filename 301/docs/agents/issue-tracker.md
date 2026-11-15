@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues and specs for this repo live as GitHub issues (`gke-demos/substrate-agent-platform`). Use the `gh` CLI for all operations.
+Issues and specs for this repo live as GitHub issues (`GoogleCloudPlatform/agent-substrate-workshop`). Use the `gh` CLI for all operations.
 
 ## Conventions
 

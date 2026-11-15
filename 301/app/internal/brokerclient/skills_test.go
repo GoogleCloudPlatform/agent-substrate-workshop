@@ -31,8 +31,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/agentruntime"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/brokerclient"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/agentruntime"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/brokerclient"
 	"google.golang.org/adk/v2/tool/skilltoolset/skill"
 )
 

@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/telemetry"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/telemetry"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"google.golang.org/protobuf/proto"
 )

@@ -28,8 +28,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/ateclient"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/broker"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/ateclient"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/broker"
 )
 
 func main() {

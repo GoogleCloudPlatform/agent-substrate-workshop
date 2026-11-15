@@ -34,7 +34,7 @@ import (
 
 	"cloud.google.com/go/auth/credentials"
 	"cloud.google.com/go/auth/httptransport"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/agentruntime"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/agentruntime"
 	"google.golang.org/adk/v2/model"
 	"google.golang.org/adk/v2/session"
 	"google.golang.org/adk/v2/tool/toolconfirmation"

@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/telemetry"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/telemetry"
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/memory"
 	"google.golang.org/adk/v2/plugin"

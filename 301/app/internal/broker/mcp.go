@@ -24,8 +24,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/brokerclient"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/telemetry"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/brokerclient"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/telemetry"
 )
 
 const maxMCPBodyBytes = 1 << 20 // 1 MiB cap per MCP JSON-RPC payload.

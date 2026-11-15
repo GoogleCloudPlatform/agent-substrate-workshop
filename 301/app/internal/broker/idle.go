@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/ateclient"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/ateclient"
 	ateapipb "go.ate.dev/substrate/api/ateapi/v1"
 	"google.golang.org/grpc"
 )

@@ -39,7 +39,7 @@ Whenever you edit instructions, commands, code snippets, or SVG diagrams in `mod
 
 ### Issue tracker
 
-Issues and specs for this repo live in GitHub Issues (`gke-demos/substrate-agent-platform`) managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues and specs for this repo live in GitHub Issues (`GoogleCloudPlatform/agent-substrate-workshop`) managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

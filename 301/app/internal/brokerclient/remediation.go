@@ -29,8 +29,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/ledgerverify"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/telemetry"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/ledgerverify"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/telemetry"
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/tool"
 	"google.golang.org/adk/v2/tool/functiontool"

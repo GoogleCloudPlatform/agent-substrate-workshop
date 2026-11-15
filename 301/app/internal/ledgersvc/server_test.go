@@ -24,7 +24,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/ledgersvc"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/ledgersvc"
 )
 
 type syncBuffer struct {

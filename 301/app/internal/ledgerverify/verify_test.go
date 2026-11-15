@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/ledgerverify"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/ledgerverify"
 )
 
 func validFixedRepo(t *testing.T, mods ...func(dir string)) string {

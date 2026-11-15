@@ -24,9 +24,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/agentruntime"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/evals"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/telemetry"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/agentruntime"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/evals"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/telemetry"
 )
 
 func (s *Server) handleEvals(w http.ResponseWriter, r *http.Request) {

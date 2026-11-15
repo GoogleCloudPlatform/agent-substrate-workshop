@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/ledgerverify"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/ledgerverify"
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/tool"
 	"google.golang.org/adk/v2/tool/functiontool"

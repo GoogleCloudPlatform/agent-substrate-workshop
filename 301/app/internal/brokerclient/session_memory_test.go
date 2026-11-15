@@ -24,9 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/broker"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/brokerclient"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/opshub"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/broker"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/brokerclient"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/opshub"
 	"google.golang.org/adk/v2/memory"
 	"google.golang.org/adk/v2/model"
 	"google.golang.org/adk/v2/session"

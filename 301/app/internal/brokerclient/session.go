@@ -31,7 +31,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/telemetry"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/telemetry"
 	"google.golang.org/adk/v2/session"
 )
 

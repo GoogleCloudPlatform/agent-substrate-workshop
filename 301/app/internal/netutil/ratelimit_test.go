@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/netutil"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/netutil"
 )
 
 func TestClientIPAndRateLimiter(t *testing.T) {

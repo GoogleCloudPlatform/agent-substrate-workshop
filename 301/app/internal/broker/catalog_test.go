@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/broker"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/broker"
 )
 
 func TestArchitectureCatalogParityWithGlossaryAndADRs(t *testing.T) {

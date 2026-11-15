@@ -14,5 +14,5 @@
 
 defaultBaseImage: gcr.io/distroless/static-debian12:nonroot
 baseImageOverrides:
-  github.com/gke-demos/substrate-agent-platform/app/cmd/agent: alpine/git:latest
-  github.com/gke-demos/substrate-agent-platform/app/cmd/ops-hub: alpine/git:latest
+  github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/cmd/agent: alpine/git:latest
+  github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/cmd/ops-hub: alpine/git:latest

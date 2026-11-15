@@ -40,7 +40,7 @@ import (
 
 	"cloud.google.com/go/auth/credentials"
 	"cloud.google.com/go/auth/httptransport"
-	"github.com/gke-demos/substrate-agent-platform/app/internal/brokerclient"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/brokerclient"
 	"google.golang.org/adk/v2/tool/skilltoolset/skill"
 )
 

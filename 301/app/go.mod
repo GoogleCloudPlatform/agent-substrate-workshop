@@ -1,4 +1,4 @@
-module github.com/gke-demos/substrate-agent-platform/app
+module github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app
 
 go 1.27.0
 

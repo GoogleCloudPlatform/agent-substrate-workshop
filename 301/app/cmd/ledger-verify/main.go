@@ -23,7 +23,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gke-demos/substrate-agent-platform/app/internal/ledgerverify"
+	"github.com/GoogleCloudPlatform/agent-substrate-workshop/301/app/internal/ledgerverify"
 	"github.com/spf13/pflag"
 )
 
