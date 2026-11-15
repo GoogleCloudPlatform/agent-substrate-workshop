@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gemini Enterprise Agent Platform · Substrate 301</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500&family=Roboto:wght@400;500&display=swap">
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <header class="platform-bar" role="banner">
+    <div class="platform-bar-left">
+      <button id="btn-nav-toggle" class="icon-btn" type="button" aria-label="Toggle section navigation" title="Toggle section navigation"></button>
+      <span id="brand-mark" class="brand-mark" aria-hidden="true"></span>
+      <span class="platform-title">Gemini Enterprise Agent Platform · Substrate 301</span>
+      <span id="project-pill" class="stroked-pill" title="Active Google Cloud project">project</span>
+    </div>
+    <div class="platform-bar-right">
+      <span id="spiffe-pill" class="status-pill status-neutral" title="Governed Broker workload identity">SPIFFE ready</span>
+      <button id="btn-cmdk" class="icon-btn" type="button" aria-label="Operator &amp; scenario controls (⌘K)" title="Operator &amp; scenario controls (⌘K)"></button>
+      <div id="theme-toggle" class="segmented-theme-toggle" role="group" aria-label="Color theme">
+        <button id="btn-theme-light" class="theme-seg-btn" type="button" aria-label="Light mode" title="Light mode"></button>
+        <button id="btn-theme-dark" class="theme-seg-btn" type="button" aria-label="Dark mode" title="Dark mode"></button>
+      </div>
+    </div>
+  </header>
+
+  <div id="shell-body" class="shell-body">
+    <nav id="left-nav" class="left-nav" aria-label="Console sections">
+      <a href="/" data-route="/" class="nav-item">
+        <span class="nav-icon" data-icon="terminal" aria-hidden="true"></span>
+        <span class="nav-label">Investigations</span>
+      </a>
+      <a href="/sessions" data-route="/sessions" class="nav-item">
+        <span class="nav-icon" data-icon="memory" aria-hidden="true"></span>
+        <span class="nav-label">Session ledger &amp; memory</span>
+      </a>
+      <a href="/catalog" data-route="/catalog" class="nav-item">
+        <span class="nav-icon" data-icon="shield" aria-hidden="true"></span>
+        <span class="nav-label">Skill &amp; agent catalog</span>
+      </a>
+      <a href="/about" data-route="/about" class="nav-item">
+        <span class="nav-icon" data-icon="account_tree" aria-hidden="true"></span>
+        <span class="nav-label">Architecture</span>
+      </a>
+    </nav>
+
+    <main id="main-stage" class="main-stage">
+      <section id="view-investigations" class="route-view">
+        <div class="investigations-split">
+          <div class="detail-canvas">
+            <div class="action-bar">
+              <div class="action-bar-left">
+                <h1 class="page-title">Investigations</h1>
+                <label for="incident-select" class="sr-only">Active incident</label>
+                <select id="incident-select" class="console-select" aria-label="Select incident"></select>
+                <span id="actor-state-pill" class="status-pill status-neutral">Ready on demand</span>
+                <span id="actor-template-pill" class="stroked-pill mono">sre-agent-v1</span>
+              </div>
+              <div class="action-bar-right">
+                <button id="btn-refresh" class="stroked-btn" type="button">
+                  <span class="btn-icon" data-icon="refresh" aria-hidden="true"></span>
+                  <span>Refresh</span>
+                </button>
+                <button id="btn-suspend-actor" class="stroked-btn" type="button">
+                  <span class="btn-icon" data-icon="pause_circle" aria-hidden="true"></span>
+                  <span>Suspend actor</span>
+                </button>
+              </div>
+            </div>
+
+            <div id="gate-banner" class="callout-banner banner-warning hidden" role="region" aria-label="Remediation gate">
+              <div class="banner-body">
+                <span class="banner-icon" data-icon="warning" aria-hidden="true"></span>
+                <div class="banner-copy">
+                  <strong class="banner-heading">Remediation gate paused · awaiting operator approval</strong>
+                  <p id="gate-banner-detail" class="banner-text">Review the staged /workspace patch before approving production merge.</p>
+                </div>
+              </div>
+              <div class="banner-actions">
+                <span id="gate-actor-pill" class="status-pill status-warning">Suspended · 0 vCPU</span>
+                <span id="gate-3lo-pill" class="status-pill status-neutral hidden">3LO required</span>
+                <button id="btn-authorize-3lo" class="primary-btn hidden" type="button">Authorize 3LO remediation</button>
+                <button id="btn-approve-gate" class="primary-btn" type="button">Approve remediation</button>
+                <button id="btn-reject-gate" class="text-btn" type="button">Reject</button>
+              </div>
+            </div>
+
+            <div id="status-toast" class="callout-banner banner-info hidden" role="status"></div>
+
+            <div class="tab-bar" role="tablist" aria-label="Investigation details">
+              <button class="tab-btn active" type="button" role="tab" data-tab="overview" aria-selected="true">Overview &amp; workspace diff</button>
+              <button class="tab-btn" type="button" role="tab" data-tab="governance" aria-selected="false">Governance &amp; policy log</button>
+              <button class="tab-btn" type="button" role="tab" data-tab="traces" aria-selected="false">Trace &amp; online evals</button>
+            </div>
+
+            <div id="tab-overview" class="tab-panel">
+              <div class="card-grid">
+                <article class="console-card">
+                  <div class="card-header">
+                    <h2 id="inc-card-title" class="card-title">Incident summary</h2>
+                    <span id="inc-severity-pill" class="status-pill status-error">P1 · OPEN</span>
+                  </div>
+                  <p id="inc-summary-text" class="body-copy"></p>
+                  <h3 class="sub-label">Observed symptoms</h3>
+                  <ul id="inc-symptoms-list" class="symptom-list"></ul>
+                  <div id="inc-note-box" class="note-box hidden">
+                    <span class="sub-label">Attached diagnostic note</span>
+                    <pre id="inc-note-pre" class="code-block"></pre>
+                  </div>
+                </article>
+
+                <article class="console-card">
+                  <div class="card-header">
+                    <h2 class="card-title">Target service telemetry (ledger-api)</h2>
+                    <span id="ledger-slo-pill" class="status-pill status-neutral">Checking</span>
+                  </div>
+                  <dl id="ledger-metrics-grid" class="kv-grid"></dl>
+                </article>
+              </div>
+
+              <article class="console-card">
+                <div class="card-header">
+                  <h2 class="card-title">Actor /workspace checkout &amp; staged diff</h2>
+                  <span id="ws-verify-pill" class="status-pill status-neutral">Uncloned</span>
+                </div>
+                <dl id="ws-meta-grid" class="kv-grid compact-kv"></dl>
+                <ul id="ws-findings-list" class="symptom-list"></ul>
+                <pre id="ws-diff-pre" class="code-block">Run a triage turn in the SRE triage agent pane to clone ledger-api.git into /workspace and inspect files.</pre>
+              </article>
+            </div>
+
+            <div id="tab-governance" class="tab-panel hidden">
+              <div class="card-grid">
+                <article class="console-card">
+                  <div class="card-header">
+                    <h2 class="card-title">Pod Agent Identity &amp; mTLS</h2>
+                    <span id="gov-identity-pill" class="status-pill status-neutral">SPIFFE</span>
+                  </div>
+                  <dl id="gov-identity-grid" class="kv-grid compact-kv"></dl>
+                </article>
+
+                <article class="console-card">
+                  <div class="card-header">
+                    <h2 class="card-title">Model Armor &amp; MCP policy</h2>
+                    <span id="gov-armor-pill" class="status-pill status-success">Active</span>
+                  </div>
+                  <dl id="gov-armor-grid" class="kv-grid compact-kv"></dl>
+                </article>
+
+                <article class="console-card">
+                  <div class="card-header">
+                    <h2 class="card-title">Auth Manager 3LO &amp; snapshot hygiene</h2>
+                    <span id="gov-oauth-pill" class="status-pill status-neutral">Keyless sandbox</span>
+                  </div>
+                  <dl id="gov-oauth-grid" class="kv-grid compact-kv"></dl>
+                  <div class="row-actions">
+                    <button id="btn-gov-authorize-3lo" class="stroked-btn" type="button">Authorize 3LO remediation</button>
+                    <button id="btn-gov-revoke-3lo" class="text-btn hidden" type="button">Revoke 3LO grant</button>
+                  </div>
+                </article>
+              </div>
+
+              <article class="console-card">
+                <div class="card-header">
+                  <h2 class="card-title">Actor Boundary &amp; Governed Broker policy log</h2>
+                  <span id="gov-egress-pill" class="stroked-pill mono">default-deny egress</span>
+                </div>
+                <div class="table-wrap">
+                  <table class="console-table">
+                    <thead>
+                      <tr>
+                        <th>Timestamp</th>
+                        <th>Boundary</th>
+                        <th>Action</th>
+                        <th>Verdict</th>
+                        <th>Detail</th>
+                      </tr>
+                    </thead>
+                    <tbody id="gov-table-body"></tbody>
+                  </table>
+                </div>
+              </article>
+            </div>
+
+            <div id="tab-traces" class="tab-panel hidden">
+              <article class="console-card">
+                <div class="card-header">
+                  <div class="action-bar-left">
+                    <h2 class="card-title">OpenTelemetry GenAI waterfall</h2>
+                    <span id="trace-backend-pill" class="status-pill status-neutral">Cloud Trace · W3C traceparent</span>
+                    <span id="trace-scrub-pill" class="stroked-pill mono">0 attributes scrubbed</span>
+                  </div>
+                  <div class="action-bar-right">
+                    <label for="trace-select" class="sr-only">Select trace</label>
+                    <select id="trace-select" class="console-select mono" aria-label="Select trace"></select>
+                  </div>
+                </div>
+                <p class="body-copy secondary-copy">W3C traceparent propagates from sre-gateway through atenet-router into the keyless Incident Actor. ADK Go v2 posts invoke_agent and execute_tool spans to /otlp/v1/traces where sensitive headers, tokens, PII, and raw tool payloads are scrubbed before Cloud Trace export.</p>
+                <dl id="trace-meta-grid" class="kv-grid compact-kv"></dl>
+                <div id="trace-waterfall-box" class="waterfall-list"></div>
+              </article>
+
+              <article class="console-card">
+                <div class="card-header">
+                  <div class="action-bar-left">
+                    <h2 class="card-title">Online evals</h2>
+                    <span id="eval-summary-pill" class="status-pill status-neutral">Preview · 4 rubrics</span>
+                  </div>
+                  <div class="action-bar-right">
+                    <button id="btn-run-evals" class="stroked-btn" type="button">
+                      <span class="btn-icon" data-icon="play_arrow" aria-hidden="true"></span>
+                      <span>Run online eval</span>
+                    </button>
+                  </div>
+                </div>
+                <p id="eval-meta-copy" class="body-copy secondary-copy">Pure-Go Gemini on Agent Platform autorater inspecting Session Ledger events, Consolidated Memory facts, Skill Registry revisions, scrubbed GenAI spans, and Actor Boundary governance verdicts.</p>
+                <div id="eval-rubrics-grid" class="card-grid"></div>
+              </article>
+            </div>
+          </div>
+
+          <aside class="assist-panel" aria-label="SRE triage agent">
+            <div class="assist-header">
+              <div class="assist-title-group">
+                <span class="assist-icon" data-icon="play_arrow" aria-hidden="true"></span>
+                <h2 class="card-title">SRE triage agent</h2>
+              </div>
+              <span id="assist-session-pill" class="stroked-pill mono">session: inc-402</span>
+            </div>
+
+            <div id="assist-stream" class="assist-stream"></div>
+
+            <form id="assist-form" class="assist-composer">
+              <label for="assist-input" class="sr-only">Ask the SRE triage agent</label>
+              <textarea id="assist-input" class="composer-input" rows="3" placeholder="Ask the SRE triage agent to investigate INC-402, inspect /workspace, or stage a patch..."></textarea>
+              <div class="composer-actions">
+                <button id="btn-clear-chat" class="text-btn" type="button">Clear</button>
+                <button id="btn-send-chat" class="primary-btn" type="submit">Send</button>
+              </div>
+            </form>
+          </aside>
+        </div>
+      </section>
+
+      <section id="view-sessions" class="route-view hidden">
+        <div class="page-container">
+          <div class="action-bar standalone-bar">
+            <div class="action-bar-left">
+              <h1 class="page-title">Session ledger &amp; memory</h1>
+              <span class="stroked-pill">Module 02 · Gemini Sessions &amp; Memory Bank</span>
+              <span id="sessions-backend-pill" class="status-pill status-neutral">Zero-wake inspection · 0 vCPU</span>
+            </div>
+            <div class="action-bar-right">
+              <button id="btn-refresh-sessions" class="stroked-btn" type="button">
+                <span class="btn-icon" data-icon="refresh" aria-hidden="true"></span>
+                <span>Refresh ledger</span>
+              </button>
+            </div>
+          </div>
+
+          <article class="console-card">
+            <div class="card-header">
+              <h2 class="card-title">Session ledger</h2>
+              <span id="sessions-count-pill" class="stroked-pill mono">0 sessions</span>
+            </div>
+            <p class="body-copy secondary-copy">Structured turn events persisted across the Actor Boundary via Gemini Sessions. Inspecting a session queries the Session Ledger directly without dialing atenet-router or waking a suspended Incident Actor.</p>
+            <div class="table-wrap">
+              <table class="console-table">
+                <thead>
+                  <tr>
+                    <th>Session</th>
+                    <th>Incident</th>
+                    <th>Template</th>
+                    <th>Actor compute</th>
+                    <th>Turn events</th>
+                    <th>Last updated</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="sessions-ledger-body"></tbody>
+              </table>
+            </div>
+
+            <div id="session-events-inspector" class="inspector-section">
+              <div class="card-header inspector-header">
+                <h3 id="session-inspector-title" class="card-title">Turn event inspector</h3>
+                <span id="session-inspector-badge" class="status-pill status-neutral">Select a session</span>
+              </div>
+              <dl id="session-state-grid" class="kv-grid compact-kv hidden"></dl>
+              <div id="session-events-list" class="waterfall-list"></div>
+            </div>
+          </article>
+
+          <article class="console-card">
+            <div class="card-header">
+              <h2 class="card-title">Consolidated memory</h2>
+              <span id="memories-count-pill" class="stroked-pill mono">0 facts</span>
+            </div>
+            <p class="body-copy secondary-copy">Distilled root-cause and pool-tuning facts extracted via Gemini Memory Bank. Consolidated facts survive ActorTemplate v1 to v2 rollouts and transfer across sibling Incident Actors such as inc-403.</p>
+
+            <form id="memory-search-form" class="filter-bar" role="search">
+              <label for="memory-search-input" class="sr-only">Search Consolidated Memory</label>
+              <input id="memory-search-input" class="console-input" type="search" placeholder="Search memory facts (e.g. MAX_OPEN_CONNS, INC-403 connection pool, rows.Close)...">
+              <button id="btn-memory-search" class="primary-btn" type="submit">Search memory</button>
+              <button id="btn-memory-reset" class="text-btn" type="button">Show all</button>
+            </form>
+
+            <div class="table-wrap">
+              <table class="console-table">
+                <thead>
+                  <tr>
+                    <th>Distilled fact</th>
+                    <th>Source session</th>
+                    <th>Topics</th>
+                    <th>Extracted at</th>
+                  </tr>
+                </thead>
+                <tbody id="memories-table-body"></tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-catalog" class="route-view hidden">
+        <div class="page-container">
+          <div class="action-bar standalone-bar">
+            <div class="action-bar-left">
+              <h1 class="page-title">Skill &amp; agent catalog</h1>
+              <span class="stroked-pill">Modules 03–05 · Skill Registry &amp; Agent Registry</span>
+              <span id="catalog-backend-pill" class="status-pill status-neutral">Skill Registry active</span>
+            </div>
+            <div class="action-bar-right">
+              <button id="btn-refresh-catalog" class="stroked-btn" type="button">
+                <span class="btn-icon" data-icon="refresh" aria-hidden="true"></span>
+                <span>Refresh catalog</span>
+              </button>
+            </div>
+          </div>
+
+          <article class="console-card">
+            <div class="card-header">
+              <h2 class="card-title">Procedural skills (Skill Registry)</h2>
+              <span id="skills-count-pill" class="stroked-pill mono">1 skill</span>
+            </div>
+            <p class="body-copy secondary-copy">Procedural Skills package SKILL.md instructions and executable POSIX shell scripts into immutable ZIP archives in Skill Registry (agentregistry.googleapis.com). Incident Actors verify the archive SHA-256 digest before atomic extraction into /workspace/.skills/ with zero container rebuilds and zero Golden Snapshot churn.</p>
+            <div class="table-wrap">
+              <table class="console-table">
+                <thead>
+                  <tr>
+                    <th>Skill</th>
+                    <th>Default revision</th>
+                    <th>Active SHA-256 digest</th>
+                    <th>Revisions</th>
+                    <th>Description</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="skills-registry-body"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <aside id="skill-revision-drawer" class="console-card revision-drawer hidden" role="region" aria-labelledby="skill-drawer-title">
+            <div class="card-header">
+              <div class="action-bar-left">
+                <h2 id="skill-drawer-title" class="card-title">Skill revisions</h2>
+                <span id="skill-drawer-default-pill" class="status-pill status-success mono">default: v1</span>
+              </div>
+              <button id="btn-close-skill-drawer" class="text-btn" type="button">Close</button>
+            </div>
+            <p id="skill-drawer-urn" class="mono secondary-copy"></p>
+            <div id="skill-revisions-list" class="waterfall-list"></div>
+          </aside>
+
+          <article class="console-card">
+            <div class="card-header">
+              <h2 class="card-title">Agent Registry · A2A agents</h2>
+              <span id="a2a-count-pill" class="stroked-pill mono">1 agent</span>
+            </div>
+            <p class="body-copy secondary-copy">Deployment/sre-gateway advertises /.well-known/agent-card.json and POST /a2a with GKE auto-discovery metadata (registry.gke.io/functional-type: AGENT and a2a-protocol.org/agent-card) for automatic ingestion into Gemini Enterprise Agent Platform Agent Registry.</p>
+            <div class="table-wrap">
+              <table class="console-table">
+                <thead>
+                  <tr>
+                    <th>Agent</th>
+                    <th>Version</th>
+                    <th>A2A JSON-RPC endpoint</th>
+                    <th>Discovery metadata</th>
+                    <th>Advertised skills</th>
+                  </tr>
+                </thead>
+                <tbody id="a2a-agents-body"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="console-card">
+            <div class="card-header">
+              <h2 class="card-title">Agent Registry · governed MCP servers</h2>
+              <span id="mcp-count-pill" class="stroked-pill mono">3 servers</span>
+            </div>
+            <p class="body-copy secondary-copy">Incident Actors discover MCP servers dynamically via google.golang.org/adk/v2/agentregistry and connect through sre-gateway's governed /mcp/{server} Streamable HTTP endpoints enforcing readOnlyHint and destructiveHint annotations.</p>
+            <div class="table-wrap">
+              <table class="console-table">
+                <thead>
+                  <tr>
+                    <th>MCP server</th>
+                    <th>Governed broker endpoint</th>
+                    <th>Tools &amp; safety annotations</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody id="mcp-servers-body"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="console-card">
+            <div class="card-header">
+              <h2 class="card-title">Governed workspace tools, procedural skills &amp; MCP servers</h2>
+            </div>
+            <p class="body-copy secondary-copy">Module 01 equips the Incident Actor with four sandbox-confined workspace tools. Modules 03–05 attach SHA-256-verified Procedural Skill bundles from Skill Registry and governed MCP servers from Agent Registry without rebuilding container images or invalidating Golden Snapshots.</p>
+            <div class="table-wrap">
+              <table class="console-table">
+                <thead>
+                  <tr>
+                    <th>Capability</th>
+                    <th>Kind</th>
+                    <th>Boundary enforcement</th>
+                    <th>Module stage</th>
+                  </tr>
+                </thead>
+                <tbody id="catalog-table-body"></tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-about" class="route-view hidden">
+        <div class="page-container">
+          <div class="action-bar standalone-bar">
+            <div class="action-bar-left">
+              <h1 id="arch-title" class="page-title">Architecture</h1>
+            </div>
+            <div id="arch-flow-buttons" class="flow-btn-row"></div>
+          </div>
+
+          <div class="arch-layout">
+            <article class="console-card arch-canvas-card">
+              <p id="arch-flow-caption" class="body-copy secondary-copy"></p>
+              <div id="arch-svg-host" class="arch-svg-host" role="img" aria-label="Interactive Actor Boundary architecture topology"></div>
+              <div id="arch-hop-strip" class="hop-strip"></div>
+            </article>
+
+            <aside class="console-card arch-inspector-card">
+              <div class="card-header">
+                <h2 id="arch-node-title" class="card-title">Select a component</h2>
+                <span id="arch-node-badge" class="status-pill status-neutral">Topology</span>
+              </div>
+              <p id="arch-node-subtitle" class="mono secondary-copy"></p>
+              <p id="arch-node-summary" class="body-copy"></p>
+              <h3 class="sub-label">Security &amp; lifecycle invariants</h3>
+              <ul id="arch-node-invariants" class="symptom-list"></ul>
+              <div id="arch-node-adrs" class="chip-row"></div>
+            </aside>
+          </div>
+
+          <article class="console-card">
+            <div class="card-header">
+              <h2 class="card-title">8-module workshop progression (90 min)</h2>
+            </div>
+            <div class="table-wrap">
+              <table class="console-table">
+                <thead>
+                  <tr>
+                    <th>Module</th>
+                    <th>Title</th>
+                    <th>Capabilities unlocked</th>
+                  </tr>
+                </thead>
+                <tbody id="arch-modules-body"></tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="cmdk-backdrop" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="cmdk-title">
+    <div class="modal-card">
+      <div class="card-header">
+        <h2 id="cmdk-title" class="card-title">Operator &amp; scenario controls</h2>
+        <button id="btn-close-cmdk" class="text-btn" type="button">Close</button>
+      </div>
+      <dl id="cmdk-env-grid" class="kv-grid compact-kv"></dl>
+      <div id="cmdk-oauth-box" class="filter-bar">
+        <span class="sub-label inline-label">3LO Auth Manager delegation</span>
+        <span id="cmdk-oauth-pill" class="status-pill status-neutral">Not granted</span>
+        <button id="btn-cmdk-authorize-3lo" class="stroked-btn" type="button">Authorize 3LO remediation</button>
+        <button id="btn-cmdk-revoke-3lo" class="text-btn hidden" type="button">Revoke 3LO grant</button>
+      </div>
+      <h3 class="sub-label">Scenario prompt presets</h3>
+      <div id="cmdk-presets" class="preset-list"></div>
+    </div>
+  </div>
+
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>

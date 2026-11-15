@@ -4,10 +4,14 @@ docs/superpowers/
 # Local workshop config and generated state
 workshop.env
 .workshop/
+**/workshop.env
+**/.workshop/
 
 # Build output
 bin/
 dist/
+**/bin/
+**/dist/
 
 # Editor / OS
 .DS_Store

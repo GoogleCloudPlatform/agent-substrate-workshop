@@ -2,5 +2,11 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
-  ]
+  ],
+  "gomod": {
+    "fileMatch": [
+      "(^|/)101/app/go\\.mod$",
+      "(^|/)301/app/go\\.mod$"
+    ]
+  }
 }

@@ -1,0 +1,130 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: networking.gke.io/v1
+kind: GCPAgentGateway
+metadata:
+  name: sre-client-to-agent-gateway
+  namespace: ${NAMESPACE}
+  labels:
+    app.kubernetes.io/name: sre-gateway
+  annotations:
+    agentregistry.googleapis.com/registries: "//agentregistry.googleapis.com/projects/${PROJECT_ID}/locations/global,//agentregistry.googleapis.com/projects/${PROJECT_ID}/locations/${REGION}"
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: sre-agent-gateway
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: sre-ingress-route
+  namespace: ${NAMESPACE}
+  labels:
+    app.kubernetes.io/name: sre-gateway
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: sre-ingress-gateway
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /
+        - path:
+            type: Exact
+            value: /about
+        - path:
+            type: Exact
+            value: /sessions
+        - path:
+            type: Exact
+            value: /catalog
+        - path:
+            type: Exact
+            value: /.well-known/agent-card.json
+        - path:
+            type: Exact
+            value: /readyz
+        - path:
+            type: PathPrefix
+            value: /assets
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: sre-gateway
+          port: 80
+    - matches:
+        - path:
+            type: Exact
+            value: /a2a
+        - path:
+            type: PathPrefix
+            value: /api
+        - path:
+            type: PathPrefix
+            value: /oauth
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: sre-gateway
+          port: 80
+---
+apiVersion: networking.gke.io/v1
+kind: GCPAuthzPolicy
+metadata:
+  name: sre-ingress-authz-policy
+  namespace: ${NAMESPACE}
+  labels:
+    app.kubernetes.io/name: sre-gateway
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: sre-ingress-gateway
+  enforcementLevel: L7
+  policyProfile: REQUEST_AUTHZ
+  action: ALLOW
+  rules:
+    - to:
+        operations:
+          - methods: ["GET", "HEAD"]
+            paths:
+              - type: Exact
+                value: "/"
+              - type: Exact
+                value: "/about"
+              - type: Exact
+                value: "/sessions"
+              - type: Exact
+                value: "/catalog"
+              - type: Exact
+                value: "/.well-known/agent-card.json"
+              - type: Exact
+                value: "/readyz"
+              - type: Prefix
+                value: "/assets/"
+    - to:
+        operations:
+          - methods: ["GET", "POST"]
+            paths:
+              - type: Exact
+                value: "/a2a"
+              - type: Prefix
+                value: "/api/"
+              - type: Prefix
+                value: "/oauth/"

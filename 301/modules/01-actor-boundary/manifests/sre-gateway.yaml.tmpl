@@ -1,0 +1,231 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sre-gateway
+  namespace: ${NAMESPACE}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sre-gateway-state
+  namespace: ${NAMESPACE}
+  labels:
+    app.kubernetes.io/name: sre-gateway
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sre-gateway
+  namespace: ${NAMESPACE}
+  labels:
+    app: sre-gateway
+    app.kubernetes.io/name: sre-gateway
+    registry.gke.io/functional-type: "AGENT"
+  annotations:
+    a2a-protocol.org/agent-card: '{"protocolVersion":"0.3.0","card":{"uriPath":"/.well-known/agent-card.json","port":8080,"protocol":"HTTP"}}'
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: sre-gateway
+  template:
+    metadata:
+      labels:
+        app: sre-gateway
+        app.kubernetes.io/name: sre-gateway
+        registry.gke.io/functional-type: "AGENT"
+      annotations:
+        iam.gke.io/spiffe-identity-type: "${SPIFFE_IDENTITY_TYPE}"
+        iam.gke.io/identity: "${SPIFFE_ID_PATTERN}"
+        iam.gke.io/inject-podcertificates: "${SPIFFE_INJECT_PODCERTIFICATES}"
+    spec:
+      serviceAccountName: sre-gateway
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: sre-gateway
+          image: ${GATEWAY_IMAGE}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "8080"
+            - name: NAMESPACE
+              value: "${NAMESPACE}"
+            - name: ATESPACE
+              value: "${ATESPACE}"
+            - name: SIM_NAMESPACE
+              value: "${SIM_NAMESPACE}"
+            - name: GOOGLE_CLOUD_PROJECT
+              value: "${PROJECT_ID}"
+            - name: REGION
+              value: "${REGION}"
+            - name: GOOGLE_GENAI_USE_ENTERPRISE
+              value: "true"
+            - name: GOOGLE_CLOUD_LOCATION
+              value: "${MODEL_LOCATION}"
+            - name: GEMINI_MODEL
+              value: "${GEMINI_MODEL}"
+            - name: MOCK_LLM
+              value: "${MOCK_LLM}"
+            - name: REASONING_ENGINE_ID
+              value: "${REASONING_ENGINE_ID}"
+            - name: BROKER_STATE_FILE
+              value: "/var/lib/sre-gateway/broker-state.json"
+            - name: IDLE_AFTER
+              value: "${IDLE_AFTER}"
+            - name: DEFAULT_ACTOR_TEMPLATE
+              value: "${DEFAULT_ACTOR_TEMPLATE}"
+            - name: SELF_URL
+              value: "http://sre-gateway.${NAMESPACE}.svc.cluster.local:8080"
+            - name: OPS_HUB_URL
+              value: "http://ops-hub.${SIM_NAMESPACE}.svc.cluster.local:8080"
+            - name: LEDGER_API_URL
+              value: "http://ledger-api.${SIM_NAMESPACE}.svc.cluster.local:8080"
+            - name: AGENT_IDENTITY_MODE
+              value: "${AGENT_IDENTITY_MODE}"
+            - name: SPIFFE_TRUST_DOMAIN
+              value: "${SPIFFE_TRUST_DOMAIN}"
+            - name: GOOGLE_API_ENABLE_RUNTIME_BOUND_TOKEN
+              value: "false"
+            - name: GOVERNANCE_ENFORCED
+              value: "${GOVERNANCE_ENFORCED}"
+            - name: REQUIRE_3LO_FOR_REMEDIATION
+              value: "${REQUIRE_3LO_FOR_REMEDIATION}"
+            - name: MODEL_ARMOR_TEMPLATE_ID
+              value: "${MODEL_ARMOR_TEMPLATE_ID}"
+            - name: GCP_AUTH_PROVIDER_ID
+              value: "${GCP_AUTH_PROVIDER_ID}"
+            - name: OAUTH_CLIENT_ID
+              value: "${OAUTH_CLIENT_ID}"
+            - name: OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sre-gateway-oauth
+                  key: client-secret
+                  optional: true
+            - name: GITHUB_OAUTH_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: sre-gateway-oauth
+                  key: github-client-id
+                  optional: true
+            - name: GITHUB_OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sre-gateway-oauth
+                  key: github-client-secret
+                  optional: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: broker-state
+              mountPath: /var/lib/sre-gateway
+            - name: ate-token
+              mountPath: /var/run/ate/token
+              readOnly: true
+            - name: ate-trust
+              mountPath: /var/run/ate/trust
+              readOnly: true
+            - name: ate-identity
+              mountPath: /var/run/ate/identity
+              readOnly: true
+      volumes:
+        - name: broker-state
+          persistentVolumeClaim:
+            claimName: sre-gateway-state
+        - name: ate-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: api.ate-system.svc
+                  expirationSeconds: 3600
+                  path: token
+        - name: ate-trust
+          projected:
+            sources:
+              - clusterTrustBundle:
+                  signerName: servicedns.podcert.ate.dev/identity
+                  labelSelector:
+                    matchLabels:
+                      podcert.ate.dev/canarying: live
+                  path: trust-bundle.pem
+        - name: ate-identity
+          projected:
+            sources:
+              - podCertificate:
+                  signerName: podidentity.podcert.ate.dev/identity
+                  keyType: ECDSAP256
+                  credentialBundlePath: credential-bundle.pem
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sre-gateway
+  namespace: ${NAMESPACE}
+  labels:
+    app: sre-gateway
+    app.kubernetes.io/name: sre-gateway
+spec:
+  selector:
+    app: sre-gateway
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+    - name: http-80
+      port: 80
+      targetPort: http
+      protocol: TCP
