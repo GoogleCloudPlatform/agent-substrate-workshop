@@ -6,7 +6,7 @@ require (
 	github.com/prometheus/client_golang v1.24.1
 	go.ate.dev/substrate v1.0.0
 	google.golang.org/genai v1.71.0
-	google.golang.org/grpc v1.84.0
+	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12
 	sigs.k8s.io/yaml v1.6.0
 )
@@ -41,5 +41,5 @@ require (
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/api v0.278.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260803160001-6ac0973c030d // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260817212433-ac3dfec99bb1 // indirect
 )
