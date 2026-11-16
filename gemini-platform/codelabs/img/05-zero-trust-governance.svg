@@ -1,0 +1,147 @@
+<!--
+ Copyright 2026 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 436" width="100%" role="img" aria-label="Defense-in-depth zero-trust governance across GCPAgentGateway, Pod Agent Identity, Model Armor, Auth Manager 3LO, and keyless snapshots">
+  <defs>
+    <style>
+      .canvas { fill: #ffffff; stroke: #dadce0; stroke-width: 1; }
+      .header-bar { fill: #f8f9fa; stroke: #dadce0; stroke-width: 1; }
+      .zone { fill: #f8f9fa; stroke: #dadce0; stroke-width: 1; }
+      .zone-blue { fill: #f4f8fe; stroke: #8ab4f8; stroke-width: 1; }
+      .zone-green { fill: #f3faf5; stroke: #81c995; stroke-width: 1; }
+      .zone-amber { fill: #fef9eb; stroke: #fdd663; stroke-width: 1; }
+      .zone-red { fill: #fdf3f2; stroke: #f28b82; stroke-width: 1.25; stroke-dasharray: 5 3; }
+      .card { fill: #ffffff; stroke: #dadce0; stroke-width: 1; }
+      .card-blue { fill: #ffffff; stroke: #1a73e8; stroke-width: 1.25; }
+      .card-green { fill: #ffffff; stroke: #188038; stroke-width: 1.25; }
+      .card-amber { fill: #ffffff; stroke: #e37400; stroke-width: 1.25; }
+      .card-red { fill: #ffffff; stroke: #d93025; stroke-width: 1.25; }
+      .pill-blue { fill: #e8f0fe; stroke: #aecbfa; stroke-width: 1; }
+      .pill-green { fill: #e6f4ea; stroke: #ceead6; stroke-width: 1; }
+      .pill-amber { fill: #fef7e0; stroke: #fde293; stroke-width: 1; }
+      .pill-red { fill: #fce8e6; stroke: #fad2cf; stroke-width: 1; }
+      .pill-neutral { fill: #f1f3f4; stroke: #dadce0; stroke-width: 1; }
+      .title { font-family: Roboto, Arial, sans-serif; font-size: 15px; font-weight: 500; fill: #202124; }
+      .zone-title { font-family: Roboto, Arial, sans-serif; font-size: 13px; font-weight: 500; fill: #202124; }
+      .zone-sub { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 400; fill: #5f6368; }
+      .card-title { font-family: Roboto, Arial, sans-serif; font-size: 12.5px; font-weight: 500; fill: #202124; }
+      .body { font-family: Roboto, Arial, sans-serif; font-size: 11.5px; font-weight: 400; fill: #5f6368; }
+      .mono { font-family: 'Roboto Mono', monospace; font-size: 11px; font-weight: 400; fill: #202124; }
+      .mono-muted { font-family: 'Roboto Mono', monospace; font-size: 10.5px; font-weight: 400; fill: #5f6368; }
+      .pill-text-blue { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #1967d2; }
+      .pill-text-green { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #137333; }
+      .pill-text-amber { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #b06000; }
+      .pill-text-red { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #c5221f; }
+      .pill-text-neutral { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #3c4043; }
+      .edge { fill: none; stroke: #1a73e8; stroke-width: 1.5; }
+      .edge-green { fill: none; stroke: #188038; stroke-width: 1.5; }
+      .edge-amber { fill: none; stroke: #e37400; stroke-width: 1.5; }
+      .edge-muted { fill: none; stroke: #5f6368; stroke-width: 1.4; stroke-dasharray: 4 3; }
+    </style>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#1a73e8"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#188038"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#e37400"/>
+    </marker>
+    <marker id="arrow-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#5f6368"/>
+    </marker>
+  </defs>
+  <rect class="canvas" x="0.5" y="0.5" width="1039" height="435" rx="6"/>
+  <rect class="header-bar" x="0.5" y="0.5" width="1039" height="48" rx="6"/>
+  <line x1="1" y1="48.5" x2="1039" y2="48.5" stroke="#dadce0" stroke-width="1"/>
+  <circle cx="22" cy="24.5" r="5" fill="#1a73e8"/>
+  <text class="title" x="36" y="29.5">Module 05 · Zero-trust governance across the Actor Boundary</text>
+  <rect class="pill-green" x="794" y="12.5" width="226" height="24" rx="12"/>
+  <text class="pill-text-green" x="907.0" y="28.5" text-anchor="middle">Model Armor + 3LO + 0-token GCS</text>
+  <rect class="zone-blue" x="20" y="64" width="224" height="352" rx="6"/>
+  <text class="zone-title" x="32" y="86">1. Ingress Agent Gateway</text>
+  <text class="zone-sub" x="32" y="102">networking.gke.io L7 edge</text>
+  <rect class="card-blue" x="32" y="114" width="200" height="122" rx="4"/>
+  <text class="card-title" x="44" y="135">GCPAgentGateway</text>
+  <text class="mono" x="44" y="153">sre-ingress-gateway</text>
+  <text class="body" x="44" y="170">CLIENT_TO_AGENT profile</text>
+  <text class="mono" x="44" y="187">GCPAuthzPolicy (ALLOW)</text>
+  <text class="body" x="44" y="204">Permits /, /a2a, /api/*</text>
+  <text class="body" x="44" y="221">and Agent Card only</text>
+  <rect class="card-red" x="32" y="248" width="200" height="114" rx="4"/>
+  <text class="card-title" x="44" y="269">Internal route isolation</text>
+  <text class="body" x="44" y="287">Blocks external callers</text>
+  <text class="body" x="44" y="304">from broker proxy paths:</text>
+  <text class="mono-muted" x="44" y="321">/genai/*  /mcp/*</text>
+  <text class="mono-muted" x="44" y="338">/ops/git/* /agentengine</text>
+  <rect class="pill-blue" x="32" y="376" width="200" height="24" rx="12"/>
+  <text class="pill-text-blue" x="132.0" y="392.0" text-anchor="middle">L7 REQUEST_AUTHZ</text>
+  <rect class="zone" x="262" y="64" width="310" height="352" rx="6"/>
+  <text class="zone-title" x="276" y="86">2. Governed Broker (sre-gateway)</text>
+  <text class="zone-sub" x="276" y="102">Inline identity, screening &amp; token vault</text>
+  <rect class="card-blue" x="276" y="114" width="282" height="70" rx="4"/>
+  <text class="card-title" x="288" y="135">Pod Agent Identity SPIFFE + mTLS</text>
+  <text class="mono" x="288" y="153">agents.global.../sa/sre-gateway</text>
+  <text class="body" x="288" y="170">Plus atenet podcert client bundle</text>
+  <rect class="card-red" x="276" y="194" width="282" height="72" rx="4"/>
+  <text class="card-title" x="288" y="215">Cloud Model Armor + SDP guard</text>
+  <text class="body" x="288" y="233">Blocks INC-409 prompt injection (403)</text>
+  <text class="body" x="288" y="250">Redacts PII before waking Actor</text>
+  <rect class="card-amber" x="276" y="276" width="282" height="62" rx="4"/>
+  <text class="card-title" x="288" y="297">MCP destructiveHint enforcement</text>
+  <text class="mono" x="288" y="315">drop_ledger_database -&gt; HTTP 403</text>
+  <text class="body" x="288" y="332">Allows readOnlyHint &amp; approved PRs</text>
+  <rect class="card-green" x="276" y="348" width="282" height="56" rx="4"/>
+  <text class="card-title" x="288" y="369">Auth Manager 3LO PKCE vault</text>
+  <text class="body" x="288" y="387">OAuth 2.0 + S256 PKCE (&lt;= 15m TTL)</text>
+  <rect class="zone-red" x="590" y="64" width="206" height="352" rx="6"/>
+  <text class="zone-title" x="604" y="86">3. Keyless Actor</text>
+  <text class="zone-sub" x="604" y="102">sre-agent-v4 (unchanged)</text>
+  <rect class="card" x="604" y="114" width="178" height="126" rx="4"/>
+  <text class="card-title" x="616" y="135">Zero-secret sandbox</text>
+  <text class="body" x="616" y="153">Zero code rebuild in</text>
+  <text class="body" x="616" y="170">Module 05</text>
+  <text class="mono-muted" x="616" y="187">0 GCP tokens</text>
+  <text class="mono-muted" x="616" y="204">0 OAuth 3LO tokens</text>
+  <text class="mono-muted" x="616" y="221">0 client secrets</text>
+  <rect class="card-green" x="604" y="254" width="178" height="108" rx="4"/>
+  <text class="card-title" x="616" y="275">Snapshot hygiene audit</text>
+  <text class="mono" x="616" y="293">make audit-snapshot</text>
+  <text class="mono-muted" x="616" y="310">SPEC_MATCHES=0</text>
+  <text class="mono-muted" x="616" y="327">WORKSPACE_MATCHES=0</text>
+  <text class="mono-muted" x="616" y="344">SNAPSHOT_MATCHES=0</text>
+  <rect class="pill-green" x="604" y="376" width="178" height="24" rx="12"/>
+  <text class="pill-text-green" x="693.0" y="392.0" text-anchor="middle">0 tokens in GCS</text>
+  <rect class="zone-green" x="814" y="64" width="206" height="352" rx="6"/>
+  <text class="zone-title" x="828" y="86">4. Governed write</text>
+  <text class="zone-sub" x="828" y="102">sre-gateway -> ops-hub</text>
+  <rect class="card-green" x="828" y="114" width="178" height="134" rx="4"/>
+  <text class="card-title" x="840" y="135">Outbound 3LO injection</text>
+  <text class="body" x="840" y="153">Token attached only on</text>
+  <text class="body" x="840" y="170">broker -&gt; ops-hub hop:</text>
+  <text class="mono-muted" x="840" y="187">Authorization: Bearer</text>
+  <text class="mono-muted" x="840" y="204">X-Agentic-Delegation</text>
+  <text class="mono-muted" x="840" y="221">X-Agent-Identity</text>
+  <rect class="card" x="828" y="262" width="178" height="100" rx="4"/>
+  <text class="card-title" x="840" y="283">Dual PR attribution</text>
+  <text class="mono-muted" x="840" y="301">operator_sub (human)</text>
+  <text class="mono-muted" x="840" y="318">+ agent_identity (pod)</text>
+  <text class="body" x="840" y="335">Recorded in audit log</text>
+  <rect class="pill-green" x="828" y="376" width="178" height="24" rx="12"/>
+  <text class="pill-text-green" x="917.0" y="392.0" text-anchor="middle">Human + Agent audit</text>
+  <path class="edge" d="M 232 170 L 272 170" marker-end="url(#arrow-blue)"/>
+  <path class="edge" d="M 558 160 L 600 160" marker-end="url(#arrow-blue)"/>
+  <path class="edge-green" d="M 558 376 L 578 376 L 578 424 L 804 424 L 804 180 L 824 180" marker-end="url(#arrow-green)"/>
+</svg>

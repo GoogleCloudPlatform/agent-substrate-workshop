@@ -1,0 +1,123 @@
+<!--
+ Copyright 2026 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 428" width="100%" role="img" aria-label="Three-tier state model comparing raw Cloud Storage snapshots, Gemini Sessions zero-wake ledger, and Gemini Memory Bank recall">
+  <defs>
+    <style>
+      .canvas { fill: #ffffff; stroke: #dadce0; stroke-width: 1; }
+      .header-bar { fill: #f8f9fa; stroke: #dadce0; stroke-width: 1; }
+      .zone { fill: #f8f9fa; stroke: #dadce0; stroke-width: 1; }
+      .zone-blue { fill: #f4f8fe; stroke: #8ab4f8; stroke-width: 1; }
+      .zone-green { fill: #f3faf5; stroke: #81c995; stroke-width: 1; }
+      .zone-amber { fill: #fef9eb; stroke: #fdd663; stroke-width: 1; }
+      .zone-red { fill: #fdf3f2; stroke: #f28b82; stroke-width: 1.25; stroke-dasharray: 5 3; }
+      .card { fill: #ffffff; stroke: #dadce0; stroke-width: 1; }
+      .card-blue { fill: #ffffff; stroke: #1a73e8; stroke-width: 1.25; }
+      .card-green { fill: #ffffff; stroke: #188038; stroke-width: 1.25; }
+      .card-amber { fill: #ffffff; stroke: #e37400; stroke-width: 1.25; }
+      .card-red { fill: #ffffff; stroke: #d93025; stroke-width: 1.25; }
+      .pill-blue { fill: #e8f0fe; stroke: #aecbfa; stroke-width: 1; }
+      .pill-green { fill: #e6f4ea; stroke: #ceead6; stroke-width: 1; }
+      .pill-amber { fill: #fef7e0; stroke: #fde293; stroke-width: 1; }
+      .pill-red { fill: #fce8e6; stroke: #fad2cf; stroke-width: 1; }
+      .pill-neutral { fill: #f1f3f4; stroke: #dadce0; stroke-width: 1; }
+      .title { font-family: Roboto, Arial, sans-serif; font-size: 15px; font-weight: 500; fill: #202124; }
+      .zone-title { font-family: Roboto, Arial, sans-serif; font-size: 13px; font-weight: 500; fill: #202124; }
+      .zone-sub { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 400; fill: #5f6368; }
+      .card-title { font-family: Roboto, Arial, sans-serif; font-size: 12.5px; font-weight: 500; fill: #202124; }
+      .body { font-family: Roboto, Arial, sans-serif; font-size: 11.5px; font-weight: 400; fill: #5f6368; }
+      .mono { font-family: 'Roboto Mono', monospace; font-size: 11px; font-weight: 400; fill: #202124; }
+      .mono-muted { font-family: 'Roboto Mono', monospace; font-size: 10.5px; font-weight: 400; fill: #5f6368; }
+      .pill-text-blue { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #1967d2; }
+      .pill-text-green { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #137333; }
+      .pill-text-amber { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #b06000; }
+      .pill-text-red { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #c5221f; }
+      .pill-text-neutral { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #3c4043; }
+      .edge { fill: none; stroke: #1a73e8; stroke-width: 1.5; }
+      .edge-green { fill: none; stroke: #188038; stroke-width: 1.5; }
+      .edge-amber { fill: none; stroke: #e37400; stroke-width: 1.5; }
+      .edge-muted { fill: none; stroke: #5f6368; stroke-width: 1.4; stroke-dasharray: 4 3; }
+    </style>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#1a73e8"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#188038"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#e37400"/>
+    </marker>
+    <marker id="arrow-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#5f6368"/>
+    </marker>
+  </defs>
+  <rect class="canvas" x="0.5" y="0.5" width="1039" height="427" rx="6"/>
+  <rect class="header-bar" x="0.5" y="0.5" width="1039" height="48" rx="6"/>
+  <line x1="1" y1="48.5" x2="1039" y2="48.5" stroke="#dadce0" stroke-width="1"/>
+  <circle cx="22" cy="24.5" r="5" fill="#1a73e8"/>
+  <text class="title" x="36" y="29.5">Module 02 · Sandbox snapshots, Session Ledger, and Consolidated Memory</text>
+  <rect class="pill-blue" x="806" y="12.5" width="214" height="24" rx="12"/>
+  <text class="pill-text-blue" x="913.0" y="28.5" text-anchor="middle">Zero-wake ListEvents · 0 vCPU</text>
+  <rect class="zone" x="20" y="64" width="318" height="346" rx="6"/>
+  <text class="zone-title" x="34" y="86">1. Raw sandbox snapshot</text>
+  <text class="zone-sub" x="34" y="102">Inside Actor Boundary · gs://PROJECT-ate</text>
+  <rect class="card" x="34" y="114" width="290" height="92" rx="4"/>
+  <text class="card-title" x="46" y="135">SNAPSHOT_FIDELITY_MEMORY</text>
+  <text class="body" x="46" y="153">Checkpoints gVisor RAM + /workspace</text>
+  <text class="mono" x="46" y="170">/workspace/ledger-api working tree</text>
+  <text class="body" x="46" y="187">Scoped to 1 Actor &amp; 1 ActorTemplate</text>
+  <rect class="card-amber" x="34" y="218" width="290" height="92" rx="4"/>
+  <text class="card-title" x="46" y="239">Template rollout boundary</text>
+  <text class="mono" x="46" y="257">sre-agent-v1 -&gt; sre-agent-v2</text>
+  <text class="body" x="46" y="274">New image creates a new Golden Snapshot</text>
+  <text class="body" x="46" y="291">Prior raw RAM checkpoint is replaced</text>
+  <rect class="pill-amber" x="34" y="326" width="290" height="26" rx="13"/>
+  <text class="pill-text-amber" x="179.0" y="343.0" text-anchor="middle">Reading /workspace wakes a worker</text>
+  <text class="body" x="179" y="378" text-anchor="middle">Ideal for active git checkouts &amp; diffs</text>
+  <rect class="zone-blue" x="361" y="64" width="318" height="346" rx="6"/>
+  <text class="zone-title" x="375" y="86">2. Session Ledger (Gemini Sessions)</text>
+  <text class="zone-sub" x="375" y="102">Across boundary · /agentengine/sessions</text>
+  <rect class="card-blue" x="375" y="114" width="290" height="92" rx="4"/>
+  <text class="card-title" x="387" y="135">brokerclient.NewSessionService</text>
+  <text class="body" x="387" y="153">Appends structured session.Event records</text>
+  <text class="mono" x="387" y="170">Prompts · tool calls · StateDelta</text>
+  <text class="body" x="387" y="187">Keyless HTTP via Governed Broker</text>
+  <rect class="card" x="375" y="218" width="290" height="92" rx="4"/>
+  <text class="card-title" x="387" y="239">Zero-wake audit &amp; rollout survival</text>
+  <text class="mono" x="387" y="257">GET /api/ledger/sessions/inc-402</text>
+  <text class="body" x="387" y="274">Inspect full history while Actor sleeps</text>
+  <text class="body" x="387" y="291">Survives v1 -&gt; v2 template replacement</text>
+  <rect class="pill-blue" x="375" y="326" width="290" height="26" rx="13"/>
+  <text class="pill-text-blue" x="520.0" y="343.0" text-anchor="middle">ListEvents at 0 vCPU · Actor SUSPENDED</text>
+  <text class="body" x="520" y="378" text-anchor="middle">Powers Incident Console /sessions view</text>
+  <rect class="zone-green" x="702" y="64" width="318" height="346" rx="6"/>
+  <text class="zone-title" x="716" y="86">3. Consolidated Memory (Memory Bank)</text>
+  <text class="zone-sub" x="716" y="102">Across boundary · cross-actor recall</text>
+  <rect class="card-green" x="716" y="114" width="290" height="92" rx="4"/>
+  <text class="card-title" x="728" y="135">AddSessionToMemory plugin</text>
+  <text class="body" x="728" y="153">Distills verified root-cause facts:</text>
+  <text class="mono" x="728" y="170">MAX_OPEN_CONNS=2 -&gt; 32, idle 30s</text>
+  <text class="mono" x="728" y="187">defer rows.Close() in pool/store.go</text>
+  <rect class="card" x="716" y="218" width="290" height="92" rx="4"/>
+  <text class="card-title" x="728" y="239">Sibling Incident Actor (inc-403)</text>
+  <text class="mono" x="728" y="257">load_memory &amp; preload_memory tools</text>
+  <text class="body" x="728" y="274">Recalls INC-402 root cause immediately</text>
+  <text class="body" x="728" y="291">Diagnoses INC-403 without re-cloning</text>
+  <rect class="pill-green" x="716" y="326" width="290" height="26" rx="13"/>
+  <text class="pill-text-green" x="861.0" y="343.0" text-anchor="middle">Shared across v2..v4 &amp; sibling Actors</text>
+  <text class="body" x="861" y="378" text-anchor="middle">Searchable live in /sessions memory bar</text>
+  <path class="edge" d="M 324 160 L 371 160" marker-end="url(#arrow-blue)"/>
+  <path class="edge-green" d="M 665 160 L 712 160" marker-end="url(#arrow-green)"/>
+</svg>

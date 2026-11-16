@@ -1,104 +1,88 @@
-# Agent Substrate Workshop
+# Agent Substrate Workshop on GKE
 
-Build and operate your own fleet of AI agents on [Agent Substrate](https://github.com/agent-substrate/substrate),
-starting from a bare GKE cluster. In about 85 minutes, you:
+Hands-on workshop curriculum for building, operating, and governing stateful AI agent fleets on [Agent Substrate](https://github.com/agent-substrate/substrate) (`v1.0.0`) on Google Kubernetes Engine (GKE).
 
-- Install Substrate and learn what each of its components does.
-- Build a Go agent, run it as a Substrate **actor**, and suspend and resume it across workers.
-- Connect the agent to a model (Gemini on the Gemini platform) through an always-on gateway, and lock down its egress.
-- Run 20 agents on 2 workers with request parking and idle suspend.
-- Monitor the fleet in Prometheus and Google Cloud console dashboards.
+This repository contains two workshops:
 
-You build everything you deploy: the agent, the gateway, and (in source mode) Substrate itself go into your own Artifact Registry repository.
-
-This workshop uses billable resources: a GKE cluster with two `c3-standard-4` nodes and a 500 GiB persistent disk for
-Substrate's bundled Postgres, plus Cloud Monitoring, Cloud Storage, and Artifact Registry. Use a dedicated project that you
-can delete when you finish; the "Clean up" section below shows how.
-
-## Agenda
-
-| # | Section | Min | What you learn |
+| Workshop | Title | Audience & Focus | Code & Guide |
 |---|---|---|---|
-| 0 | [Setup](modules/00-setup/README.md) | 10 | Google Cloud prerequisites; starting the background install |
-| 1 | [Architecture tour](modules/01-architecture/README.md) | 10 | Actors vs. Pods; ateapi, atelet, router, egress; CRDs vs. records |
-| 2 | [Hello actor](modules/02-hello-actor/README.md) | 15 | WorkerPool, ActorTemplate and golden snapshot, Actor, routing header |
-| 3 | [Suspend and resume](modules/03-suspend-resume/README.md) | 12 | MEMORY vs. VOLUMES snapshots, durable directories, template immutability |
-| 4 | [Make it an agent](modules/04-make-it-an-agent/README.md) | 13 | Gateway pattern, Workload Identity, deny-by-default egress |
-| 5 | [Density and idle](modules/05-density-idle/README.md) | 10 | Oversubscription, request parking, building an idle-suspender |
-| 6 | [Observe the fleet](modules/06-observe/README.md) | 12 | Substrate OpenTelemetry and app metrics, PromQL, dashboards, per-actor logs |
-| 7 | [Wrap-up](modules/07-wrap-up/README.md) | 3 | Real-world patterns, limits, optional labs |
+| **Intro** | [Untrusted Code on Secure Runtimes: Agent Substrate on Kubernetes](intro/README.md) | Platform engineers, Kubernetes operators, and AI infrastructure builders learning Substrate fundamentals. | [`intro/`](intro/) |
+| **Gemini Platform** | [Enterprise AI Agents with Agent Substrate and Gemini Agent Platform on GKE](gemini-platform/README.md) | Enterprise SRE, platform security, and AI agent developers building governed, stateful ADK agents across the Actor Boundary. | [`gemini-platform/`](gemini-platform/) |
 
-The optional labs follow in order of how much they change the cluster, so a later lab
-doesn't break an earlier one (see [Wrap-up](modules/07-wrap-up/README.md#keep-going-optional-labs)):
-- [A — agent-substrate/env](optional/A-env/README.md) (start here), [B — google/ax](optional/B-ax/README.md),
-  [C](optional/C-what-counts-as-idle/README.md), [D](optional/D-tags-clone-revert/README.md), and [E](optional/E-grpc-client/README.md) stay in their own namespace.
-- [F](optional/F-observability-deep-dive/README.md), [G](optional/G-hpa-workerpool/README.md),
-  [H](optional/H-agent-swarm/README.md), and [J](optional/J-credential-injection/README.md) modify shared cluster resources and include cleanup steps.
-- [I](optional/I-microvm/README.md) adds a nested-virtualization node pool and a cluster-wide `SandboxConfig`.
+---
 
-## Prerequisites
-- A Google Cloud project where you have the **Owner** role, with a GKE **1.37+** cluster that has Workload Identity, managed
-  OpenTelemetry, Managed Service for Prometheus, no node auto-upgrade, no spot nodes, and 2× `c3-standard-4` nodes. `make preflight`
-  verifies all of these settings. If you don't have a cluster yet, the [Setup](modules/00-setup/README.md) section creates one
-  with these settings.
-- Local tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst`, `curl`, `git`, `python3`, and, only to
-  build Substrate from source, a running Docker daemon with `buildx`. Cloud Shell includes all of these tools except `ko`
-  (`go install github.com/google/ko@v0.19.1`).
-- Familiarity with Kubernetes. You don't need prior Substrate knowledge.
+## Workshops
 
-For comparison, [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) solves a
-similar problem with a Pod per agent session and no Substrate integration. See the [Architecture tour](modules/01-architecture/README.md)
-for the full comparison.
+### [Intro: Untrusted Code on Secure Runtimes](intro/README.md)
 
-## Ways to take this workshop
-- **Instructor-led:** Follow the sections in order. If you fall behind, run `make catch-up MODULE=<n>` to bring your
-  environment to the start of section `n`, and continue from there.
-- **Self-paced:** Follow the same path. After each section, run `make verify MODULE=<n>` to verify your state.
-  See `instructor/troubleshooting.md` for common failures. Add `bin/` to your `PATH`
-  (`export PATH="$PWD/bin:$PATH"` from the repository root, as shown in the [Setup](modules/00-setup/README.md) section) before you run any `kubectl ate …`
-  commands yourself; `make catch-up` doesn't modify your shell environment.
-- **Qwiklabs (`GKE004`):** Uses [`qwiklabs/en.md`](qwiklabs/en.md), where the cluster, GCP resources, dashboards, and `ate-system`
-  control plane are pre-warmed at lab startup so learners unpack `.prewarm/workshop-prewarm.tar.gz` in Setup, inspect the
-  control plane in [Architecture tour](modules/01-architecture/README.md), and start building in
-  [Hello actor](modules/02-hello-actor/README.md).
+Build and operate your own fleet of AI agents on Agent Substrate, starting from a bare GKE cluster. In ~85 minutes across 8 core modules:
+- Install Agent Substrate and understand the roles of `ateapi`, `atelet`, `router`, and `egress`.
+- Run sandboxed Go agents as Substrate **actors** inside `gVisor` sandboxes.
+- Suspend and resume actors across worker nodes with millisecond warm restores from Cloud Storage memory snapshots.
+- Connect agents to Gemini through an always-on gateway and enforce deny-by-default egress policies.
+- Pack 20 concurrent agents onto 2 worker nodes using oversubscription, request parking, and idle auto-suspend.
+- Monitor fleet metrics and latency with Prometheus, PromQL, and Cloud Monitoring dashboards.
+- Dive deeper with 10 post-workshop optional labs in [`intro/optional/`](intro/optional/) covering `agent-substrate/env`, `google/ax`, custom idle triggers, snapshot branching, direct gRPC clients, HPA, agent swarms, Kata/Cloud-Hypervisor microVMs, and credential injection.
 
-## Quick start
+### [Gemini Platform: Enterprise AI Agents on GKE](gemini-platform/README.md)
+
+Build, upgrade, govern, trace, and evaluate a stateful **ADK Go v2** (`google.golang.org/adk/v2`) **Platform SRE Triage Agent** running inside an **Agent Substrate (`v1.0.0`)** gVisor Actor on GKE, integrated across the Actor Boundary with **Gemini Enterprise Agent Platform**. In ~90 minutes across 8 modules:
+- Enforce the **Actor Boundary**: a 100% keyless, default-deny gVisor Incident Actor communicating strictly through an always-on **Governed Broker** (`sre-gateway`) serving a Google Cloud Console-styled **Incident Console**.
+- Zero-wake state inspection with **Gemini Sessions** and cross-rollout / sibling-actor knowledge retention with **Gemini Memory Bank**.
+- Dynamic, zero-rebuild runtime diagnostic tool delivery with SHA-256-verified **Skill Registry** procedural skill bundles (`v1` -> `v2`).
+- A2A Agent Card publishing and MCP server discovery with **Agent Registry**, pausing high-blast-radius actions at an ADK **Remediation Gate** that suspends the Actor to Cloud Storage (`0 vCPU`) until operator approval.
+- Defense-in-depth zero-trust governance: GKE `Gateway` + `GCPAgentGateway` + `GCPAuthzPolicy`, Pod **Agent Identity** SPIFFE credentials, **Auth Manager** 3-legged OAuth (`S256` PKCE), live **Model Armor** prompt-injection blocking (`INC-409`), and `0`-token snapshot hygiene audits.
+- Export secret-scrubbed W3C **OpenTelemetry** GenAI spans to **Cloud Trace** and score live triage sessions with a pure-Go **Gemini on Agent Platform** autorater (`make eval`).
+
+---
+
+## Quick Start
+
+Each workshop is self-contained with its own configuration, manifests, solutions, and tests.
+
 ```bash
-cp workshop.env.example workshop.env     # set PROJECT_ID and CLUSTER_LOCATION
+# Clone the repository
+git clone https://github.com/GoogleCloudPlatform/agent-substrate-workshop
+cd agent-substrate-workshop
+
+# Work on the Intro workshop
+cd intro
+cp workshop.env.example workshop.env
 make preflight
-export PATH="$PWD/bin:$PATH"             # `kubectl ate` lands in bin/ during the install
-make help                                # list every target
+make help
+
+# Or work on the Gemini Platform workshop
+cd ../gemini-platform
+cp workshop.env.example workshop.env
+make preflight
+make help
 ```
 
-## Repository layout
+---
 
-| Path | Description |
-|---|---|
-| `modules/NN-*/` | The guide: one README per section, the manifests it uses, and the finished `main.go` |
-| `codelabs/` | Consolidated Codelabs edition (`en.md`, including optional labs appendix) and diagrams (`img/`) |
-| `qwiklabs/` | Consolidated Qwiklabs edition (`en.md`, pre-warmed core flow) and diagrams (`img/`) |
-| `app/` | Go code: `cmd/agent` (which you edit), `cmd/gateway`, `cmd/egressctl` |
-| `scripts/` | Scripts that `make` runs; `verify/` checks each section's end state |
-| `observability/` | Dashboard JSON, PodMonitoring, Prometheus UI, canned queries |
-| `optional/` | Post-workshop labs |
-| `instructor/` | Runbook (timings, cut lines, pre-event checks) and troubleshooting |
+## Testing & Quality Assurance
 
-## Versions
-Substrate evolves quickly. The workshop pins a specific commit with `SUBSTRATE_REF` in `workshop.env`. It uses published images when
-you set `SUBSTRATE_IMAGE_REPO` and `SUBSTRATE_IMAGE_TAG`, and builds from source otherwise. The runbook lists the ref
-validated for the next event. This workshop requires GKE 1.37 or later, and `make preflight` rejects older versions.
+Run offline test suites across both workshops from the root directory:
 
-## Clean up
-`make teardown` deletes the workshop's atespace, namespace, dashboards (the workshop dashboard and Substrate's three dashboards), and snapshots, while keeping your cluster,
-bucket, and Artifact Registry repository. It prompts for confirmation unless you set `YES=1`. Running `YES=1 scripts/teardown.sh --all`
-also deletes the bucket, the Artifact Registry repository, the
-project IAM bindings that `make gcp` created for the workshop namespace, and the snapshot transfer service account, but never deletes
-the GKE cluster. See [Wrap-up](modules/07-wrap-up/README.md#clean-up) for details.
+```bash
+# Test all workshops
+make test
 
-If the project exists only for this workshop, deleting the project is the simplest complete cleanup. Otherwise, run
-`make teardown ALL=1`, and then run `make delete-cluster`, which deletes the cluster's PersistentVolumeClaims first so their
-disks (including Substrate's Postgres volume) don't outlive the cluster. At an instructor-led event, check with your
-instructor before you delete a cluster that they provisioned.
+# Test individual workshops
+make test-intro
+make test-gemini-platform
+```
+
+---
+
+## Multi-Source Documentation Synchronization
+
+Workshop documentation across both tracks is maintained and synchronized for three publishing formats:
+1. **Modular Guide (`modules/`)**: Markdown sources of truth with step-by-step instructions, diagrams, and solution files.
+2. **DevSite Codelabs (`codelabs/en.md`)**: Single-page `claat`-compatible codelabs with step timings and optional appendix labs.
+3. **Google Skills / Qwiklabs (`qwiklabs/en.md`)**: Pre-warmed lab guides aligned with `CloudVLab/gcp-devrel-content` (`labs/gke005-agent-substrate-intro` for the Intro workshop; `labs/gke006-agent-substrate-platform` for the Gemini Platform workshop).
+
+---
 
 ## License and Disclaimers
 

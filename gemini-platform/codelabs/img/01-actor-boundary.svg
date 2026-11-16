@@ -1,0 +1,135 @@
+<!--
+ Copyright 2026 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 428" width="100%" role="img" aria-label="Actor Boundary architecture separating the keyless gVisor Incident Actor from the Governed Broker and Gemini Enterprise Agent Platform">
+  <defs>
+    <style>
+      .canvas { fill: #ffffff; stroke: #dadce0; stroke-width: 1; }
+      .header-bar { fill: #f8f9fa; stroke: #dadce0; stroke-width: 1; }
+      .zone { fill: #f8f9fa; stroke: #dadce0; stroke-width: 1; }
+      .zone-blue { fill: #f4f8fe; stroke: #8ab4f8; stroke-width: 1; }
+      .zone-green { fill: #f3faf5; stroke: #81c995; stroke-width: 1; }
+      .zone-amber { fill: #fef9eb; stroke: #fdd663; stroke-width: 1; }
+      .zone-red { fill: #fdf3f2; stroke: #f28b82; stroke-width: 1.25; stroke-dasharray: 5 3; }
+      .card { fill: #ffffff; stroke: #dadce0; stroke-width: 1; }
+      .card-blue { fill: #ffffff; stroke: #1a73e8; stroke-width: 1.25; }
+      .card-green { fill: #ffffff; stroke: #188038; stroke-width: 1.25; }
+      .card-amber { fill: #ffffff; stroke: #e37400; stroke-width: 1.25; }
+      .card-red { fill: #ffffff; stroke: #d93025; stroke-width: 1.25; }
+      .pill-blue { fill: #e8f0fe; stroke: #aecbfa; stroke-width: 1; }
+      .pill-green { fill: #e6f4ea; stroke: #ceead6; stroke-width: 1; }
+      .pill-amber { fill: #fef7e0; stroke: #fde293; stroke-width: 1; }
+      .pill-red { fill: #fce8e6; stroke: #fad2cf; stroke-width: 1; }
+      .pill-neutral { fill: #f1f3f4; stroke: #dadce0; stroke-width: 1; }
+      .title { font-family: Roboto, Arial, sans-serif; font-size: 15px; font-weight: 500; fill: #202124; }
+      .zone-title { font-family: Roboto, Arial, sans-serif; font-size: 13px; font-weight: 500; fill: #202124; }
+      .zone-sub { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 400; fill: #5f6368; }
+      .card-title { font-family: Roboto, Arial, sans-serif; font-size: 12.5px; font-weight: 500; fill: #202124; }
+      .body { font-family: Roboto, Arial, sans-serif; font-size: 11.5px; font-weight: 400; fill: #5f6368; }
+      .mono { font-family: 'Roboto Mono', monospace; font-size: 11px; font-weight: 400; fill: #202124; }
+      .mono-muted { font-family: 'Roboto Mono', monospace; font-size: 10.5px; font-weight: 400; fill: #5f6368; }
+      .pill-text-blue { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #1967d2; }
+      .pill-text-green { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #137333; }
+      .pill-text-amber { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #b06000; }
+      .pill-text-red { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #c5221f; }
+      .pill-text-neutral { font-family: Roboto, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #3c4043; }
+      .edge { fill: none; stroke: #1a73e8; stroke-width: 1.5; }
+      .edge-green { fill: none; stroke: #188038; stroke-width: 1.5; }
+      .edge-amber { fill: none; stroke: #e37400; stroke-width: 1.5; }
+      .edge-muted { fill: none; stroke: #5f6368; stroke-width: 1.4; stroke-dasharray: 4 3; }
+    </style>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#1a73e8"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#188038"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#e37400"/>
+    </marker>
+    <marker id="arrow-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#5f6368"/>
+    </marker>
+  </defs>
+  <rect class="canvas" x="0.5" y="0.5" width="1039" height="427" rx="6"/>
+  <rect class="header-bar" x="0.5" y="0.5" width="1039" height="48" rx="6"/>
+  <line x1="1" y1="48.5" x2="1039" y2="48.5" stroke="#dadce0" stroke-width="1"/>
+  <circle cx="22" cy="24.5" r="5" fill="#1a73e8"/>
+  <text class="title" x="36" y="29.5">Module 01 · Keyless Incident Actor and Governed Broker boundary</text>
+  <rect class="pill-green" x="813" y="12.5" width="207" height="24" rx="12"/>
+  <text class="pill-text-green" x="916.5" y="28.5" text-anchor="middle">0 credentials inside sandbox</text>
+  <rect class="zone-red" x="20" y="64" width="356" height="346" rx="6"/>
+  <text class="zone-title" x="34" y="86">Actor Boundary · keyless gVisor sandbox</text>
+  <text class="zone-sub" x="34" y="102">ATESPACE: workshop-301 · WorkerPool/sre-workers</text>
+  <rect class="card-red" x="34" y="114" width="328" height="86" rx="4"/>
+  <text class="card-title" x="46" y="135">Incident Actor (inc-402 · sre-agent-v1)</text>
+  <text class="mono" x="46" y="153">ADK Go v2 HTTP turn server (:80)</text>
+  <text class="body" x="46" y="170">0 ambient GCP tokens, 0 API keys in env</text>
+  <text class="mono-muted" x="46" y="187">clone_repo · read_file · ledger-verify</text>
+  <rect class="card" x="34" y="212" width="328" height="72" rx="4"/>
+  <text class="card-title" x="46" y="233">Durable /workspace git checkout</text>
+  <text class="mono" x="46" y="251">/workspace/ledger-api (pool.yaml, store.go)</text>
+  <text class="body" x="46" y="268">Persists staged fixes across turns</text>
+  <rect class="card-green" x="34" y="296" width="328" height="72" rx="4"/>
+  <text class="card-title" x="46" y="317">Cloud Storage snapshot (gs://PROJECT-ate)</text>
+  <text class="body" x="46" y="335">Golden Snapshot boot in &lt; 400ms</text>
+  <text class="mono-muted" x="46" y="352">Suspends to 0 vCPU after 15s idle</text>
+  <rect class="pill-red" x="34" y="376" width="328" height="24" rx="12"/>
+  <text class="pill-text-red" x="198.0" y="392.0" text-anchor="middle">Default-deny EgressPolicy: sre-gateway only</text>
+  <rect class="zone-blue" x="412" y="64" width="316" height="346" rx="6"/>
+  <text class="zone-title" x="426" y="86">Always-on routing &amp; broker tier</text>
+  <text class="zone-sub" x="426" y="102">ate-system + workshop-301 namespaces</text>
+  <rect class="card" x="426" y="114" width="288" height="86" rx="4"/>
+  <text class="card-title" x="438" y="135">atenet-router (ate-system)</text>
+  <text class="mono" x="438" y="153">mTLS podcert (:8443) + park budget</text>
+  <text class="body" x="438" y="170">Wakes suspended Actors on demand</text>
+  <text class="mono-muted" x="438" y="187">ate-target-actor: workshop-301/inc-402</text>
+  <rect class="card-blue" x="426" y="218" width="288" height="146" rx="4"/>
+  <text class="card-title" x="438" y="239">sre-gateway (Governed Broker)</text>
+  <text class="body" x="438" y="257">Serves Cloud Console Incident Console</text>
+  <text class="body" x="438" y="274">Attaches Workload Identity outside Actor</text>
+  <text class="mono" x="438" y="291">/genai/* -&gt; Gemini Model Garden</text>
+  <text class="mono" x="438" y="308">/ops/*   -&gt; Smart HTTP Git &amp; tickets</text>
+  <text class="mono-muted" x="438" y="325">IDLE_AFTER=15s idle-suspender</text>
+  <rect class="pill-blue" x="426" y="376" width="288" height="24" rx="12"/>
+  <text class="pill-text-blue" x="570.0" y="392.0" text-anchor="middle">Workload Identity + podcert mTLS</text>
+  <rect class="zone" x="764" y="64" width="256" height="346" rx="6"/>
+  <text class="zone-title" x="778" y="86">Managed AI &amp; prod-sim</text>
+  <text class="zone-sub" x="778" y="102">External to sandbox checkpoint</text>
+  <rect class="card-blue" x="778" y="114" width="228" height="86" rx="4"/>
+  <text class="card-title" x="790" y="135">Gemini on Agent Platform</text>
+  <text class="mono" x="790" y="153">gemini-3.8-flash</text>
+  <text class="body" x="790" y="170">Model Garden enterprise API</text>
+  <text class="mono-muted" x="790" y="187">GOOGLE_GENAI_USE_ENTERPRISE</text>
+  <rect class="card" x="778" y="214" width="228" height="88" rx="4"/>
+  <text class="card-title" x="790" y="235">ops-hub (Operations Hub)</text>
+  <text class="mono" x="790" y="253">/git/ledger-api.git</text>
+  <text class="body" x="790" y="270">INC-402 &amp; INC-409 tracker</text>
+  <text class="mono-muted" x="790" y="287">MCP + OAuth 2.0 in prod-sim</text>
+  <rect class="card-amber" x="778" y="314" width="228" height="84" rx="4"/>
+  <text class="card-title" x="790" y="335">ledger-api (Target Service)</text>
+  <text class="mono" x="790" y="353">MAX_OPEN_CONNS=2 · 503</text>
+  <text class="body" x="790" y="370">Unclosed row cursors in store.go</text>
+  <text class="mono-muted" x="790" y="387">pool_exhausted JSON logs</text>
+  <path class="edge" d="M 426 156 L 366 156" marker-end="url(#arrow-blue)"/>
+  <text class="mono-muted" x="394" y="149" text-anchor="middle">mTLS</text>
+  <path class="edge" d="M 362 250 L 422 250" marker-end="url(#arrow-blue)"/>
+  <text class="mono-muted" x="392" y="243" text-anchor="middle">HTTP</text>
+  <path class="edge" d="M 570 218 L 570 204" marker-end="url(#arrow-blue)"/>
+  <path class="edge-green" d="M 198 284 L 198 294" marker-end="url(#arrow-green)"/>
+  <path class="edge" d="M 714 248 L 746 248 L 746 158 L 774 158" marker-end="url(#arrow-blue)"/>
+  <path class="edge" d="M 714 278 L 774 278" marker-end="url(#arrow-blue)"/>
+  <path class="edge-muted" d="M 892 302 L 892 312" marker-end="url(#arrow-muted)"/>
+</svg>
