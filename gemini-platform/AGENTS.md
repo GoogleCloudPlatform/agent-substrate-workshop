@@ -1,10 +1,10 @@
 # AGENTS.md
 
-Context for AI coding agents working in `gke-demos/substrate-agent-platform` (**Agent Substrate 301: Agent Substrate × Gemini Enterprise Agent Platform**).
+Context for AI coding agents working in `GoogleCloudPlatform/agent-substrate-workshop/gemini-platform` (**Enterprise AI Agents with Agent Substrate and Gemini Agent Platform on GKE**).
 
 ## Project overview
 
-Staging repository for the **301** hands-on workshop track of `GoogleCloudPlatform/agent-substrate-workshop`. Participants build and govern a stateful **ADK Go v2** (`google.golang.org/adk/v2`) **Platform SRE Triage Agent** running inside an **Agent Substrate (`v1.0.0`)** gVisor Actor on Google Kubernetes Engine (GKE), integrated across the Actor Boundary with **Gemini Enterprise Agent Platform** (Model Garden, Gemini Sessions, Gemini Memory Bank, Skill Registry, Agent Registry MCP & A2A, Agent Identity, Ingress `GCPAgentGateway` + governed broker with Model Armor & Auth Manager, and OpenTelemetry GenAI Traces & Online Evals).
+Curriculum Track **301** of `GoogleCloudPlatform/agent-substrate-workshop`. Participants build and govern a stateful **ADK Go v2** (`google.golang.org/adk/v2`) **Platform SRE Triage Agent** running inside an **Agent Substrate (`v1.0.0`)** gVisor Actor on Google Kubernetes Engine (GKE), integrated across the Actor Boundary with **Gemini Enterprise Agent Platform** (Model Garden, Gemini Sessions, Gemini Memory Bank, Skill Registry, Agent Registry MCP & A2A, Agent Identity, Ingress `GCPAgentGateway` + governed broker with Model Armor & Auth Manager, and OpenTelemetry GenAI Traces & Online Evals).
 
 ## Branding & hygiene rules
 
@@ -20,12 +20,12 @@ Workshop content is maintained in **three synchronized places** (enforced automa
    - Module titles use `# Title (NN min)` with subsections starting at `##` and diagram embeds at `../img/0N-*.svg`.
    - Modules `00` through `06` end with a `Next: [...]` relative link.
 2. **DevSite Codelabs edition ([`codelabs/en.md`](codelabs/en.md) + `codelabs/img/*.svg`)**:
-   - Starts with `claat` YAML frontmatter (`id: agent-substrate-301`, `categories: AgentPlatform, Kubernetes`, `language:GoLang`, `product:AgentPlatform`).
+   - Starts with `claat` YAML frontmatter (`id: agent-substrate-gemini-platform`, `categories: AgentPlatform, Kubernetes`, `language:GoLang`, `product:AgentPlatform`).
    - Contains a condensed `## Introduction` (`Duration: 02:00`), all 8 core modules (`## Setup` through `## Wrap-up and production patterns`, each immediately followed by `Duration: MM:SS` with subsections shifted down one level to `###`/`####`), and a trailing `## Appendix: Optional content` (`Duration: 10:00`) covering the GKE Ambient Networking + Secure Web Proxy (`AGENT_TO_ANYWHERE`) egress overlay and ending with `### When you're done`.
-   - Rewrites diagram paths to `img/0N-*.svg`, omits `Next:` lines, links repository files via full GitHub URLs (`https://github.com/gke-demos/substrate-agent-platform/blob/main/...`), and keeps zero `<...>` angle-bracket placeholders inside single-backtick inline code spans (`claat` HTML parser safety; enforce this across `modules/` and `qwiklabs/` as well).
+   - Rewrites diagram paths to `img/0N-*.svg`, omits `Next:` lines, links repository files via full GitHub URLs (`https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/...`), and keeps zero `<...>` angle-bracket placeholders inside single-backtick inline code spans (`claat` HTML parser safety; enforce this across `modules/` and `qwiklabs/` as well).
 3. **Google Skills / Qwiklabs edition ([`qwiklabs/en.md`](qwiklabs/en.md) + `qwiklabs/img/*.svg`)**:
-   - Omits YAML frontmatter (starts directly at `# Agent Substrate 301...`), omits `Duration:` lines, and omits `## Appendix: Optional content` plus **all** references or links to optional overlays.
-   - `## Setup` omits manual cluster creation (Terraform pre-provisions `2× n1-standard-4` `Intel Skylake` on GKE `1.37`) and populates `workshop.env` with `<ql-variable>` (`project_0.project_id`, `project_0.default_region`, `project_0.default_zone`) and `<ql-code-block bash templated noWrap>`.
+   - Omits YAML frontmatter (starts directly at `# Enterprise AI Agents...`), omits `Duration:` lines, and omits `## Appendix: Optional content` plus **all** references or links to optional overlays.
+   - `## Setup` explains the pre-warmed Google Skills `GKE006` environment (Terraform pre-provisions `2× n1-standard-4` `Intel Skylake` on GKE `1.37`, regional Gateways, `ReasoningEngine`, `prod-sim`, and `.workshop/` state with `.prewarm/gemini-platform-prewarm.tar.gz`) and omits `### Clean up`.
    - Keeps byte-for-byte identical copies of all Apache-2.0 header SVGs (`modules/img/`, `codelabs/img/`, `qwiklabs/img/`) with zero `@font-face` blocks or external URLs.
 
 Whenever you edit instructions, commands, code snippets, or SVG diagrams in `modules/`, apply the corresponding update to `codelabs/` and `qwiklabs/`.
@@ -56,7 +56,7 @@ When syncing changes from `gke-demos/substrate-agent-platform` to the multi-trac
 
 ### Issue tracker
 
-Issues and specs for this repo live in GitHub Issues (`gke-demos/substrate-agent-platform`) managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues and specs for this repo live in GitHub Issues (`GoogleCloudPlatform/agent-substrate-workshop`) managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
