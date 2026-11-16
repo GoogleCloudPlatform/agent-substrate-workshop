@@ -82,11 +82,25 @@ fi
 export KO_DOCKER_REPO KO_DEFAULTPLATFORMS
 step "ko build ${cmd_dir#./cmd/} -> ${KO_DOCKER_REPO}"
 prev="$(state_get "$state_key" || true)"
+rm -f "$STATE_DIR/$state_key"
+if [[ "$target" == "agent" ]]; then
+  rm -f "$STATE_DIR/agent-image-features"
+fi
 ref="$(cd "$REPO_ROOT/app" && ko build --base-import-paths "$cmd_dir")"
 [[ "$ref" == *@sha256:* ]] || die "ko did not return a digest-pinned image reference: $ref"
 state_put "$state_key" "$ref"
 if [[ "$state_key" == "gateway-image" ]]; then
   state_put "gateway-image-built" "$ref"
+fi
+if [[ "$target" == "agent" && "${2:-}" == "--check-changed" ]]; then
+  main_go="$REPO_ROOT/app/cmd/agent/main.go"
+  features=""
+  for sym in NewModel NewSessionService NewMemoryService NewSkillSource NewRemediationTools DiscoverMCPToolsets; do
+    if grep -q "$sym" "$main_go" 2>/dev/null; then
+      features+="${sym},"
+    fi
+  done
+  state_put "agent-image-features" "$features"
 fi
 ok "$ref (saved to .workshop/$state_key)"
 

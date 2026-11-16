@@ -52,7 +52,9 @@ is_known_solution() {
 
 use_solution() {
   local sol="$M/$1/solution/main.go"
+  SOLUTION_CHANGED=false
   cmp -s "$sol" "$MAIN" && return 0
+  SOLUTION_CHANGED=true
   if ! $BACKED_UP && ! is_known_solution; then
     local bak
     bak="$STATE_DIR/main.go.bak.$(date +%Y%m%d-%H%M%S).$$"
@@ -65,10 +67,10 @@ use_solution() {
 }
 
 stage_template() {
-  local mod_slug="$1" tmpl_name="$2" tmpl_file="$3"
+  local mod_slug="$1" tmpl_name="$2" tmpl_file="$3" target_n="${4:-0}"
   use_solution "$mod_slug"
-  if [[ "$tmpl_name" == "$RESET_TEMPLATE" ]]; then
-    step "RESET=1: deleting template $tmpl_name and all its actors to rebuild from solution"
+  if [[ "$tmpl_name" == "$RESET_TEMPLATE" ]] || ( (( target_n == N )) && $SOLUTION_CHANGED && kubectl ate get actor-template "$tmpl_name" -a "$ATESPACE" >/dev/null 2>&1 ); then
+    step "Rebuilding template $tmpl_name and resetting its actors from solution"
     reset_template "$ATESPACE" "$tmpl_name"
     ok "template $tmpl_name deleted"
   fi
@@ -135,7 +137,7 @@ if (( N >= 2 )); then
     "$S/sre-gateway.sh"
   fi
 
-  stage_template "01-actor-boundary" "sre-agent-v1" "template-v1.yaml.tmpl"
+  stage_template "01-actor-boundary" "sre-agent-v1" "template-v1.yaml.tmpl" 2
 
   if (( N == 2 )); then
     ephemeral_port_forward catchup-gw "$NAMESPACE" svc/sre-gateway 18081 8080
@@ -161,7 +163,7 @@ fi
 
 if (( N >= 3 )); then
   step "Module 02 end state: sre-agent-v2, Session Ledger, and Consolidated Memory"
-  stage_template "02-sessions-and-memory" "sre-agent-v2" "template-v2.yaml.tmpl"
+  stage_template "02-sessions-and-memory" "sre-agent-v2" "template-v2.yaml.tmpl" 3
 
   if (( N == 3 )); then
     WORKSHOP_TEMPLATE_OVERRIDE=sre-agent-v2 DEFAULT_ACTOR_TEMPLATE=sre-agent-v2 "$S/sre-gateway.sh"
@@ -196,7 +198,7 @@ fi
 
 if (( N >= 4 )); then
   step "Module 03 end state: sre-agent-v3, SkillToolset, and Procedural Skill v1 -> v2 rollout"
-  stage_template "03-skill-registry" "sre-agent-v3" "template-v3.yaml.tmpl"
+  stage_template "03-skill-registry" "sre-agent-v3" "template-v3.yaml.tmpl" 4
 
   if (( N == 4 )); then
     WORKSHOP_TEMPLATE_OVERRIDE=sre-agent-v3 DEFAULT_ACTOR_TEMPLATE=sre-agent-v3 "$S/sre-gateway.sh"
@@ -237,7 +239,7 @@ fi
 
 if (( N >= 5 )); then
   step "Module 04 end state: sre-agent-v4, Agent Registry MCP & A2A, and INC-402 Remediation Gate"
-  stage_template "04-agent-registry-mcp-a2a" "sre-agent-v4" "template-v4.yaml.tmpl"
+  stage_template "04-agent-registry-mcp-a2a" "sre-agent-v4" "template-v4.yaml.tmpl" 5
 
   if (( N == 5 )); then
     WORKSHOP_TEMPLATE_OVERRIDE=sre-agent-v4 DEFAULT_ACTOR_TEMPLATE=sre-agent-v4 "$S/sre-gateway.sh"

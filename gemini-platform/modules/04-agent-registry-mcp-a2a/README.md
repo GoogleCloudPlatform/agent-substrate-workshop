@@ -29,8 +29,27 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
    ```bash
    cloudshell edit app/cmd/agent/main.go
    ```
-   Locate `// WORKSHOP(module-4):` in `app/cmd/agent/main.go`. Replace the `tools := ...` through `toolsets := ...` section in `buildRunner` with the code you copy below and save the file (`Ctrl+S` or `Cmd+S`—or compare against `modules/04-agent-registry-mcp-a2a/solution/main.go`):
+   Locate `func buildRunner` in `app/cmd/agent/main.go`. Replace the entire `buildRunner` function with the code you copy below and save the file (`Ctrl+S` or `Cmd+S`—or compare against `modules/04-agent-registry-mcp-a2a/solution/main.go`):
    ```go
+   func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
+   	llm, err := brokerclient.NewModel(ctx, cfg.BrokerURL, cfg.ModelName, nil)
+   	if err != nil {
+   		return nil, err
+   	}
+
+   	sessionSvc, err := brokerclient.NewSessionService(cfg.BrokerURL, nil)
+   	if err != nil {
+   		return nil, err
+   	}
+   	memorySvc, err := brokerclient.NewMemoryService(cfg.BrokerURL, nil)
+   	if err != nil {
+   		return nil, err
+   	}
+   	memoryPlugin, err := brokerclient.NewMemoryConsolidationPlugin(sessionSvc, memorySvc)
+   	if err != nil {
+   		return nil, err
+   	}
+
    	tools := append([]tool.Tool(nil), workspaceTools...)
    	tools = append(tools, loadmemorytool.New(), preloadmemorytool.New())
 
@@ -69,6 +88,30 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
    		return nil, err
    	}
    	toolsets = append(toolsets, mcpToolsets...)
+
+   	triageAgent, err := llmagent.New(llmagent.Config{
+   		Name:        "sre_triage_agent",
+   		Description: "Platform SRE Triage Agent running inside a keyless Agent Substrate gVisor Incident Actor.",
+   		Model:       llm,
+   		InstructionProvider: func(agent.ReadonlyContext) (string, error) {
+   			return agentruntime.DefaultInstruction, nil
+   		},
+   		Tools:    tools,
+   		Toolsets: toolsets,
+   	})
+   	if err != nil {
+   		return nil, err
+   	}
+
+   	return runner.New(runner.Config{
+   		AppName:           agentruntime.AppName,
+   		Agent:             triageAgent,
+   		SessionService:    sessionSvc,
+   		MemoryService:     memorySvc,
+   		PluginConfig:      runner.PluginConfig{Plugins: []*plugin.Plugin{memoryPlugin}},
+   		AutoCreateSession: true,
+   	})
+   }
    ```
    **What this code does:**
    - `brokerclient.NewRemediationTools(cfg.BrokerURL, cfg.WorkspaceDir, nil)` registers `push_git_branch` (which pushes the verified `/workspace/ledger-api` fix branch over `sre-gateway/ops/git/ledger-api.git`) and `apply_remediation_pr` configured with ADK Go v2's `RequireConfirmation: true` **Remediation Gate** so the actor pauses and suspends to `0 vCPU` in Cloud Storage until a human operator approves.

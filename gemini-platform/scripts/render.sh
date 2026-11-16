@@ -22,6 +22,21 @@ resolve_spiffe_identity
 tmpl="${1:?usage: render.sh <file.tmpl>}"
 [[ -f "$tmpl" ]] || die "no such template: $tmpl"
 
+if [[ -f "$STATE_DIR/agent-image-features" ]]; then
+  built_features="$(state_get agent-image-features || true)"
+  req_feature=""
+  req_mod=""
+  case "${tmpl##*/}" in
+    template-v1.yaml.tmpl) req_feature="NewModel"; req_mod="WORKSHOP(module-1)" ;;
+    template-v2.yaml.tmpl) req_feature="NewMemoryService"; req_mod="WORKSHOP(module-2)" ;;
+    template-v3.yaml.tmpl) req_feature="NewSkillSource"; req_mod="WORKSHOP(module-3)" ;;
+    template-v4.yaml.tmpl) req_feature="DiscoverMCPToolsets"; req_mod="WORKSHOP(module-4)" ;;
+  esac
+  if [[ -n "$req_feature" && "$built_features" != *"$req_feature"* ]]; then
+    die "${tmpl##*/} requires ${req_feature} (${req_mod}) in app/cmd/agent/main.go, which was missing from your last 'make build-agent'. Save app/cmd/agent/main.go in Cloud Shell Editor (Ctrl+S / Cmd+S), run 'make build-agent', and re-run this command."
+  fi
+fi
+
 state_source() {
   case "$1" in
     AGENT_IMAGE)         echo "agent-image|make build-agent" ;;

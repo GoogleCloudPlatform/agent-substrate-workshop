@@ -100,17 +100,15 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
        "incident_id": "INC-402",
        "template": "sre-agent-v2",
        "prompt": "Investigate INC-402 by cloning ledger-api into /workspace, inspecting config/pool.yaml and pool/store.go, and running ledger-verify."
-     }' | jq '{actor_name, template, backend, workspace_cloned: .workspace.cloned, tool_steps: [(.tool_steps // [])[].name]}'
+     }' | jq '{actor_name, template, workspace_cloned: .workspace.cloned, tool_steps: [(.tool_steps // [])[].name]}'
    ```
-   Expected output:
+   Expected output on the first `sre-agent-v2` turn (when `/workspace/ledger-api` starts empty):
    ```json
    {
      "actor_name": "inc-402",
      "template": "sre-agent-v2",
-     "backend": "adk-gemini",
      "workspace_cloned": true,
      "tool_steps": [
-       "load_memory",
        "clone_repo",
        "read_workspace_file",
        "read_workspace_file",
@@ -118,10 +116,21 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
      ]
    }
    ```
+   *(If `inc-402` on `sre-agent-v2` already cloned `/workspace/ledger-api` and recorded its file inspection in the Session Ledger on an earlier turn, `preload_memory` injects those facts into the prompt automatically and `tool_steps` only needs to run `["run_workspace_command"]` while `workspace_cloned` remains `true`:)*
+   ```json
+   {
+     "actor_name": "inc-402",
+     "template": "sre-agent-v2",
+     "workspace_cloned": true,
+     "tool_steps": [
+       "run_workspace_command"
+     ]
+   }
+   ```
    **What this output means (and what to notice after running the command):**
-   - `template: "sre-agent-v2"` and `backend: "adk-gemini"`: Confirm that `inc-402` is running the upgraded `sre-agent-v2` ADK Go v2 runner. *(If you ever see `backend: "starter-stub"`, `workspace_cloned: false`, and `tool_steps: []`, `app/cmd/agent/main.go` was not saved before `make build-agent`—save `app/cmd/agent/main.go` in Cloud Shell Editor and re-run Step 2.)*
-   - **Notice why `workspace_cloned` is `true` and `tool_steps` ran `clone_repo` again**: In Agent Substrate, an `Actor`'s `actorTemplate` reference is immutable because RAM checkpoints bind to the exact container image and kernel state of that template. Upgrading `inc-402` from `sre-agent-v1` -> `sre-agent-v2` replaced the `sre-agent-v1` actor with a fresh `sre-agent-v2` sandbox restored from `sre-agent-v2`'s Golden Snapshot, so `/workspace` started empty and the agent cloned `ledger-api.git` again.
-   - **Persisted outside the sandbox**: During this turn, `Runner.Run` streamed every prompt, tool call (`load_memory`, `clone_repo`, `read_workspace_file`, `run_workspace_command`), and model reply through `sre-gateway/agentengine/sessions:appendEvent` into the **Session Ledger**, and `NewMemoryConsolidationPlugin` called `AddSessionToMemory` to distill `INC-402`'s verified root cause (`MAX_OPEN_CONNS=2`, `IDLE_TIMEOUT_SECONDS=0` in `config/pool.yaml` and the missing `defer rows.Close()` before `rows.ValidateChecksum()` in `pool/store.go`) into **Consolidated Memory**.
+   - `template: "sre-agent-v2"` and `workspace_cloned: true`: Confirm that `inc-402` is running the upgraded `sre-agent-v2` ADK Go v2 runner with `/workspace/ledger-api` checked out. *(If you ever see `workspace_cloned: false` and `tool_steps: []`, `app/cmd/agent/main.go` was not saved before `make build-agent`—save `app/cmd/agent/main.go` in Cloud Shell Editor and re-run Step 2.)*
+   - **Notice why `sre-agent-v1` -> `sre-agent-v2` replaced the raw memory snapshot**: In Agent Substrate, an `Actor`'s `actorTemplate` reference is immutable because RAM checkpoints bind to the exact container image and kernel state of that template. Upgrading `inc-402` from `sre-agent-v1` -> `sre-agent-v2` replaced the `sre-agent-v1` actor with a fresh `sre-agent-v2` sandbox restored from `sre-agent-v2`'s Golden Snapshot.
+   - **Persisted outside the sandbox**: During this turn, `Runner.Run` streamed every prompt, tool call, and model reply through `sre-gateway/agentengine/sessions:appendEvent` into the **Session Ledger**, and `NewMemoryConsolidationPlugin` called `AddSessionToMemory` to distill `INC-402`'s verified root cause (`MAX_OPEN_CONNS=2`, `IDLE_TIMEOUT_SECONDS=0` in `config/pool.yaml` and the missing `defer rows.Close()` before `rows.ValidateChecksum()` in `pool/store.go`) into **Consolidated Memory**.
 
 4. **Audit the Session Ledger at `0 vCPU` (zero-wake inspection).** Suspend `inc-402` (or wait `15s` for the idle-suspender) and confirm it consumes zero worker slots:
    ```bash

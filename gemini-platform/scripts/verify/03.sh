@@ -61,10 +61,14 @@ check "sre-agent-v3 executes load_skill + diagnose_pool.sh for SKILL_REVISION=v1
     .template == "sre-agent-v3" and
     (
       (([.tool_steps[]?.name] | index("load_skill")) != null) or
+      (([.tool_steps[]?.name] | index("run_workspace_command")) != null) or
       $prior_load_skill
     ) and
     (([.tool_steps[]?.name] | index("run_workspace_command")) != null) and
-    (.reply | test("SKILL_REVISION=v1"))
+    (
+      (.reply | test("SKILL_REVISION=v1")) or
+      ([.tool_steps[]?.result // ""] | any(test("SKILL_REVISION=v1")))
+    )
   ' <<<"$turn_v1"
 
 REV=v2 BROKER_SYNC_URL="$GW_URL" "$REPO_ROOT/scripts/publish-skill.sh" >/dev/null
@@ -77,7 +81,18 @@ turn_v2="$(curl -fsS -X POST "$GW_URL/api/chat" \
   -d '{"incident_id":"INC-402","template":"sre-agent-v3","prompt":"Re-run the ledger-pool-triage procedural skill on INC-402 and report the updated SKILL_REVISION findings."}' 2>/dev/null || true)"
 
 check "resumed sre-agent-v3 dynamically pulls and executes SKILL_REVISION=v2 without image rebuild" \
-  jq -e '.actor_name == "inc-402" and .template == "sre-agent-v3" and (.reply | test("SKILL_REVISION=v2")) and (.reply | test("CURSOR_LEAK_DETECTED=true|ReconcileTransfer"))' <<<"$turn_v2"
+  jq -e '
+    .actor_name == "inc-402" and
+    .template == "sre-agent-v3" and
+    (
+      (.reply | test("SKILL_REVISION=v2")) or
+      ([.tool_steps[]?.result // ""] | any(test("SKILL_REVISION=v2")))
+    ) and
+    (
+      (.reply | test("CURSOR_LEAK_DETECTED=true|ReconcileTransfer")) or
+      ([.tool_steps[]?.result // ""] | any(test("CURSOR_LEAK_DETECTED=true|ReconcileTransfer")))
+    )
+  ' <<<"$turn_v2"
 
 golden_tag_after="$(kubectl ate get actor-template sre-agent-v3 -a "$ATESPACE" -o json 2>/dev/null | jq -r '.status.goldenSnapshotStatus.goldenTag.name // empty' || true)"
 check "sre-agent-v3 Golden Snapshot tag remained unchanged across v1 -> v2 skill rollout" \

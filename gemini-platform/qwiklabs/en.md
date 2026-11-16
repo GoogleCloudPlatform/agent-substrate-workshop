@@ -352,17 +352,15 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
        "incident_id": "INC-402",
        "template": "sre-agent-v2",
        "prompt": "Investigate INC-402 by cloning ledger-api into /workspace, inspecting config/pool.yaml and pool/store.go, and running ledger-verify."
-     }' | jq '{actor_name, template, backend, workspace_cloned: .workspace.cloned, tool_steps: [(.tool_steps // [])[].name]}'
+     }' | jq '{actor_name, template, workspace_cloned: .workspace.cloned, tool_steps: [(.tool_steps // [])[].name]}'
    ```
-   Expected output:
+   Expected output on the first `sre-agent-v2` turn (when `/workspace/ledger-api` starts empty):
    ```json
    {
      "actor_name": "inc-402",
      "template": "sre-agent-v2",
-     "backend": "adk-gemini",
      "workspace_cloned": true,
      "tool_steps": [
-       "load_memory",
        "clone_repo",
        "read_workspace_file",
        "read_workspace_file",
@@ -370,10 +368,21 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
      ]
    }
    ```
+   *(If `inc-402` on `sre-agent-v2` already cloned `/workspace/ledger-api` and recorded its file inspection in the Session Ledger on an earlier turn, `preload_memory` injects those facts into the prompt automatically and `tool_steps` only needs to run `["run_workspace_command"]` while `workspace_cloned` remains `true`:)*
+   ```json
+   {
+     "actor_name": "inc-402",
+     "template": "sre-agent-v2",
+     "workspace_cloned": true,
+     "tool_steps": [
+       "run_workspace_command"
+     ]
+   }
+   ```
    **What this output means (and what to notice after running the command):**
-   - `template: "sre-agent-v2"` and `backend: "adk-gemini"`: Confirm that `inc-402` is running the upgraded `sre-agent-v2` ADK Go v2 runner. *(If you ever see `backend: "starter-stub"`, `workspace_cloned: false`, and `tool_steps: []`, `app/cmd/agent/main.go` was not saved before `make build-agent`—save `app/cmd/agent/main.go` in Cloud Shell Editor and re-run Step 2.)*
-   - **Notice why `workspace_cloned` is `true` and `tool_steps` ran `clone_repo` again**: In Agent Substrate, an `Actor`'s `actorTemplate` reference is immutable because RAM checkpoints bind to the exact container image and kernel state of that template. Upgrading `inc-402` from `sre-agent-v1` -> `sre-agent-v2` replaced the `sre-agent-v1` actor with a fresh `sre-agent-v2` sandbox restored from `sre-agent-v2`'s Golden Snapshot, so `/workspace` started empty and the agent cloned `ledger-api.git` again.
-   - **Persisted outside the sandbox**: During this turn, `Runner.Run` streamed every prompt, tool call (`load_memory`, `clone_repo`, `read_workspace_file`, `run_workspace_command`), and model reply through `sre-gateway/agentengine/sessions:appendEvent` into the **Session Ledger**, and `NewMemoryConsolidationPlugin` called `AddSessionToMemory` to distill `INC-402`'s verified root cause (`MAX_OPEN_CONNS=2`, `IDLE_TIMEOUT_SECONDS=0` in `config/pool.yaml` and the missing `defer rows.Close()` before `rows.ValidateChecksum()` in `pool/store.go`) into **Consolidated Memory**.
+   - `template: "sre-agent-v2"` and `workspace_cloned: true`: Confirm that `inc-402` is running the upgraded `sre-agent-v2` ADK Go v2 runner with `/workspace/ledger-api` checked out. *(If you ever see `workspace_cloned: false` and `tool_steps: []`, `app/cmd/agent/main.go` was not saved before `make build-agent`—save `app/cmd/agent/main.go` in Cloud Shell Editor and re-run Step 2.)*
+   - **Notice why `sre-agent-v1` -> `sre-agent-v2` replaced the raw memory snapshot**: In Agent Substrate, an `Actor`'s `actorTemplate` reference is immutable because RAM checkpoints bind to the exact container image and kernel state of that template. Upgrading `inc-402` from `sre-agent-v1` -> `sre-agent-v2` replaced the `sre-agent-v1` actor with a fresh `sre-agent-v2` sandbox restored from `sre-agent-v2`'s Golden Snapshot.
+   - **Persisted outside the sandbox**: During this turn, `Runner.Run` streamed every prompt, tool call, and model reply through `sre-gateway/agentengine/sessions:appendEvent` into the **Session Ledger**, and `NewMemoryConsolidationPlugin` called `AddSessionToMemory` to distill `INC-402`'s verified root cause (`MAX_OPEN_CONNS=2`, `IDLE_TIMEOUT_SECONDS=0` in `config/pool.yaml` and the missing `defer rows.Close()` before `rows.ValidateChecksum()` in `pool/store.go`) into **Consolidated Memory**.
 
 4. **Audit the Session Ledger at `0 vCPU` (zero-wake inspection).** Suspend `inc-402` (or wait `15s` for the idle-suspender) and confirm it consumes zero worker slots:
    ```bash
@@ -460,8 +469,27 @@ In Module 03, you decouple operational procedures from the container image by pa
    ```bash
    cloudshell edit app/cmd/agent/main.go
    ```
-   Locate `// WORKSHOP(module-3):` in `app/cmd/agent/main.go`. Replace the `tools := ...` through `llmagent.New(...)` section in `buildRunner` with the code you copy below and save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically add `"google.golang.org/adk/v2/tool/skilltoolset"` to the `import` block while keeping `// WORKSHOP(module-4):` unchanged):
+   Locate `func buildRunner` in `app/cmd/agent/main.go`. Replace the entire `buildRunner` function with the code you copy below and save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically add `"google.golang.org/adk/v2/tool/skilltoolset"` to the `import` block while keeping `// WORKSHOP(module-4):` unchanged):
    ```go
+   func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
+   	llm, err := brokerclient.NewModel(ctx, cfg.BrokerURL, cfg.ModelName, nil)
+   	if err != nil {
+   		return nil, err
+   	}
+
+   	sessionSvc, err := brokerclient.NewSessionService(cfg.BrokerURL, nil)
+   	if err != nil {
+   		return nil, err
+   	}
+   	memorySvc, err := brokerclient.NewMemoryService(cfg.BrokerURL, nil)
+   	if err != nil {
+   		return nil, err
+   	}
+   	memoryPlugin, err := brokerclient.NewMemoryConsolidationPlugin(sessionSvc, memorySvc)
+   	if err != nil {
+   		return nil, err
+   	}
+
    	tools := append([]tool.Tool(nil), workspaceTools...)
    	tools = append(tools, loadmemorytool.New(), preloadmemorytool.New())
 
@@ -491,6 +519,19 @@ In Module 03, you decouple operational procedures from the container image by pa
    		Tools:    tools,
    		Toolsets: toolsets,
    	})
+   	if err != nil {
+   		return nil, err
+   	}
+
+   	return runner.New(runner.Config{
+   		AppName:           agentruntime.AppName,
+   		Agent:             triageAgent,
+   		SessionService:    sessionSvc,
+   		MemoryService:     memorySvc,
+   		PluginConfig:      runner.PluginConfig{Plugins: []*plugin.Plugin{memoryPlugin}},
+   		AutoCreateSession: true,
+   	})
+   }
    ```
    **What this code does:**
    - `brokerclient.NewSkillSource(cfg.BrokerURL, cfg.WorkspaceDir, nil)` queries `sre-gateway/agentregistry/skills` on every turn for the active `defaultRevision`, verifies the `.zip` bundle's `SHA-256` digest in memory, and atomically extracts `SKILL.md` and `scripts/*.sh` into `/workspace/.skills/ledger-pool-triage/`.
@@ -509,7 +550,7 @@ In Module 03, you decouple operational procedures from the container image by pa
    SNAP_BEFORE="$(kubectl ate get actor-template sre-agent-v3 -a "$ATESPACE" -o json | jq -r '.status.goldenSnapshotStatus.goldenTag.name')"
    echo "Golden Snapshot tag: $SNAP_BEFORE"
    ```
-   Dispatch an investigation turn asking `sre-agent-v3` to run `ledger-pool-triage` against `INC-402`:
+   Dispatch an investigation turn asking `sre-agent-v3` to run `ledger-pool-triage` (`v1`) against `INC-402` and extract the `skill_output` lines from `diagnose_pool.sh`:
    ```bash
    curl -s -X POST http://localhost:8081/api/chat \
      -H 'Content-Type: application/json' \
@@ -517,9 +558,30 @@ In Module 03, you decouple operational procedures from the container image by pa
        "incident_id": "INC-402",
        "template": "sre-agent-v3",
        "prompt": "Run the ledger-pool-triage procedural skill against INC-402 and report the SKILL_REVISION findings."
-     }' | jq '{actor_name, template, tool_steps: [(.tool_steps // [])[].name], reply}'
+     }' | jq '{actor_name, template, tool_steps: [(.tool_steps // [])[].name], skill_output: ([(.tool_steps // [])[] | (.result | fromjson? // {}) | select(.command == "sh") | .output | split("\n")[:-1]] | last // (.reply | split("\n")))}'
    ```
-   Observe `load_skill` -> `clone_repo` -> `run_workspace_command` (`sh .skills/ledger-pool-triage/scripts/diagnose_pool.sh`) and `SKILL_REVISION=v1` (`MAX_OPEN_CONNS=2`, `IDLE_TIMEOUT_SECONDS=0`) in the response.
+   Expected output (`SKILL_REVISION=v1` — baseline `config/pool.yaml` check only):
+   ```json
+   {
+     "actor_name": "inc-402",
+     "template": "sre-agent-v3",
+     "tool_steps": [
+       "load_skill",
+       "clone_repo",
+       "run_workspace_command"
+     ],
+     "skill_output": [
+       "SKILL_NAME=ledger-pool-triage",
+       "SKILL_REVISION=v1",
+       "CHECK_SCOPE=pool_config_baseline",
+       "MAX_OPEN_CONNS=2",
+       "IDLE_TIMEOUT_SECONDS=0",
+       "ACQUIRE_TIMEOUT_MS=150",
+       "POOL_CONFIG_STATUS=SATURATION_RISK"
+     ]
+   }
+   ```
+   Notice that `v1` (`CHECK_SCOPE=pool_config_baseline`) only inspects `config/pool.yaml` (`MAX_OPEN_CONNS=2`, `IDLE_TIMEOUT_SECONDS=0`) and does **not** inspect Go source code for unclosed row cursors.
 
 4. **Publish `v2` and hot-reload on the resumed Incident Actor with zero rebuilds.** Without running `make build-agent` or modifying `ActorTemplate/sre-agent-v3`, publish revision `v2` and promote it to `defaultRevision`:
    ```bash
@@ -527,7 +589,7 @@ In Module 03, you decouple operational procedures from the container image by pa
    ```
    Open `http://localhost:8081/catalog` (**Skill & agent catalog** in the **Incident Console**) and click **Inspect revisions** on `ledger-pool-triage`:
    - Both immutable `SHA-256` revision pills (`v1` and `v2`) appear in the **Skill revisions** drawer, with `v2` marked as the active `defaultRevision`.
-   - Now send a follow-up turn to the existing `inc-402` Actor (either in the docked **SRE triage agent** pane on `/` or via `curl`):
+   - Now send a follow-up turn to the existing `inc-402` Actor and compare `skill_output` against Step 3:
    ```bash
    curl -s -X POST http://localhost:8081/api/chat \
      -H 'Content-Type: application/json' \
@@ -535,9 +597,34 @@ In Module 03, you decouple operational procedures from the container image by pa
        "incident_id": "INC-402",
        "template": "sre-agent-v3",
        "prompt": "Re-run the ledger-pool-triage procedural skill on INC-402 and report the updated SKILL_REVISION findings."
-     }' | jq '{actor_name, template, tool_steps: [(.tool_steps // [])[].name], reply}'
+     }' | jq '{actor_name, template, tool_steps: [(.tool_steps // [])[].name], skill_output: ([(.tool_steps // [])[] | (.result | fromjson? // {}) | select(.command == "sh") | .output | split("\n")[:-1]] | last // (.reply | split("\n")))}'
    ```
-   On this turn, the resumed `inc-402` Actor checks `/agentregistry/skills/ledger-pool-triage`, sees `defaultRevision=v2`, verifies `v2`'s `SHA-256` digest, unpacks `/workspace/.skills/ledger-pool-triage@v2/`, and executes `v2`'s `diagnose_pool.sh` inside gVisor, reporting `SKILL_REVISION=v2`, `CURSOR_LEAK_DETECTED=true`, and `pool/store.go:ReconcileTransfer`!
+   Expected output (`SKILL_REVISION=v2` — adds Go cursor-leak detection in `pool/store.go`):
+   ```json
+   {
+     "actor_name": "inc-402",
+     "template": "sre-agent-v3",
+     "tool_steps": [
+       "run_workspace_command"
+     ],
+     "skill_output": [
+       "SKILL_NAME=ledger-pool-triage",
+       "SKILL_REVISION=v2",
+       "CHECK_SCOPE=pool_config_and_cursor_leak",
+       "MAX_OPEN_CONNS=2",
+       "IDLE_TIMEOUT_SECONDS=0",
+       "ACQUIRE_TIMEOUT_MS=150",
+       "POOL_CONFIG_STATUS=SATURATION_RISK",
+       "CURSOR_LEAK_DETECTED=true",
+       "CURSOR_LEAK_LOCATION=pool/store.go:ReconcileTransfer",
+       "CURSOR_LEAK_DETAIL=rows.ValidateChecksum() returns on checksum error before rows.Close() releases the pool slot"
+     ]
+   }
+   ```
+   **What changed in `skill_output` between Step 3 (`v1`) and Step 4 (`v2`):**
+   - `SKILL_REVISION` flipped from `SKILL_REVISION=v1` -> `SKILL_REVISION=v2` and `CHECK_SCOPE` expanded from `pool_config_baseline` -> `pool_config_and_cursor_leak`.
+   - Three new diagnostic lines appear at the bottom of `skill_output`: `CURSOR_LEAK_DETECTED=true`, `CURSOR_LEAK_LOCATION=pool/store.go:ReconcileTransfer`, and `CURSOR_LEAK_DETAIL=rows.ValidateChecksum() returns on checksum error before rows.Close() releases the pool slot`.
+   - All of this happened on the resumed `inc-402` Actor without rebuilding the container image or touching `ActorTemplate/sre-agent-v3`.
 
    Confirm `sre-agent-v3`'s **Golden Snapshot** tag is completely unchanged:
    ```bash
@@ -586,8 +673,27 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
    ```bash
    cloudshell edit app/cmd/agent/main.go
    ```
-   Locate `// WORKSHOP(module-4):` in `app/cmd/agent/main.go`. Replace the `tools := ...` through `toolsets := ...` section in `buildRunner` with the code you copy below and save the file (`Ctrl+S` or `Cmd+S`—or compare against `modules/04-agent-registry-mcp-a2a/solution/main.go`):
+   Locate `func buildRunner` in `app/cmd/agent/main.go`. Replace the entire `buildRunner` function with the code you copy below and save the file (`Ctrl+S` or `Cmd+S`—or compare against `modules/04-agent-registry-mcp-a2a/solution/main.go`):
    ```go
+   func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
+   	llm, err := brokerclient.NewModel(ctx, cfg.BrokerURL, cfg.ModelName, nil)
+   	if err != nil {
+   		return nil, err
+   	}
+
+   	sessionSvc, err := brokerclient.NewSessionService(cfg.BrokerURL, nil)
+   	if err != nil {
+   		return nil, err
+   	}
+   	memorySvc, err := brokerclient.NewMemoryService(cfg.BrokerURL, nil)
+   	if err != nil {
+   		return nil, err
+   	}
+   	memoryPlugin, err := brokerclient.NewMemoryConsolidationPlugin(sessionSvc, memorySvc)
+   	if err != nil {
+   		return nil, err
+   	}
+
    	tools := append([]tool.Tool(nil), workspaceTools...)
    	tools = append(tools, loadmemorytool.New(), preloadmemorytool.New())
 
@@ -626,6 +732,30 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
    		return nil, err
    	}
    	toolsets = append(toolsets, mcpToolsets...)
+
+   	triageAgent, err := llmagent.New(llmagent.Config{
+   		Name:        "sre_triage_agent",
+   		Description: "Platform SRE Triage Agent running inside a keyless Agent Substrate gVisor Incident Actor.",
+   		Model:       llm,
+   		InstructionProvider: func(agent.ReadonlyContext) (string, error) {
+   			return agentruntime.DefaultInstruction, nil
+   		},
+   		Tools:    tools,
+   		Toolsets: toolsets,
+   	})
+   	if err != nil {
+   		return nil, err
+   	}
+
+   	return runner.New(runner.Config{
+   		AppName:           agentruntime.AppName,
+   		Agent:             triageAgent,
+   		SessionService:    sessionSvc,
+   		MemoryService:     memorySvc,
+   		PluginConfig:      runner.PluginConfig{Plugins: []*plugin.Plugin{memoryPlugin}},
+   		AutoCreateSession: true,
+   	})
+   }
    ```
    **What this code does:**
    - `brokerclient.NewRemediationTools(cfg.BrokerURL, cfg.WorkspaceDir, nil)` registers `push_git_branch` (which pushes the verified `/workspace/ledger-api` fix branch over `sre-gateway/ops/git/ledger-api.git`) and `apply_remediation_pr` configured with ADK Go v2's `RequireConfirmation: true` **Remediation Gate** so the actor pauses and suspends to `0 vCPU` in Cloud Storage until a human operator approves.
