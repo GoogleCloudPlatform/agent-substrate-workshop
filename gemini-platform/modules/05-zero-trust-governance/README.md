@@ -22,7 +22,7 @@ Notice that Module 05 requires **zero `cmd/agent` code changes or image rebuilds
 
 ## Steps
 
-1. **Inspect the declarative ingress policy and Model Armor template manifests.** Review [`manifests/ingress-policy.yaml.tmpl`](manifests/ingress-policy.yaml.tmpl) and [`manifests/model-armor-template.json`](manifests/model-armor-template.json):
+1. **Inspect the declarative ingress policy and Model Armor template manifests.** Review `modules/05-zero-trust-governance/manifests/ingress-policy.yaml.tmpl` and `modules/05-zero-trust-governance/manifests/model-armor-template.json`:
    ```bash
    source scripts/env.sh
    scripts/render.sh modules/05-zero-trust-governance/manifests/ingress-policy.yaml.tmpl

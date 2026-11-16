@@ -10,16 +10,16 @@ In Module 03, you decouple operational procedures from the container image by pa
 
 | Step | Component | Security & lifecycle contract |
 |---|---|---|
-| **1. Package & publish (`make publish-skill REV=v1\|v2`)** | [`scripts/publish-skill.sh`](../../scripts/publish-skill.sh) -> **Skill Registry** & `sre-gateway` | Builds a deterministic `ZIP_STORED` archive from `SKILL.md` + `scripts/diagnose_pool.sh`, computes its `SHA-256` digest, publishes the immutable `SkillRevision` (`gcloud alpha agent-registry skills --location=global`), and updates `defaultRevision`. |
+| **1. Package & publish (`make publish-skill REV=v1\|v2`)** | `scripts/publish-skill.sh` -> **Skill Registry** & `sre-gateway` | Builds a deterministic `ZIP_STORED` archive from `SKILL.md` + `scripts/diagnose_pool.sh`, computes its `SHA-256` digest, publishes the immutable `SkillRevision` (`gcloud alpha agent-registry skills --location=global`), and updates `defaultRevision`. |
 | **2. Progressive disclosure (`available_skills` -> `load_skill`)** | ADK Go v2 `skilltoolset.New` + `brokerclient.NewSkillSource` | On each turn, `RegistrySkillSource` queries keyless `http://sre-gateway.${NAMESPACE}.svc.cluster.local:8080/agentregistry/skills` for the active `defaultRevision` and injects the lightweight `available_skills` XML catalog into the model prompt before loading full `SKILL.md` instructions via `load_skill`. |
-| **3. Integrity & archive hardening** | [`app/internal/brokerclient/skills.go`](../../app/internal/brokerclient/skills.go) | When `SKILL@REVISION` is not yet unpacked in `/workspace/.skills/`, the Actor downloads the `.zip` over `sre-gateway`, verifies its `SHA-256` digest in memory before touching disk, enforces zip-slip (`filepath.Clean` + separator prefix), symlink, file-count (`<= 64`), and uncompressed size (`<= 10 MiB`) bounds, and atomically activates `/workspace/.skills/ledger-pool-triage/` (`0755` on `scripts/*.sh`). |
+| **3. Integrity & archive hardening** | `app/internal/brokerclient/skills.go` | When `SKILL@REVISION` is not yet unpacked in `/workspace/.skills/`, the Actor downloads the `.zip` over `sre-gateway`, verifies its `SHA-256` digest in memory before touching disk, enforces zip-slip (`filepath.Clean` + separator prefix), symlink, file-count (`<= 64`), and uncompressed size (`<= 10 MiB`) bounds, and atomically activates `/workspace/.skills/ledger-pool-triage/` (`0755` on `scripts/*.sh`). |
 | **4. Sandboxed execution (`run_workspace_command`)** | gVisor **Incident Actor** (`/workspace/ledger-api`) | Executes `sh .skills/ledger-pool-triage/scripts/diagnose_pool.sh` inside the isolated `/workspace/ledger-api` git checkout with zero ambient cloud credentials. |
 
 ## Steps
 
-1. **Inspect the `v1` and `v2` Procedural Skill bundles and publish `v1`.** Compare the two revisions under [`skills/ledger-pool-triage/`](skills/ledger-pool-triage/):
-   - [`v1/SKILL.md`](skills/ledger-pool-triage/v1/SKILL.md) + [`v1/scripts/diagnose_pool.sh`](skills/ledger-pool-triage/v1/scripts/diagnose_pool.sh): inspects `config/pool.yaml` (`max_open_conns`, `idle_timeout_seconds`, `acquire_timeout_ms`) and outputs baseline saturation diagnostics stamped with `SKILL_REVISION=v1`.
-   - [`v2/SKILL.md`](skills/ledger-pool-triage/v2/SKILL.md) + [`v2/scripts/diagnose_pool.sh`](skills/ledger-pool-triage/v2/scripts/diagnose_pool.sh): inspects **both** `config/pool.yaml` and Go source files (`pool/store.go`) to pinpoint unclosed row cursors (`rows.ValidateChecksum()` returning before `defer rows.Close()` in `ReconcileTransfer`), stamped with `SKILL_REVISION=v2`.
+1. **Inspect the `v1` and `v2` Procedural Skill bundles and publish `v1`.** Compare the two revisions under `modules/03-skill-registry/skills/ledger-pool-triage/`:
+   - `modules/03-skill-registry/skills/ledger-pool-triage/v1/SKILL.md` + `v1/scripts/diagnose_pool.sh`: inspects `config/pool.yaml` (`max_open_conns`, `idle_timeout_seconds`, `acquire_timeout_ms`) and outputs baseline saturation diagnostics stamped with `SKILL_REVISION=v1`.
+   - `modules/03-skill-registry/skills/ledger-pool-triage/v2/SKILL.md` + `v2/scripts/diagnose_pool.sh`: inspects **both** `config/pool.yaml` and Go source files (`pool/store.go`) to pinpoint unclosed row cursors (`rows.ValidateChecksum()` returning before `defer rows.Close()` in `ReconcileTransfer`), stamped with `SKILL_REVISION=v2`.
 
    Publish `v1` as the active `defaultRevision`:
    ```bash
@@ -27,9 +27,11 @@ In Module 03, you decouple operational procedures from the container image by pa
    make publish-skill REV=v1
    ```
 
-2. **Complete `WORKSHOP(module-3)` in `app/cmd/agent/main.go`.** Open [`app/cmd/agent/main.go`](../../app/cmd/agent/main.go) and locate `// WORKSHOP(module-3):`. Construct `brokerclient.NewSkillSource` + `skilltoolset.New` and pass `Toolsets: toolsets` into `llmagent.Config` (compare against [`solution/main.go`](solution/main.go)) while **keeping `// WORKSHOP(module-4):` unchanged**:
-
-   Add `"google.golang.org/adk/v2/tool/skilltoolset"` to your imports:
+2. **Open `app/cmd/agent/main.go` in Cloud Shell Editor and complete `WORKSHOP(module-3)`.** Run the command below in Cloud Shell to open `app/cmd/agent/main.go`:
+   ```bash
+   cloudshell edit app/cmd/agent/main.go
+   ```
+   Locate `// WORKSHOP(module-3):` in `app/cmd/agent/main.go`. First, add `"google.golang.org/adk/v2/tool/skilltoolset"` to the `import (...)` block in `app/cmd/agent/main.go`:
    ```go
    	"google.golang.org/adk/v2/tool"
    	"google.golang.org/adk/v2/tool/loadmemorytool"
@@ -37,11 +39,12 @@ In Module 03, you decouple operational procedures from the container image by pa
    	"google.golang.org/adk/v2/tool/skilltoolset"
    ```
 
-   Wire `skillSource` and `skillsTS` in `buildRunner` (and optionally update the default `ACTOR_TEMPLATE` fallback in `main()` to `"sre-agent-v3"`):
+   Next, replace the `tools := ...` through `llmagent.New(...)` section in `buildRunner` with the code you copy below (and optionally update the default `ACTOR_TEMPLATE` fallback in `main()` to `"sre-agent-v3"`, or compare against `modules/03-skill-registry/solution/main.go`) while **keeping `// WORKSHOP(module-4):` unchanged**:
    ```go
    	tools := append([]tool.Tool(nil), workspaceTools...)
    	tools = append(tools, loadmemorytool.New(), preloadmemorytool.New())
 
+   	// 1. Connect to Skill Registry via sre-gateway and unpack SHA-256-verified skills into /workspace/.skills/.
    	skillSource, err := brokerclient.NewSkillSource(cfg.BrokerURL, cfg.WorkspaceDir, nil)
    	if err != nil {
    		return nil, err
@@ -56,6 +59,7 @@ In Module 03, you decouple operational procedures from the container image by pa
 
    	// WORKSHOP(module-4): Discover MCP toolsets from Agent Registry and enable RequireConfirmation on apply_remediation_pr.
 
+   	// 2. Pass both Tools and Toolsets into llmagent.New.
    	triageAgent, err := llmagent.New(llmagent.Config{
    		Name:        "sre_triage_agent",
    		Description: "Platform SRE Triage Agent running inside a keyless Agent Substrate gVisor Incident Actor.",
@@ -67,8 +71,11 @@ In Module 03, you decouple operational procedures from the container image by pa
    		Toolsets: toolsets,
    	})
    ```
+   **What this code does:**
+   - `brokerclient.NewSkillSource(cfg.BrokerURL, cfg.WorkspaceDir, nil)` queries `sre-gateway/agentregistry/skills` on every turn for the active `defaultRevision`, verifies the `.zip` bundle's `SHA-256` digest in memory, and atomically extracts `SKILL.md` and `scripts/*.sh` into `/workspace/.skills/ledger-pool-triage/`.
+   - `skilltoolset.New(ctx, skilltoolset.Config{Source: skillSource})` registers ADK Go v2's `load_skill` toolset and progressive-disclosure prompt catalog so promoting `v1` -> `v2` in **Skill Registry** takes effect on the very next turn with zero image rebuilds and zero **Golden Snapshot** churn.
 
-3. **Build `sre-agent-v3` once, warm its Golden Snapshot, and run `v1` on `INC-402`.** Build the agent image, create [`manifests/template-v3.yaml.tmpl`](manifests/template-v3.yaml.tmpl), and point `sre-gateway` at `sre-agent-v3`:
+3. **Build `sre-agent-v3` once, warm its Golden Snapshot, and run `v1` on `INC-402`.** Build the agent image, create `modules/03-skill-registry/manifests/template-v3.yaml.tmpl`, and point `sre-gateway` at `sre-agent-v3`:
    ```bash
    make build-agent
    scripts/render.sh modules/03-skill-registry/manifests/template-v3.yaml.tmpl | kubectl ate create actor-template -f -

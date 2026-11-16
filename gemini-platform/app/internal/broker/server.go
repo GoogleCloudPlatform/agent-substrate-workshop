@@ -31,6 +31,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -1522,12 +1523,12 @@ func setConsoleSecurityHeaders(w http.ResponseWriter, noStore bool) {
 func verifyOriginAndCSRF(r *http.Request) error {
 	if origin := strings.TrimSpace(r.Header.Get("Origin")); origin != "" {
 		u, err := url.Parse(origin)
-		if err != nil || u.Host == "" || !strings.EqualFold(u.Host, r.Host) {
+		if err != nil || u.Host == "" || !allowedOriginHost(u.Host, r) {
 			return errors.New("cross-origin state-changing request denied")
 		}
 	}
 	if fetchSite := strings.ToLower(strings.TrimSpace(r.Header.Get("Sec-Fetch-Site"))); fetchSite != "" &&
-		fetchSite != "same-origin" && fetchSite != "none" {
+		fetchSite != "same-origin" && fetchSite != "same-site" && fetchSite != "none" {
 		return errors.New("cross-site state-changing request denied")
 	}
 	if hasBrowserContext(r) {
@@ -1540,6 +1541,43 @@ func verifyOriginAndCSRF(r *http.Request) error {
 	}
 	// TODO(security): Production deployments behind Identity-Aware Proxy (IAP) enforce authenticated OIDC/IAP JWTs on all mutating /api/* endpoints.
 	return nil
+}
+
+func allowedOriginHost(originHost string, r *http.Request) bool {
+	if strings.EqualFold(originHost, r.Host) {
+		return true
+	}
+	for _, xfh := range strings.Split(r.Header.Get("X-Forwarded-Host"), ",") {
+		if xfh = strings.TrimSpace(xfh); xfh != "" && strings.EqualFold(originHost, xfh) {
+			return true
+		}
+	}
+	if isLoopbackHostPort(r.Host) && (isLoopbackHostPort(originHost) || isTrustedDevProxyHost(originHost)) {
+		return true
+	}
+	return false
+}
+
+func isLoopbackHostPort(hostPort string) bool {
+	h := strings.TrimSpace(hostPort)
+	if splitHost, _, err := net.SplitHostPort(h); err == nil {
+		h = splitHost
+	}
+	h = strings.Trim(h, "[]")
+	return strings.EqualFold(h, "localhost") || h == "127.0.0.1" || h == "::1"
+}
+
+func isTrustedDevProxyHost(hostPort string) bool {
+	h := strings.ToLower(strings.TrimSpace(hostPort))
+	if splitHost, _, err := net.SplitHostPort(h); err == nil {
+		h = splitHost
+	}
+	for _, suffix := range []string{".cloudshell.dev", ".cloudworkstations.dev", ".googleusercontent.com", ".github.dev"} {
+		if strings.HasSuffix(h, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 func hasBrowserContext(r *http.Request) bool {
@@ -1560,7 +1598,9 @@ func hasBrowserContext(r *http.Request) bool {
 
 func readCSRFCookieValue(r *http.Request) string {
 	if isHTTPSRequest(r) {
-		return readCookieValue(r, csrfHostCookieName)
+		if v := readCookieValue(r, csrfHostCookieName); v != "" {
+			return v
+		}
 	}
 	if v := readCookieValue(r, csrfCookieName); v != "" {
 		return v

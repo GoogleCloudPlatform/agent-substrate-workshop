@@ -18,9 +18,11 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
 
 ## Steps
 
-1. **Complete `WORKSHOP(module-2)` in `app/cmd/agent/main.go`.** Open [`app/cmd/agent/main.go`](../../app/cmd/agent/main.go) and locate `// WORKSHOP(module-2):`. Replace `session.InMemoryService()` with `brokerclient.NewSessionService`, wire `brokerclient.NewMemoryService` plus `brokerclient.NewMemoryConsolidationPlugin` (which invokes `AddSessionToMemory` after each completed turn), and attach ADK Go v2's `loadmemorytool.New()` and `preloadmemorytool.New()` (compare against [`solution/main.go`](solution/main.go)) while **keeping `// WORKSHOP(module-3):` and `// WORKSHOP(module-4):` unchanged**:
-
-   Update your imports in `app/cmd/agent/main.go` (replacing `"google.golang.org/adk/v2/session"` with `plugin`, `loadmemorytool`, and `preloadmemorytool`):
+1. **Open `app/cmd/agent/main.go` in Cloud Shell Editor and complete `WORKSHOP(module-2)`.** Run the command below in Cloud Shell to open `app/cmd/agent/main.go` in the editor:
+   ```bash
+   cloudshell edit app/cmd/agent/main.go
+   ```
+   Locate `// WORKSHOP(module-2):` in `app/cmd/agent/main.go`. First, replace the ADK imports in `app/cmd/agent/main.go` (replacing `"google.golang.org/adk/v2/session"` with `plugin`, `loadmemorytool`, and `preloadmemorytool`) with the snippet you copy below:
    ```go
    	"google.golang.org/adk/v2/agent"
    	"google.golang.org/adk/v2/agent/llmagent"
@@ -31,7 +33,7 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
    	"google.golang.org/adk/v2/tool/preloadmemorytool"
    ```
 
-   Then update `buildRunner` (and optionally change the default `ACTOR_TEMPLATE` fallback in `main()` to `"sre-agent-v2"`):
+   Next, replace the `buildRunner` function in `app/cmd/agent/main.go` with the code you copy below (and optionally update the default `ACTOR_TEMPLATE` fallback in `main()` to `"sre-agent-v2"`, or compare against `modules/02-sessions-and-memory/solution/main.go`) while **keeping `// WORKSHOP(module-3):` and `// WORKSHOP(module-4):` unchanged**:
    ```go
    func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
    	llm, err := brokerclient.NewModel(ctx, cfg.BrokerURL, cfg.ModelName, nil)
@@ -39,6 +41,7 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
    		return nil, err
    	}
 
+   	// 1. Replace in-memory sessions with Gemini Sessions + Gemini Memory Bank via sre-gateway/agentengine.
    	sessionSvc, err := brokerclient.NewSessionService(cfg.BrokerURL, nil)
    	if err != nil {
    		return nil, err
@@ -52,6 +55,7 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
    		return nil, err
    	}
 
+   	// 2. Attach ADK Go v2's load_memory and preload_memory tools alongside /workspace tools.
    	tools := append([]tool.Tool(nil), workspaceTools...)
    	tools = append(tools, loadmemorytool.New(), preloadmemorytool.New())
    	// WORKSHOP(module-3): Attach SkillToolset backed by RegistrySkillSource so procedural runbooks load without rebuilding the Actor.
@@ -81,8 +85,12 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
    	})
    }
    ```
+   **What this code does:**
+   - `brokerclient.NewSessionService(cfg.BrokerURL, nil)` streams every ADK `session.Event` (user prompts, tool calls, tool responses, and `StateDelta` updates) across the Actor Boundary to `sre-gateway/agentengine/sessions` (**Gemini Sessions**), so operators can inspect turn history at `0 vCPU` while the actor is `SUSPENDED`.
+   - `brokerclient.NewMemoryService(cfg.BrokerURL, nil)` and `brokerclient.NewMemoryConsolidationPlugin(sessionSvc, memorySvc)` automatically call `AddSessionToMemory` after each completed turn, distilling verified root-cause facts into **Gemini Memory Bank**.
+   - `preloadmemorytool.New()` and `loadmemorytool.New()` allow upgraded templates (`sre-agent-v2`) and sibling Incident Actors (`inc-403`) to recall prior `ledger-api` root causes without re-cloning the git repository.
 
-2. **Build `sre-agent-v2`, warm its Golden Snapshot, and roll out the `v2` template on `sre-gateway`.** Inspect [`manifests/template-v2.yaml.tmpl`](manifests/template-v2.yaml.tmpl), build the updated agent image with `ko`, and create `ActorTemplate/sre-agent-v2`:
+2. **Build `sre-agent-v2`, warm its Golden Snapshot, and roll out the `v2` template on `sre-gateway`.** Inspect `modules/02-sessions-and-memory/manifests/template-v2.yaml.tmpl`, build the updated agent image with `ko`, and create `ActorTemplate/sre-agent-v2`:
    ```bash
    source scripts/env.sh
    make build-agent

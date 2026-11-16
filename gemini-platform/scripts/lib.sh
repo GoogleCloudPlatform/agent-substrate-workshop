@@ -69,7 +69,7 @@ load_env() {
   [[ -n "${PROJECT_ID:-}" ]] || die "PROJECT_ID is empty in $f"
   : "${REGION:=us-central1}"
   : "${BUCKET_NAME:=${PROJECT_ID}-ate}"
-  : "${AR_REPO:=workshop}"
+  : "${AR_REPO:=workshop-301}"
   : "${KO_DOCKER_REPO:=${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}}"
   : "${KO_DEFAULTPLATFORMS:=linux/amd64}"
   : "${SUBSTRATE_REF:=v1.0.0}"
@@ -134,7 +134,7 @@ resolve_spiffe_identity() {
     SPIFFE_TRUST_DOMAIN="${PROJECT_ID}.svc.id.goog"
     SPIFFE_IDENTITY_TYPE="workload-identity"
     SPIFFE_INJECT_PODCERTIFICATES="false"
-    SPIFFE_ID_PATTERN="spiffe://${PROJECT_ID}.svc.id.goog/ns/${NAMESPACE}/sa/sre-gateway"
+    SPIFFE_ID_PATTERN=""
     WORKLOAD_PRINCIPAL_PREFIX="principal://iam.googleapis.com/projects/${pnum:-0}/locations/global/workloadIdentityPools/${PROJECT_ID}.svc.id.goog/subject"
   fi
   export AGENT_IDENTITY_MODE SPIFFE_TRUST_DOMAIN SPIFFE_IDENTITY_TYPE
@@ -195,7 +195,11 @@ render() {
   local tmpl="$1"; shift
   local v list=""
   for v in "$@"; do
-    [[ -n "${!v:-}" ]] || die "render $tmpl: \$$v is unset"
+    if [[ "$v" == "SPIFFE_ID_PATTERN" ]]; then
+      [[ -n "${!v+x}" ]] || die "render $tmpl: \$$v is unset"
+    else
+      [[ -n "${!v:-}" ]] || die "render $tmpl: \$$v is unset"
+    fi
     list+="\${$v} "
   done
   envsubst "$list" <"$tmpl"

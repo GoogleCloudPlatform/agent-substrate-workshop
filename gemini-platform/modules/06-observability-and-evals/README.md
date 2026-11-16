@@ -21,7 +21,7 @@ Like Module 05, Module 06 requires **zero `cmd/agent` edits or `ActorTemplate` r
 
 ## Steps
 
-1. **Inspect and apply the Managed Service for Prometheus `PodMonitoring` manifest (`make observe`).** Review [`manifests/podmonitoring.yaml.tmpl`](manifests/podmonitoring.yaml.tmpl) and enable scraping:
+1. **Inspect and apply the Managed Service for Prometheus `PodMonitoring` manifest (`make observe`).** Review `modules/06-observability-and-evals/manifests/podmonitoring.yaml.tmpl` and enable scraping:
    ```bash
    source scripts/env.sh
    scripts/render.sh modules/06-observability-and-evals/manifests/podmonitoring.yaml.tmpl

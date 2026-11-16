@@ -25,13 +25,16 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
    ```
    Open `http://localhost:8081/catalog` (**Skill & agent catalog** in the **Incident Console**) to inspect the **Agent Registry · A2A agents** and **Agent Registry · governed MCP servers** tables alongside your `SHA-256` **Procedural Skills**. Notice how `query_service_error_logs` and `get_deployment_health` carry green `readOnlyHint` pills, while `apply_remediation_pr`, `delete_production_namespace`, and `drop_ledger_database` carry red `destructiveHint` pills.
 
-2. **Complete `WORKSHOP(module-4)` in `app/cmd/agent/main.go`.** Open [`app/cmd/agent/main.go`](../../app/cmd/agent/main.go) and replace the final `// WORKSHOP(module-4):` marker by attaching `brokerclient.NewRemediationTools` (`push_git_branch` + confirmation-gated `apply_remediation_pr`) and `brokerclient.DiscoverMCPToolsets` via `brokerclient.NewAgentRegistryClient` (compare against [`solution/main.go`](solution/main.go)):
-
-   Update the default `ACTOR_TEMPLATE` fallback in `main()` to `"sre-agent-v4"`, then wire remediation tools and Agent Registry MCP toolsets inside `buildRunner`:
+2. **Open `app/cmd/agent/main.go` in Cloud Shell Editor and complete `WORKSHOP(module-4)`.** Run the command below in Cloud Shell to open `app/cmd/agent/main.go`:
+   ```bash
+   cloudshell edit app/cmd/agent/main.go
+   ```
+   Locate `// WORKSHOP(module-4):` in `app/cmd/agent/main.go`. Update the default `ACTOR_TEMPLATE` fallback in `main()` to `"sre-agent-v4"`, and replace the `tools := ...` through `toolsets := ...` section in `buildRunner` with the code you copy below (or compare against `modules/04-agent-registry-mcp-a2a/solution/main.go`):
    ```go
    	tools := append([]tool.Tool(nil), workspaceTools...)
    	tools = append(tools, loadmemorytool.New(), preloadmemorytool.New())
 
+   	// 1. Attach push_git_branch and confirmation-gated apply_remediation_pr (RequireConfirmation: true).
    	remediationTools, err := brokerclient.NewRemediationTools(cfg.BrokerURL, cfg.WorkspaceDir, nil)
    	if err != nil {
    		return nil, err
@@ -50,6 +53,7 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
    	}
    	toolsets := []tool.Toolset{skillsTS}
 
+   	// 2. Dynamically discover governed MCP servers (logging-mcp, container-mcp, ops-hub-mcp) from Agent Registry.
    	regClient, err := brokerclient.NewAgentRegistryClient(
    		ctx,
    		cfg.BrokerURL,
@@ -66,8 +70,11 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
    	}
    	toolsets = append(toolsets, mcpToolsets...)
    ```
+   **What this code does:**
+   - `brokerclient.NewRemediationTools(cfg.BrokerURL, cfg.WorkspaceDir, nil)` registers `push_git_branch` (which pushes the verified `/workspace/ledger-api` fix branch over `sre-gateway/ops/git/ledger-api.git`) and `apply_remediation_pr` configured with ADK Go v2's `RequireConfirmation: true` **Remediation Gate** so the actor pauses and suspends to `0 vCPU` in Cloud Storage until a human operator approves.
+   - `brokerclient.NewAgentRegistryClient(...)` and `brokerclient.DiscoverMCPToolsets(...)` query **Agent Registry** via `sre-gateway` at startup and attach the governed MCP toolsets (`logging-mcp`, `container-mcp`, `ops-hub-mcp`) to the agent without mounting cloud credentials inside the sandbox.
 
-3. **Build `sre-agent-v4` and warm its Golden Snapshot.** Build the final workshop agent image, register [`manifests/template-v4.yaml.tmpl`](manifests/template-v4.yaml.tmpl), and update `sre-gateway` to default new incidents to `sre-agent-v4`:
+3. **Build `sre-agent-v4` and warm its Golden Snapshot.** Build the final workshop agent image, register `modules/04-agent-registry-mcp-a2a/manifests/template-v4.yaml.tmpl`, and update `sre-gateway` to default new incidents to `sre-agent-v4`:
    ```bash
    make build-agent
    scripts/render.sh modules/04-agent-registry-mcp-a2a/manifests/template-v4.yaml.tmpl | kubectl ate create actor-template -f -

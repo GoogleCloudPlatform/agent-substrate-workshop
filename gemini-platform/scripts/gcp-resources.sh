@@ -23,10 +23,12 @@ PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(project
 state_put project-number "$PROJECT_NUMBER"
 
 ORG_ID="$(gcloud projects get-ancestors "$PROJECT_ID" --format=json 2>/dev/null | jq -r '.[] | select(.type=="organization") | .id // empty' | head -n1 || true)"
-if [[ -n "$ORG_ID" ]]; then
+if [[ "${ENABLE_POD_AGENT_IDENTITY:-false}" == "true" && -n "$ORG_ID" ]]; then
   state_put org-id "$ORG_ID"
+else
+  rm -f "$STATE_DIR/org-id"
 fi
-export PROJECT_NUMBER ORG_ID
+export PROJECT_NUMBER
 resolve_spiffe_identity
 
 WI="principal://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${PROJECT_ID}.svc.id.goog/subject"
@@ -105,6 +107,8 @@ AGENT_GATEWAY_MEMBER="${WORKLOAD_PRINCIPAL_PREFIX}/ns/${NAMESPACE}/sa/sre-gatewa
 GATEWAY_MEMBERS=("$WIF_GATEWAY_MEMBER")
 if [[ "$AGENT_GATEWAY_MEMBER" != "$WIF_GATEWAY_MEMBER" ]]; then
   GATEWAY_MEMBERS+=("$AGENT_GATEWAY_MEMBER")
+elif [[ -n "${ORG_ID:-}" ]]; then
+  GATEWAY_MEMBERS+=("principal://agents.global.org-${ORG_ID}.system.id.goog/resources/container/projects/${PROJECT_NUMBER}/locations/${CLUSTER_LOCATION:-${REGION}}/clusters/${CLUSTER_NAME}/ns/${NAMESPACE}/sa/sre-gateway")
 fi
 for gw_member in "${GATEWAY_MEMBERS[@]}"; do
   for role in roles/aiplatform.user roles/modelarmor.user roles/logging.viewer roles/container.viewer roles/cloudtrace.agent roles/monitoring.viewer roles/serviceusage.serviceUsageConsumer; do

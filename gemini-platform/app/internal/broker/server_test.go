@@ -528,6 +528,22 @@ func TestHTTPSHostCSRFCookieBrowserContextAndDesignCompliance(t *testing.T) {
 		t.Fatalf("HTTPS POST /api/chat status = %d, want 200 OK", okHTTPSResp.StatusCode)
 	}
 
+	// 3b. Cloud Shell Web Preview POST /api/chat (Origin: https://8081-cs-...cloudshell.dev forwarded to loopback Host) succeeds with valid CSRF token.
+	csReq, _ := http.NewRequest(http.MethodPost, gwTS.URL+"/api/chat", strings.NewReader(`{"incident_id":"INC-402","prompt":"hello from cloud shell"}`))
+	csReq.Header.Set("Content-Type", "application/json")
+	csReq.Header.Set("Origin", "https://8081-cs-123456-default.cs-us-central1-pkhd.cloudshell.dev")
+	csReq.Header.Set("Sec-Fetch-Site", "same-origin")
+	csReq.Header.Set("X-CSRF-Token", sessDoc.CSRFToken)
+	csReq.AddCookie(hostCookie)
+	csResp, err := http.DefaultClient.Do(csReq)
+	if err != nil {
+		t.Fatalf("Cloud Shell Web Preview POST /api/chat: %v", err)
+	}
+	csResp.Body.Close()
+	if csResp.StatusCode != http.StatusOK {
+		t.Fatalf("Cloud Shell Web Preview POST /api/chat status = %d, want 200 OK", csResp.StatusCode)
+	}
+
 	// 4. Verify DESIGN.md strict sentence-case labels, icon-only #btn-cmdk, and waterfall radius token.
 	rootResp, err := http.Get(gwTS.URL + "/")
 	if err != nil {
