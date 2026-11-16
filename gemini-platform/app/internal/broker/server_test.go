@@ -31,13 +31,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/agentruntime"
-	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/ateclient"
-	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/ateclient/atetest"
-	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/broker"
-	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/brokerclient"
-	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/ledgersvc"
-	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/opshub"
+	"github.com/gke-demos/substrate-agent-platform/app/internal/agentruntime"
+	"github.com/gke-demos/substrate-agent-platform/app/internal/ateclient"
+	"github.com/gke-demos/substrate-agent-platform/app/internal/ateclient/atetest"
+	"github.com/gke-demos/substrate-agent-platform/app/internal/broker"
+	"github.com/gke-demos/substrate-agent-platform/app/internal/brokerclient"
+	"github.com/gke-demos/substrate-agent-platform/app/internal/ledgersvc"
+	"github.com/gke-demos/substrate-agent-platform/app/internal/opshub"
 	ateapipb "go.ate.dev/substrate/api/ateapi/v1"
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/agent/llmagent"
@@ -528,20 +528,29 @@ func TestHTTPSHostCSRFCookieBrowserContextAndDesignCompliance(t *testing.T) {
 		t.Fatalf("HTTPS POST /api/chat status = %d, want 200 OK", okHTTPSResp.StatusCode)
 	}
 
-	// 3b. Cloud Shell Web Preview POST /api/chat (Origin: https://8081-cs-...cloudshell.dev forwarded to loopback Host) succeeds with valid CSRF token.
-	csReq, _ := http.NewRequest(http.MethodPost, gwTS.URL+"/api/chat", strings.NewReader(`{"incident_id":"INC-402","prompt":"hello from cloud shell"}`))
-	csReq.Header.Set("Content-Type", "application/json")
-	csReq.Header.Set("Origin", "https://8081-cs-123456-default.cs-us-central1-pkhd.cloudshell.dev")
-	csReq.Header.Set("Sec-Fetch-Site", "same-origin")
-	csReq.Header.Set("X-CSRF-Token", sessDoc.CSRFToken)
-	csReq.AddCookie(hostCookie)
-	csResp, err := http.DefaultClient.Do(csReq)
-	if err != nil {
-		t.Fatalf("Cloud Shell Web Preview POST /api/chat: %v", err)
-	}
-	csResp.Body.Close()
-	if csResp.StatusCode != http.StatusOK {
-		t.Fatalf("Cloud Shell Web Preview POST /api/chat status = %d, want 200 OK", csResp.StatusCode)
+	// 3b. Cloud Shell Web Preview POST /api/chat (Origin: https://8081-cs-...cloudshell.dev forwarded with non-loopback Host: ...:8081) succeeds with valid CSRF token.
+	for _, hostHdr := range []string{
+		"",
+		"8081-cs-123456-default.cs-us-central1-pkhd.cloudshell.dev:8081",
+		"cs-123456-default.cs-us-central1-pkhd.cloudshell.dev:8081",
+	} {
+		csReq, _ := http.NewRequest(http.MethodPost, gwTS.URL+"/api/chat", strings.NewReader(`{"incident_id":"INC-402","prompt":"hello from cloud shell"}`))
+		if hostHdr != "" {
+			csReq.Host = hostHdr
+		}
+		csReq.Header.Set("Content-Type", "application/json")
+		csReq.Header.Set("Origin", "https://8081-cs-123456-default.cs-us-central1-pkhd.cloudshell.dev")
+		csReq.Header.Set("Sec-Fetch-Site", "same-origin")
+		csReq.Header.Set("X-CSRF-Token", sessDoc.CSRFToken)
+		csReq.AddCookie(hostCookie)
+		csResp, err := http.DefaultClient.Do(csReq)
+		if err != nil {
+			t.Fatalf("Cloud Shell Web Preview POST /api/chat (Host=%q): %v", hostHdr, err)
+		}
+		csResp.Body.Close()
+		if csResp.StatusCode != http.StatusOK {
+			t.Fatalf("Cloud Shell Web Preview POST /api/chat (Host=%q) status = %d, want 200 OK", hostHdr, csResp.StatusCode)
+		}
 	}
 
 	// 4. Verify DESIGN.md strict sentence-case labels, icon-only #btn-cmdk, and waterfall radius token.

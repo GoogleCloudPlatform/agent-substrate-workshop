@@ -151,7 +151,7 @@
     return node;
   }
 
-  async function apiFetch(path, options) {
+  async function apiFetch(path, options, isRetry) {
     const opts = Object.assign({ credentials: "same-origin" }, options || {});
     const headers = Object.assign({}, opts.headers || {});
     if (opts.method === "POST") {
@@ -163,6 +163,16 @@
     opts.headers = headers;
     const resp = await fetch(path, opts);
     const data = await resp.json().catch(() => ({}));
+    if (resp.status === 403 && opts.method === "POST" && !isRetry && path !== "/api/session") {
+      try {
+        const sessResp = await fetch("/api/session", { credentials: "same-origin" });
+        const sessData = await sessResp.json().catch(() => ({}));
+        if (sessData && sessData.csrf_token) {
+          state.csrfToken = sessData.csrf_token;
+          return apiFetch(path, options, true);
+        }
+      } catch (_) {}
+    }
     if (!resp.ok) {
       const err = new Error(data.error || "Request failed with HTTP " + resp.status);
       err.status = resp.status;

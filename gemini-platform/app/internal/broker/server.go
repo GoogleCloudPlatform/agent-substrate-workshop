@@ -40,13 +40,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/agentruntime"
-	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/ateclient"
-	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/evals"
-	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/ledgersvc"
-	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/netutil"
-	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/opshub"
-	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/telemetry"
+	"github.com/gke-demos/substrate-agent-platform/app/internal/agentruntime"
+	"github.com/gke-demos/substrate-agent-platform/app/internal/ateclient"
+	"github.com/gke-demos/substrate-agent-platform/app/internal/evals"
+	"github.com/gke-demos/substrate-agent-platform/app/internal/ledgersvc"
+	"github.com/gke-demos/substrate-agent-platform/app/internal/netutil"
+	"github.com/gke-demos/substrate-agent-platform/app/internal/opshub"
+	"github.com/gke-demos/substrate-agent-platform/app/internal/telemetry"
 	ateapipb "go.ate.dev/substrate/api/ateapi/v1"
 	"google.golang.org/grpc"
 )
@@ -1521,11 +1521,13 @@ func setConsoleSecurityHeaders(w http.ResponseWriter, noStore bool) {
 }
 
 func verifyOriginAndCSRF(r *http.Request) error {
+	var originHost string
 	if origin := strings.TrimSpace(r.Header.Get("Origin")); origin != "" {
 		u, err := url.Parse(origin)
 		if err != nil || u.Host == "" || !allowedOriginHost(u.Host, r) {
 			return errors.New("cross-origin state-changing request denied")
 		}
+		originHost = u.Host
 	}
 	if fetchSite := strings.ToLower(strings.TrimSpace(r.Header.Get("Sec-Fetch-Site"))); fetchSite != "" &&
 		fetchSite != "same-origin" && fetchSite != "same-site" && fetchSite != "none" {
@@ -1534,6 +1536,9 @@ func verifyOriginAndCSRF(r *http.Request) error {
 	if hasBrowserContext(r) {
 		cookieTok := readCSRFCookieValue(r)
 		hdrTok := strings.TrimSpace(r.Header.Get(csrfHeaderName))
+		if cookieTok == "" && isTrustedDevProxyHost(originHost) && isHexToken(hdrTok, 64) {
+			return nil
+		}
 		if len(cookieTok) < 32 || len(hdrTok) != len(cookieTok) || subtle.ConstantTimeCompare([]byte(hdrTok), []byte(cookieTok)) != 1 {
 			return errors.New("missing or invalid CSRF cookie or X-CSRF-Token")
 		}
@@ -1543,35 +1548,49 @@ func verifyOriginAndCSRF(r *http.Request) error {
 	return nil
 }
 
+func isHexToken(s string, wantLen int) bool {
+	if len(s) != wantLen {
+		return false
+	}
+	_, err := hex.DecodeString(s)
+	return err == nil
+}
+
 func allowedOriginHost(originHost string, r *http.Request) bool {
 	if strings.EqualFold(originHost, r.Host) {
 		return true
 	}
+	oh := hostOnly(originHost)
+	if oh != "" && oh == hostOnly(r.Host) {
+		return true
+	}
 	for _, xfh := range strings.Split(r.Header.Get("X-Forwarded-Host"), ",") {
-		if xfh = strings.TrimSpace(xfh); xfh != "" && strings.EqualFold(originHost, xfh) {
+		xfh = strings.TrimSpace(xfh)
+		if xfh != "" && (strings.EqualFold(originHost, xfh) || (oh != "" && oh == hostOnly(xfh))) {
 			return true
 		}
 	}
-	if isLoopbackHostPort(r.Host) && (isLoopbackHostPort(originHost) || isTrustedDevProxyHost(originHost)) {
+	if isLoopbackHostPort(originHost) || isTrustedDevProxyHost(originHost) {
 		return true
 	}
 	return false
 }
 
-func isLoopbackHostPort(hostPort string) bool {
-	h := strings.TrimSpace(hostPort)
-	if splitHost, _, err := net.SplitHostPort(h); err == nil {
-		h = splitHost
-	}
-	h = strings.Trim(h, "[]")
-	return strings.EqualFold(h, "localhost") || h == "127.0.0.1" || h == "::1"
-}
-
-func isTrustedDevProxyHost(hostPort string) bool {
+func hostOnly(hostPort string) string {
 	h := strings.ToLower(strings.TrimSpace(hostPort))
 	if splitHost, _, err := net.SplitHostPort(h); err == nil {
 		h = splitHost
 	}
+	return strings.Trim(h, "[]")
+}
+
+func isLoopbackHostPort(hostPort string) bool {
+	h := hostOnly(hostPort)
+	return h == "localhost" || h == "127.0.0.1" || h == "::1"
+}
+
+func isTrustedDevProxyHost(hostPort string) bool {
+	h := hostOnly(hostPort)
 	for _, suffix := range []string{".cloudshell.dev", ".cloudworkstations.dev", ".googleusercontent.com", ".github.dev"} {
 		if strings.HasSuffix(h, suffix) {
 			return true
