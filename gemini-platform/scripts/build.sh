@@ -69,10 +69,14 @@ sync_agent_imports() {
     /^import \(/ { in_imp=1; print ENVIRON["IMPORT_REPLACEMENT"]; next }
     in_imp && /^\)/ { in_imp=0; next }
     !in_imp { print }
-  ' "$main_go" > "${main_go}.tmp" && mv "${main_go}.tmp" "$main_go"
+  ' "$main_go" > "${main_go}.tmp"
   if command -v gofmt >/dev/null 2>&1; then
-    gofmt -w "$main_go" 2>/dev/null || true
+    gofmt -w "${main_go}.tmp" 2>/dev/null || true
   fi
+  if ! cmp -s "${main_go}.tmp" "$main_go"; then
+    cat "${main_go}.tmp" > "$main_go"
+  fi
+  rm -f "${main_go}.tmp"
 }
 
 if [[ "$target" == "agent" ]]; then
@@ -92,11 +96,11 @@ state_put "$state_key" "$ref"
 if [[ "$state_key" == "gateway-image" ]]; then
   state_put "gateway-image-built" "$ref"
 fi
-if [[ "$target" == "agent" && "${2:-}" == "--check-changed" ]]; then
+if [[ "$target" == "agent" ]]; then
   main_go="$REPO_ROOT/app/cmd/agent/main.go"
   features=""
   for sym in NewModel NewSessionService NewMemoryService NewSkillSource NewRemediationTools DiscoverMCPToolsets; do
-    if grep -q "$sym" "$main_go" 2>/dev/null; then
+    if grep -q "${sym}(" "$main_go" 2>/dev/null; then
       features+="${sym},"
     fi
   done

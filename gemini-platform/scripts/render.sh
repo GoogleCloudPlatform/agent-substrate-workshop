@@ -22,18 +22,32 @@ resolve_spiffe_identity
 tmpl="${1:?usage: render.sh <file.tmpl>}"
 [[ -f "$tmpl" ]] || die "no such template: $tmpl"
 
-if [[ -f "$STATE_DIR/agent-image-features" ]]; then
+req_feature=""
+req_mod=""
+case "${tmpl##*/}" in
+  template-v1.yaml.tmpl) req_feature="NewModel"; req_mod="WORKSHOP(module-1)" ;;
+  template-v2.yaml.tmpl) req_feature="NewMemoryService"; req_mod="WORKSHOP(module-2)" ;;
+  template-v3.yaml.tmpl) req_feature="NewSkillSource"; req_mod="WORKSHOP(module-3)" ;;
+  template-v4.yaml.tmpl) req_feature="DiscoverMCPToolsets"; req_mod="WORKSHOP(module-4)" ;;
+esac
+if [[ -n "$req_feature" ]]; then
   built_features="$(state_get agent-image-features || true)"
-  req_feature=""
-  req_mod=""
-  case "${tmpl##*/}" in
-    template-v1.yaml.tmpl) req_feature="NewModel"; req_mod="WORKSHOP(module-1)" ;;
-    template-v2.yaml.tmpl) req_feature="NewMemoryService"; req_mod="WORKSHOP(module-2)" ;;
-    template-v3.yaml.tmpl) req_feature="NewSkillSource"; req_mod="WORKSHOP(module-3)" ;;
-    template-v4.yaml.tmpl) req_feature="DiscoverMCPToolsets"; req_mod="WORKSHOP(module-4)" ;;
-  esac
-  if [[ -n "$req_feature" && "$built_features" != *"$req_feature"* ]]; then
-    die "${tmpl##*/} requires ${req_feature} (${req_mod}) in app/cmd/agent/main.go, which was missing from your last 'make build-agent'. Save app/cmd/agent/main.go in Cloud Shell Editor (Ctrl+S / Cmd+S), run 'make build-agent', and re-run this command."
+  cur_agent_img="$(state_get agent-image || true)"
+  if [[ -f "$STATE_DIR/agent-image-features" || "$cur_agent_img" == *".pkg.dev/"* ]]; then
+    if [[ "$built_features" != *"${req_feature},"* ]] || ! grep -q "${req_feature}(" "$REPO_ROOT/app/cmd/agent/main.go" 2>/dev/null; then
+      sol_file="${tmpl%/manifests/*}/solution/main.go"
+      if [[ "${RENDER_STRICT_FEATURES:-false}" != "true" && -f "$sol_file" ]]; then
+        if ! grep -q "${req_feature}(" "$REPO_ROOT/app/cmd/agent/main.go" 2>/dev/null; then
+          warn "${tmpl##*/} requires ${req_feature} (${req_mod}); syncing ${sol_file#"$REPO_ROOT"/} to app/cmd/agent/main.go and rebuilding agent image..." >&2
+          cat "$sol_file" > "$REPO_ROOT/app/cmd/agent/main.go"
+        else
+          warn "${tmpl##*/} requires ${req_feature} (${req_mod}); rebuilding agent image from app/cmd/agent/main.go..." >&2
+        fi
+        "$REPO_ROOT/scripts/build.sh" agent >&2
+      else
+        die "${tmpl##*/} requires ${req_feature} (${req_mod}) in app/cmd/agent/main.go, which was missing from your last 'make build-agent'. Save app/cmd/agent/main.go in Cloud Shell Editor (Ctrl+S / Cmd+S), run 'make build-agent', and re-run this command."
+      fi
+    fi
   fi
 fi
 
