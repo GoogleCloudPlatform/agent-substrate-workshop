@@ -162,7 +162,7 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
    **What this output means:**
    - `workspace_cloned: false` and `tool_steps` contains no `clone_repo`: Because you deleted `inc-402` above, its raw Cloud Storage `/workspace` snapshot was destroyed. Yet the fresh `sre-agent-v2` instance recovers both its **Session Ledger** history and its distilled **Consolidated Memory** facts (`MAX_OPEN_CONNS=2`, `IDLE_TIMEOUT_SECONDS=0`, `max_open_conns: 32`, `idle_timeout_seconds: 30`) across the Actor Boundary and answers immediately without cloning `ledger-api.git`!
 
-   Next, dispatch a brand-new sibling Incident Actor for `INC-403` (`inc-403`, either by selecting `INC-403 · ledger-api` in the **Incident Console** dropdown or via `curl`):
+   Next, dispatch a brand-new sibling Incident Actor for `INC-403` (`inc-403`, either by clicking the **Recall memory (INC-403)** preset chip in the **SRE triage agent** pane and pressing **Send**, or via `curl`):
    ```bash
    curl -s -X POST http://localhost:8081/api/chat \
      -H 'Content-Type: application/json' \

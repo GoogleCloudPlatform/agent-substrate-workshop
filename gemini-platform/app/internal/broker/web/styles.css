@@ -904,6 +904,49 @@ body {
   gap: var(--space-100);
 }
 
+.assist-presets-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.assist-presets-label {
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 500;
+  color: var(--cm-sys-color-on-surface-variant);
+}
+
+.assist-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preset-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  height: auto;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--cm-sys-color-outline);
+  background: var(--cm-sys-color-surface);
+  color: var(--cm-sys-color-primary);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  line-height: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.preset-pill-btn:hover {
+  background: var(--cm-sys-color-selection-container);
+  border-color: var(--cm-sys-color-outline-active);
+  color: var(--cm-sys-color-on-selection-container);
+}
+
 .composer-input {
   width: 100%;
   resize: vertical;

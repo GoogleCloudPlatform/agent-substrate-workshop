@@ -131,7 +131,7 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
    while kubectl ate get actor inc-402 -a "$ATESPACE" >/dev/null 2>&1; do sleep 1; done
    ```
 
-4. **Trigger end-to-end remediation on `INC-402` and observe immediate `0 vCPU` suspension.** Send a remediation prompt (either via the preset chip in the **SRE triage agent** pane at `http://localhost:8081/` or via `curl`):
+4. **Trigger end-to-end remediation on `INC-402` and observe immediate `0 vCPU` suspension.** Send a remediation prompt (either click the **Stage & remediate PR** preset chip above the chat input in the **SRE triage agent** pane at `http://localhost:8081/` — or via `⌘K` — and press **Send**, or run via `curl`):
    ```bash
    curl -s -X POST http://localhost:8081/api/chat \
      -H 'Content-Type: application/json' \

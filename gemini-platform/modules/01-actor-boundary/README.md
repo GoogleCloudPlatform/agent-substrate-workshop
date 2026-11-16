@@ -127,7 +127,7 @@ In `ops-hub`, three simulated incidents are pre-seeded for the workshop:
    until kubectl ate get actor-template sre-agent-v1 -a "$ATESPACE" -o json | jq -e '.status.goldenSnapshotStatus.goldenTag.name' >/dev/null; do sleep 2; done
    ```
 
-5. **Dispatch Turn 1 on `INC-402` (via Incident Console or `curl`).** Either click the first starter prompt in the right-docked **SRE triage agent** pane at `http://localhost:8081` (**Investigations** view) and press **Send**, or run:
+5. **Dispatch Turn 1 on `INC-402` (via Incident Console or `curl`).** Either click the **Triage INC-402** preset chip above the chat input in the right-docked **SRE triage agent** pane at `http://localhost:8081` (**Investigations** view, or via `⌘K`) and press **Send**, or run:
    ```bash
    curl -s -X POST http://localhost:8081/api/chat \
      -H 'Content-Type: application/json' \

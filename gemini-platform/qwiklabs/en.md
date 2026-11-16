@@ -228,7 +228,7 @@ In `ops-hub`, three simulated incidents are pre-seeded for the workshop:
    until kubectl ate get actor-template sre-agent-v1 -a "$ATESPACE" -o json | jq -e '.status.goldenSnapshotStatus.goldenTag.name' >/dev/null; do sleep 2; done
    ```
 
-5. **Dispatch Turn 1 on `INC-402` (via Incident Console or `curl`).** Either click the first starter prompt in the right-docked **SRE triage agent** pane at `http://localhost:8081` (**Investigations** view) and press **Send**, or run:
+5. **Dispatch Turn 1 on `INC-402` (via Incident Console or `curl`).** Either click the **Triage INC-402** preset chip above the chat input in the right-docked **SRE triage agent** pane at `http://localhost:8081` (**Investigations** view, or via `⌘K`) and press **Send**, or run:
    ```bash
    curl -s -X POST http://localhost:8081/api/chat \
      -H 'Content-Type: application/json' \
@@ -426,7 +426,7 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
    **What this output means:**
    - `workspace_cloned: false` and `tool_steps` contains no `clone_repo`: Because you deleted `inc-402` above, its raw Cloud Storage `/workspace` snapshot was destroyed. Yet the fresh `sre-agent-v2` instance recovers both its **Session Ledger** history and its distilled **Consolidated Memory** facts (`MAX_OPEN_CONNS=2`, `IDLE_TIMEOUT_SECONDS=0`, `max_open_conns: 32`, `idle_timeout_seconds: 30`) across the Actor Boundary and answers immediately without cloning `ledger-api.git`!
 
-   Next, dispatch a brand-new sibling Incident Actor for `INC-403` (`inc-403`, either by selecting `INC-403 · ledger-api` in the **Incident Console** dropdown or via `curl`):
+   Next, dispatch a brand-new sibling Incident Actor for `INC-403` (`inc-403`, either by clicking the **Recall memory (INC-403)** preset chip in the **SRE triage agent** pane and pressing **Send**, or via `curl`):
    ```bash
    curl -s -X POST http://localhost:8081/api/chat \
      -H 'Content-Type: application/json' \
@@ -787,7 +787,7 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
    while kubectl ate get actor inc-402 -a "$ATESPACE" >/dev/null 2>&1; do sleep 1; done
    ```
 
-4. **Trigger end-to-end remediation on `INC-402` and observe immediate `0 vCPU` suspension.** Send a remediation prompt (either via the preset chip in the **SRE triage agent** pane at `http://localhost:8081/` or via `curl`):
+4. **Trigger end-to-end remediation on `INC-402` and observe immediate `0 vCPU` suspension.** Send a remediation prompt (either click the **Stage & remediate PR** preset chip above the chat input in the **SRE triage agent** pane at `http://localhost:8081/` — or via `⌘K` — and press **Send**, or run via `curl`):
    ```bash
    curl -s -X POST http://localhost:8081/api/chat \
      -H 'Content-Type: application/json' \

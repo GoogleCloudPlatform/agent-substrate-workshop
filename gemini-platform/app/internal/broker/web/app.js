@@ -50,13 +50,35 @@
     ]
   };
 
-  const STARTER_PROMPTS = [
-    "Investigate INC-402 by cloning ledger-api into /workspace, inspecting config/pool.yaml and pool/store.go, and running ledger-verify.",
-    "Run the ledger-pool-triage procedural skill against INC-402 and report the active SKILL_REVISION findings.",
-    "Stage and remediate INC-402 end-to-end: query MCP logs and health, patch config/pool.yaml and pool/store.go on branch fix/inc-402-pool-leak, verify with ledger-verify, push the branch, and apply_remediation_pr.",
-    "Triage sibling incident INC-403 using Consolidated Memory from prior ledger-api incidents.",
-    "Investigate INC-409 and summarize the attached partner webhook diagnostic note."
+  const PROMPT_PRESETS = [
+    {
+      label: "Triage INC-402",
+      incident: "INC-402",
+      prompt: "Investigate INC-402 by cloning ledger-api into /workspace, inspecting config/pool.yaml and pool/store.go, and running ledger-verify."
+    },
+    {
+      label: "Run skill diagnosis",
+      incident: "INC-402",
+      prompt: "Run the ledger-pool-triage procedural skill against INC-402 and report the active SKILL_REVISION findings."
+    },
+    {
+      label: "Stage & remediate PR",
+      incident: "INC-402",
+      prompt: "Stage and remediate INC-402 end-to-end: query MCP logs and health, patch config/pool.yaml and pool/store.go on branch fix/inc-402-pool-leak, verify with ledger-verify, push the branch, and apply_remediation_pr."
+    },
+    {
+      label: "Recall memory (INC-403)",
+      incident: "INC-403",
+      prompt: "Triage sibling incident INC-403 using Consolidated Memory from prior ledger-api incidents."
+    },
+    {
+      label: "Poisoned note (INC-409)",
+      incident: "INC-409",
+      prompt: "Investigate INC-409 and summarize the attached partner webhook diagnostic note."
+    }
   ];
+
+  const STARTER_PROMPTS = PROMPT_PRESETS.map((p) => p.prompt);
 
   const state = {
     csrfToken: "",
@@ -1175,19 +1197,51 @@
     return root;
   }
 
+  async function applyPresetPrompt(preset) {
+    if (preset.incident && preset.incident !== state.selectedIncidentID) {
+      state.selectedIncidentID = preset.incident;
+      const selectEl = document.getElementById("incident-select");
+      if (selectEl) {
+        selectEl.value = preset.incident;
+      }
+      await refreshAll();
+    }
+    const input = document.getElementById("assist-input");
+    if (input) {
+      input.value = preset.prompt;
+      input.focus();
+    }
+  }
+
+  function renderAssistPresets() {
+    const holder = document.getElementById("assist-presets");
+    if (!holder) {
+      return;
+    }
+    const chips = PROMPT_PRESETS.map((preset) => {
+      const btn = el("button", "preset-pill-btn", preset.label);
+      btn.type = "button";
+      btn.title = preset.prompt;
+      btn.addEventListener("click", () => {
+        applyPresetPrompt(preset);
+      });
+      return btn;
+    });
+    holder.replaceChildren(...chips);
+  }
+
   function renderAssistStream() {
+    renderAssistPresets();
     const stream = document.getElementById("assist-stream");
     const turns = state.turnsByIncident[state.selectedIncidentID] || [];
     if (turns.length === 0) {
       const box = el("div", "starter-box");
       box.appendChild(el("p", "secondary-copy", "Select a starter investigation prompt to populate the composer, then click Send to wake Incident Actor " + actorNameForIncident(state.selectedIncidentID) + ":"));
-      for (const promptText of STARTER_PROMPTS) {
-        const chip = el("button", "starter-chip", promptText);
+      for (const preset of PROMPT_PRESETS) {
+        const chip = el("button", "starter-chip", preset.prompt);
         chip.type = "button";
         chip.addEventListener("click", () => {
-          const input = document.getElementById("assist-input");
-          input.value = promptText;
-          input.focus();
+          applyPresetPrompt(preset);
         });
         box.appendChild(chip);
       }
@@ -2250,15 +2304,13 @@
       );
       renderCmdKOAuthRow((state.governance && state.governance.oauth_3lo) || {});
       const presets = document.getElementById("cmdk-presets");
-      presets.replaceChildren(...STARTER_PROMPTS.map((p) => {
-        const btn = el("button", "starter-chip", p);
+      presets.replaceChildren(...PROMPT_PRESETS.map((preset) => {
+        const btn = el("button", "starter-chip", preset.prompt);
         btn.type = "button";
-        btn.addEventListener("click", () => {
+        btn.addEventListener("click", async () => {
           setRoute("/", true);
-          const input = document.getElementById("assist-input");
-          input.value = p;
           openCmdK(false);
-          input.focus();
+          await applyPresetPrompt(preset);
         });
         return btn;
       }));
