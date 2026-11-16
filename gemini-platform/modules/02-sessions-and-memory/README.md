@@ -22,18 +22,7 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
    ```bash
    cloudshell edit app/cmd/agent/main.go
    ```
-   Locate `// WORKSHOP(module-2):` in `app/cmd/agent/main.go`. First, replace the ADK imports in `app/cmd/agent/main.go` (replacing `"google.golang.org/adk/v2/session"` with `plugin`, `loadmemorytool`, and `preloadmemorytool`) with the snippet you copy below:
-   ```go
-   	"google.golang.org/adk/v2/agent"
-   	"google.golang.org/adk/v2/agent/llmagent"
-   	"google.golang.org/adk/v2/plugin"
-   	"google.golang.org/adk/v2/runner"
-   	"google.golang.org/adk/v2/tool"
-   	"google.golang.org/adk/v2/tool/loadmemorytool"
-   	"google.golang.org/adk/v2/tool/preloadmemorytool"
-   ```
-
-   Next, replace the `buildRunner` function in `app/cmd/agent/main.go` with the code you copy below (and optionally update the default `ACTOR_TEMPLATE` fallback in `main()` to `"sre-agent-v2"`, or compare against `modules/02-sessions-and-memory/solution/main.go`) while **keeping `// WORKSHOP(module-3):` and `// WORKSHOP(module-4):` unchanged**:
+   Locate `// WORKSHOP(module-2):` inside `buildRunner` in `app/cmd/agent/main.go`. Replace the `buildRunner` function with the code you copy below and save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically update the Go `import` block for you):
    ```go
    func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
    	llm, err := brokerclient.NewModel(ctx, cfg.BrokerURL, cfg.ModelName, nil)
@@ -103,7 +92,7 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
    make forward-gateway
    ```
 
-3. **Notice how `v1` -> `v2` invalidates raw memory snapshots, then record `INC-402` into the Session Ledger.** In Agent Substrate, an `Actor`'s `actorTemplate` reference is immutable because RAM checkpoints bind to the exact container image and kernel state of that template. When `sre-gateway` dispatches `INC-402` onto `sre-agent-v2`, it replaces the `sre-agent-v1` actor with a fresh `sre-agent-v2` sandbox restored from `sre-agent-v2`'s Golden Snapshot:
+3. **Dispatch an investigation turn on `INC-402` using `sre-agent-v2` to record the Session Ledger.** Run the `curl` command below to send a turn to `inc-402` on template `sre-agent-v2`:
    ```bash
    curl -s -X POST http://localhost:8081/api/chat \
      -H 'Content-Type: application/json' \
@@ -111,11 +100,28 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
        "incident_id": "INC-402",
        "template": "sre-agent-v2",
        "prompt": "Investigate INC-402 by cloning ledger-api into /workspace, inspecting config/pool.yaml and pool/store.go, and running ledger-verify."
-     }' | jq '{actor_name, template, workspace_cloned: .workspace.cloned, tool_steps: [(.tool_steps // [])[].name]}'
+     }' | jq '{actor_name, template, backend, workspace_cloned: .workspace.cloned, tool_steps: [(.tool_steps // [])[].name]}'
    ```
-   During this turn:
-   - `Runner.Run` persists every prompt, tool call (`load_memory`, `clone_repo`, `read_workspace_file`, `run_workspace_command`), and model reply through `sre-gateway/agentengine/sessions:appendEvent`.
-   - When the turn completes, `NewMemoryConsolidationPlugin` calls `AddSessionToMemory`, distilling `INC-402`'s verified root cause (`MAX_OPEN_CONNS=2`, `IDLE_TIMEOUT_SECONDS=0` in `config/pool.yaml` and the missing `defer rows.Close()` before `rows.ValidateChecksum()` in `pool/store.go`) into **Consolidated Memory**.
+   Expected output:
+   ```json
+   {
+     "actor_name": "inc-402",
+     "template": "sre-agent-v2",
+     "backend": "adk-gemini",
+     "workspace_cloned": true,
+     "tool_steps": [
+       "load_memory",
+       "clone_repo",
+       "read_workspace_file",
+       "read_workspace_file",
+       "run_workspace_command"
+     ]
+   }
+   ```
+   **What this output means (and what to notice after running the command):**
+   - `template: "sre-agent-v2"` and `backend: "adk-gemini"`: Confirm that `inc-402` is running the upgraded `sre-agent-v2` ADK Go v2 runner. *(If you ever see `backend: "starter-stub"`, `workspace_cloned: false`, and `tool_steps: []`, `app/cmd/agent/main.go` was not saved before `make build-agent`—save `app/cmd/agent/main.go` in Cloud Shell Editor and re-run Step 2.)*
+   - **Notice why `workspace_cloned` is `true` and `tool_steps` ran `clone_repo` again**: In Agent Substrate, an `Actor`'s `actorTemplate` reference is immutable because RAM checkpoints bind to the exact container image and kernel state of that template. Upgrading `inc-402` from `sre-agent-v1` -> `sre-agent-v2` replaced the `sre-agent-v1` actor with a fresh `sre-agent-v2` sandbox restored from `sre-agent-v2`'s Golden Snapshot, so `/workspace` started empty and the agent cloned `ledger-api.git` again.
+   - **Persisted outside the sandbox**: During this turn, `Runner.Run` streamed every prompt, tool call (`load_memory`, `clone_repo`, `read_workspace_file`, `run_workspace_command`), and model reply through `sre-gateway/agentengine/sessions:appendEvent` into the **Session Ledger**, and `NewMemoryConsolidationPlugin` called `AddSessionToMemory` to distill `INC-402`'s verified root cause (`MAX_OPEN_CONNS=2`, `IDLE_TIMEOUT_SECONDS=0` in `config/pool.yaml` and the missing `defer rows.Close()` before `rows.ValidateChecksum()` in `pool/store.go`) into **Consolidated Memory**.
 
 4. **Audit the Session Ledger at `0 vCPU` (zero-wake inspection).** Suspend `inc-402` (or wait `15s` for the idle-suspender) and confirm it consumes zero worker slots:
    ```bash
@@ -124,9 +130,10 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
    ```
    Now query `inc-402`'s structured turn history through `sre-gateway` and verify the Actor remains `SUSPENDED`:
    ```bash
-   curl -s http://localhost:8081/api/ledger/sessions/inc-402 | jq '{session_id, actor_state, compute_badge, event_count, events: [.events[] | {kind, author, summary}]}'
+   curl -s http://localhost:8081/api/ledger/sessions/inc-402 | jq '{session_id, actor_state, compute_badge, event_count, events: [(.events // [])[] | {kind, author, summary}]}'
    kubectl ate get actor inc-402 -a "$ATESPACE" -o json | jq -r '.status.state'
    ```
+   Notice that `actor_state` is `"SUSPENDED"` (`Suspended · 0 vCPU · <400ms wake`), while `event_count` and `events` return the full ordered log of user prompts, tool calls, and model replies directly from the **Session Ledger** without waking the actor.
    Open `http://localhost:8081/sessions` (**Session ledger & memory** in the left navigation of the **Incident Console**):
    - Click **Inspect events** on `inc-402` to expand each structured prompt, tool call, and tool response while the **Actor compute** badge stays `Suspended · 0 vCPU · < 400ms wake`.
    - Use the **Consolidated memory** search bar at the bottom of `/sessions` (for example, search `MAX_OPEN_CONNS` or `rows.Close`) to test live `SearchMemory` recall.
@@ -141,9 +148,10 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
        "incident_id": "INC-402",
        "template": "sre-agent-v2",
        "prompt": "Summarize the previously verified INC-402 connection pool root cause and tuning values from memory without re-cloning."
-     }' | jq '{actor_name, template, workspace_cloned: .workspace.cloned, reply}'
+     }' | jq '{actor_name, template, workspace_cloned: .workspace.cloned, tool_steps: [(.tool_steps // [])[].name], reply}'
    ```
-   Notice `workspace_cloned` is `false` (the raw snapshot was deleted), yet the fresh `sre-agent-v2` instance recovers both its **Session Ledger** history and its distilled **Consolidated Memory** facts (`MAX_OPEN_CONNS=2`, `IDLE_TIMEOUT_SECONDS=0`, `max_open_conns: 32`, `idle_timeout_seconds: 30`)!
+   **What this output means:**
+   - `workspace_cloned: false` and `tool_steps` contains no `clone_repo`: Because you deleted `inc-402` above, its raw Cloud Storage `/workspace` snapshot was destroyed. Yet the fresh `sre-agent-v2` instance recovers both its **Session Ledger** history and its distilled **Consolidated Memory** facts (`MAX_OPEN_CONNS=2`, `IDLE_TIMEOUT_SECONDS=0`, `max_open_conns: 32`, `idle_timeout_seconds: 30`) across the Actor Boundary and answers immediately without cloning `ledger-api.git`!
 
    Next, dispatch a brand-new sibling Incident Actor for `INC-403` (`inc-403`, either by selecting `INC-403 · ledger-api` in the **Incident Console** dropdown or via `curl`):
    ```bash

@@ -31,15 +31,7 @@ In Module 03, you decouple operational procedures from the container image by pa
    ```bash
    cloudshell edit app/cmd/agent/main.go
    ```
-   Locate `// WORKSHOP(module-3):` in `app/cmd/agent/main.go`. First, add `"google.golang.org/adk/v2/tool/skilltoolset"` to the `import (...)` block in `app/cmd/agent/main.go`:
-   ```go
-   	"google.golang.org/adk/v2/tool"
-   	"google.golang.org/adk/v2/tool/loadmemorytool"
-   	"google.golang.org/adk/v2/tool/preloadmemorytool"
-   	"google.golang.org/adk/v2/tool/skilltoolset"
-   ```
-
-   Next, replace the `tools := ...` through `llmagent.New(...)` section in `buildRunner` with the code you copy below (and optionally update the default `ACTOR_TEMPLATE` fallback in `main()` to `"sre-agent-v3"`, or compare against `modules/03-skill-registry/solution/main.go`) while **keeping `// WORKSHOP(module-4):` unchanged**:
+   Locate `// WORKSHOP(module-3):` in `app/cmd/agent/main.go`. Replace the `tools := ...` through `llmagent.New(...)` section in `buildRunner` with the code you copy below and save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically add `"google.golang.org/adk/v2/tool/skilltoolset"` to the `import` block while keeping `// WORKSHOP(module-4):` unchanged):
    ```go
    	tools := append([]tool.Tool(nil), workspaceTools...)
    	tools = append(tools, loadmemorytool.New(), preloadmemorytool.New())

@@ -19,10 +19,25 @@ source "$(dirname "$0")/lib.sh"
 load_env
 resolve_spiffe_identity
 
-if [[ ! -s "$STATE_DIR/gateway-image" ]]; then
-  "$REPO_ROOT/scripts/build.sh" sre-gateway
+if [[ -z "${GATEWAY_IMAGE:-}" ]]; then
+  if [[ -s "$STATE_DIR/gateway-image-built" ]]; then
+    GATEWAY_IMAGE="$(state_get gateway-image-built)"
+    state_put gateway-image "$GATEWAY_IMAGE"
+    rm -f "$STATE_DIR/gateway-image-built"
+  else
+    live_gw_img="$(kubectl -n "$NAMESPACE" get deploy sre-gateway \
+      -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
+    if [[ -n "$live_gw_img" ]]; then
+      GATEWAY_IMAGE="$live_gw_img"
+      state_put gateway-image "$GATEWAY_IMAGE"
+    else
+      if [[ ! -s "$STATE_DIR/gateway-image" ]]; then
+        "$REPO_ROOT/scripts/build.sh" sre-gateway
+      fi
+      GATEWAY_IMAGE="$(state_get gateway-image)"
+    fi
+  fi
 fi
-GATEWAY_IMAGE="$(state_get gateway-image)"
 export GATEWAY_IMAGE
 
 if [[ -z "${IDLE_AFTER:-}" ]]; then

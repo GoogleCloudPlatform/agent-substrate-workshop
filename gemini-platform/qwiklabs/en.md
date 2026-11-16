@@ -112,7 +112,7 @@ Production SRE agents need two things that appear to conflict:
 1. **Stateful sandbox execution**: Investigating an incident requires cloning source repositories into `/workspace`, inspecting configs and ASTs, running diagnostic scripts, and staging git commits that survive across turns.
 2. **Zero-credential governance**: Multiplexed gVisor sandboxes checkpoint their full memory and `/workspace` filesystem to Cloud Storage (`SNAPSHOT_FIDELITY_MEMORY`). Any bearer token, API key, or OAuth secret fetched inside the sandbox would be written into shared snapshot storage.
 
-**Agent Substrate: Gemini Enterprise Agent Platform** separates those two concerns across the **Actor Boundary**:
+**Agent Substrate 301** separates those two concerns across the **Actor Boundary**:
 
 - **Inside the Actor Boundary (`WorkerPool/sre-workers` + `sre-agent-v1`)**: Each incident (`inc-402`, `inc-403`, `inc-409`) runs in its own isolated `ateworker-gvisor` sandbox listening on port `80` with **zero ambient credentials** (`GOOGLE_APPLICATION_CREDENTIALS`, API keys, and OAuth tokens are never mounted inside the sandbox) and a default-deny `EgressPolicy` allowing outbound HTTP strictly to `sre-gateway.${NAMESPACE}.svc.cluster.local`.
 - **Outside the Actor Boundary (`Deployment/sre-gateway`)**: The always-on **Governed Broker** (`100m` CPU / `128Mi` RAM) serves the Google Cloud Console-modeled **Incident Console**, dials `atenet-router` over mTLS (`podidentity.podcert.ate.dev/identity`), attaches GKE Workload Identity credentials on `/genai/` requests to **Gemini on Agent Platform** (`gemini-3.8-flash`), streams Smart HTTP git clones via `/ops/`, and suspends idle Incident Actors after `15s` (`IDLE_AFTER=15s`).
@@ -154,34 +154,12 @@ In `ops-hub`, three simulated incidents are pre-seeded for the workshop:
    ```
    Notice that `app/.ko.yaml` packages `./cmd/agent` onto `alpine/git:latest` (`< 5s` rebuilds) with `ledger-verify` compiled directly into `/ko-app/agent`, and `app/internal/agentruntime/workspace.go` provides four confined `/workspace` tools (`clone_repo`, `read_workspace_file`, `run_workspace_command`, and `stage_git_patch`).
 
-   In `app/cmd/agent/main.go`, locate the `import (...)` block (lines 22–36) and the starter `buildRunner` function (lines 60–73) containing `// WORKSHOP(module-1):`:
+   In `app/cmd/agent/main.go`, locate the starter `buildRunner` function (lines 60–73) containing `// WORKSHOP(module-1):`:
    ```go
    func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
    	// WORKSHOP(module-1): Wire brokerclient.NewModel, llmagent.New, and runner.New with workspaceTools.
    ```
-   Replace the `import (...)` block and the `buildRunner` function in `app/cmd/agent/main.go` with the code you copy below (keeping `main()`, `listenAddr()`, `envOr()`, `maybeRunLedgerVerify()`, and the three downstream `// WORKSHOP(module-2..4):` comment lines intact, or compare against `modules/01-actor-boundary/solution/main.go`):
-   ```go
-   import (
-   	"context"
-   	"encoding/json"
-   	"fmt"
-   	"log"
-   	"net/http"
-   	"os"
-   	"path/filepath"
-   	"strings"
-
-   	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/agentruntime"
-   	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/brokerclient"
-   	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/ledgerverify"
-   	"google.golang.org/adk/v2/agent"
-   	"google.golang.org/adk/v2/agent/llmagent"
-   	"google.golang.org/adk/v2/runner"
-   	"google.golang.org/adk/v2/session"
-   	"google.golang.org/adk/v2/tool"
-   )
-   ```
-   And replace `buildRunner` with:
+   Replace the `buildRunner` function in `app/cmd/agent/main.go` with the code you copy below and save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically add the required Go `import` packages):
    ```go
    func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
    	// 1. Create a keyless Gemini model client that routes /genai/* requests through sre-gateway.
@@ -296,18 +274,7 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
    ```bash
    cloudshell edit app/cmd/agent/main.go
    ```
-   Locate `// WORKSHOP(module-2):` in `app/cmd/agent/main.go`. First, replace the ADK imports in `app/cmd/agent/main.go` (replacing `"google.golang.org/adk/v2/session"` with `plugin`, `loadmemorytool`, and `preloadmemorytool`) with the snippet you copy below:
-   ```go
-   	"google.golang.org/adk/v2/agent"
-   	"google.golang.org/adk/v2/agent/llmagent"
-   	"google.golang.org/adk/v2/plugin"
-   	"google.golang.org/adk/v2/runner"
-   	"google.golang.org/adk/v2/tool"
-   	"google.golang.org/adk/v2/tool/loadmemorytool"
-   	"google.golang.org/adk/v2/tool/preloadmemorytool"
-   ```
-
-   Next, replace the `buildRunner` function in `app/cmd/agent/main.go` with the code you copy below (and optionally update the default `ACTOR_TEMPLATE` fallback in `main()` to `"sre-agent-v2"`, or compare against `modules/02-sessions-and-memory/solution/main.go`) while **keeping `// WORKSHOP(module-3):` and `// WORKSHOP(module-4):` unchanged**:
+   Locate `// WORKSHOP(module-2):` inside `buildRunner` in `app/cmd/agent/main.go`. Replace the `buildRunner` function with the code you copy below and save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically update the Go `import` block for you):
    ```go
    func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
    	llm, err := brokerclient.NewModel(ctx, cfg.BrokerURL, cfg.ModelName, nil)
@@ -377,7 +344,7 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
    make forward-gateway
    ```
 
-3. **Notice how `v1` -> `v2` invalidates raw memory snapshots, then record `INC-402` into the Session Ledger.** In Agent Substrate, an `Actor`'s `actorTemplate` reference is immutable because RAM checkpoints bind to the exact container image and kernel state of that template. When `sre-gateway` dispatches `INC-402` onto `sre-agent-v2`, it replaces the `sre-agent-v1` actor with a fresh `sre-agent-v2` sandbox restored from `sre-agent-v2`'s Golden Snapshot:
+3. **Dispatch an investigation turn on `INC-402` using `sre-agent-v2` to record the Session Ledger.** Run the `curl` command below to send a turn to `inc-402` on template `sre-agent-v2`:
    ```bash
    curl -s -X POST http://localhost:8081/api/chat \
      -H 'Content-Type: application/json' \
@@ -385,11 +352,28 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
        "incident_id": "INC-402",
        "template": "sre-agent-v2",
        "prompt": "Investigate INC-402 by cloning ledger-api into /workspace, inspecting config/pool.yaml and pool/store.go, and running ledger-verify."
-     }' | jq '{actor_name, template, workspace_cloned: .workspace.cloned, tool_steps: [(.tool_steps // [])[].name]}'
+     }' | jq '{actor_name, template, backend, workspace_cloned: .workspace.cloned, tool_steps: [(.tool_steps // [])[].name]}'
    ```
-   During this turn:
-   - `Runner.Run` persists every prompt, tool call (`load_memory`, `clone_repo`, `read_workspace_file`, `run_workspace_command`), and model reply through `sre-gateway/agentengine/sessions:appendEvent`.
-   - When the turn completes, `NewMemoryConsolidationPlugin` calls `AddSessionToMemory`, distilling `INC-402`'s verified root cause (`MAX_OPEN_CONNS=2`, `IDLE_TIMEOUT_SECONDS=0` in `config/pool.yaml` and the missing `defer rows.Close()` before `rows.ValidateChecksum()` in `pool/store.go`) into **Consolidated Memory**.
+   Expected output:
+   ```json
+   {
+     "actor_name": "inc-402",
+     "template": "sre-agent-v2",
+     "backend": "adk-gemini",
+     "workspace_cloned": true,
+     "tool_steps": [
+       "load_memory",
+       "clone_repo",
+       "read_workspace_file",
+       "read_workspace_file",
+       "run_workspace_command"
+     ]
+   }
+   ```
+   **What this output means (and what to notice after running the command):**
+   - `template: "sre-agent-v2"` and `backend: "adk-gemini"`: Confirm that `inc-402` is running the upgraded `sre-agent-v2` ADK Go v2 runner. *(If you ever see `backend: "starter-stub"`, `workspace_cloned: false`, and `tool_steps: []`, `app/cmd/agent/main.go` was not saved before `make build-agent`—save `app/cmd/agent/main.go` in Cloud Shell Editor and re-run Step 2.)*
+   - **Notice why `workspace_cloned` is `true` and `tool_steps` ran `clone_repo` again**: In Agent Substrate, an `Actor`'s `actorTemplate` reference is immutable because RAM checkpoints bind to the exact container image and kernel state of that template. Upgrading `inc-402` from `sre-agent-v1` -> `sre-agent-v2` replaced the `sre-agent-v1` actor with a fresh `sre-agent-v2` sandbox restored from `sre-agent-v2`'s Golden Snapshot, so `/workspace` started empty and the agent cloned `ledger-api.git` again.
+   - **Persisted outside the sandbox**: During this turn, `Runner.Run` streamed every prompt, tool call (`load_memory`, `clone_repo`, `read_workspace_file`, `run_workspace_command`), and model reply through `sre-gateway/agentengine/sessions:appendEvent` into the **Session Ledger**, and `NewMemoryConsolidationPlugin` called `AddSessionToMemory` to distill `INC-402`'s verified root cause (`MAX_OPEN_CONNS=2`, `IDLE_TIMEOUT_SECONDS=0` in `config/pool.yaml` and the missing `defer rows.Close()` before `rows.ValidateChecksum()` in `pool/store.go`) into **Consolidated Memory**.
 
 4. **Audit the Session Ledger at `0 vCPU` (zero-wake inspection).** Suspend `inc-402` (or wait `15s` for the idle-suspender) and confirm it consumes zero worker slots:
    ```bash
@@ -398,9 +382,10 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
    ```
    Now query `inc-402`'s structured turn history through `sre-gateway` and verify the Actor remains `SUSPENDED`:
    ```bash
-   curl -s http://localhost:8081/api/ledger/sessions/inc-402 | jq '{session_id, actor_state, compute_badge, event_count, events: [.events[] | {kind, author, summary}]}'
+   curl -s http://localhost:8081/api/ledger/sessions/inc-402 | jq '{session_id, actor_state, compute_badge, event_count, events: [(.events // [])[] | {kind, author, summary}]}'
    kubectl ate get actor inc-402 -a "$ATESPACE" -o json | jq -r '.status.state'
    ```
+   Notice that `actor_state` is `"SUSPENDED"` (`Suspended · 0 vCPU · <400ms wake`), while `event_count` and `events` return the full ordered log of user prompts, tool calls, and model replies directly from the **Session Ledger** without waking the actor.
    Open `http://localhost:8081/sessions` (**Session ledger & memory** in the left navigation of the **Incident Console**):
    - Click **Inspect events** on `inc-402` to expand each structured prompt, tool call, and tool response while the **Actor compute** badge stays `Suspended · 0 vCPU · < 400ms wake`.
    - Use the **Consolidated memory** search bar at the bottom of `/sessions` (for example, search `MAX_OPEN_CONNS` or `rows.Close`) to test live `SearchMemory` recall.
@@ -415,9 +400,10 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
        "incident_id": "INC-402",
        "template": "sre-agent-v2",
        "prompt": "Summarize the previously verified INC-402 connection pool root cause and tuning values from memory without re-cloning."
-     }' | jq '{actor_name, template, workspace_cloned: .workspace.cloned, reply}'
+     }' | jq '{actor_name, template, workspace_cloned: .workspace.cloned, tool_steps: [(.tool_steps // [])[].name], reply}'
    ```
-   Notice `workspace_cloned` is `false` (the raw snapshot was deleted), yet the fresh `sre-agent-v2` instance recovers both its **Session Ledger** history and its distilled **Consolidated Memory** facts (`MAX_OPEN_CONNS=2`, `IDLE_TIMEOUT_SECONDS=0`, `max_open_conns: 32`, `idle_timeout_seconds: 30`)!
+   **What this output means:**
+   - `workspace_cloned: false` and `tool_steps` contains no `clone_repo`: Because you deleted `inc-402` above, its raw Cloud Storage `/workspace` snapshot was destroyed. Yet the fresh `sre-agent-v2` instance recovers both its **Session Ledger** history and its distilled **Consolidated Memory** facts (`MAX_OPEN_CONNS=2`, `IDLE_TIMEOUT_SECONDS=0`, `max_open_conns: 32`, `idle_timeout_seconds: 30`) across the Actor Boundary and answers immediately without cloning `ledger-api.git`!
 
    Next, dispatch a brand-new sibling Incident Actor for `INC-403` (`inc-403`, either by selecting `INC-403 · ledger-api` in the **Incident Console** dropdown or via `curl`):
    ```bash
@@ -474,15 +460,7 @@ In Module 03, you decouple operational procedures from the container image by pa
    ```bash
    cloudshell edit app/cmd/agent/main.go
    ```
-   Locate `// WORKSHOP(module-3):` in `app/cmd/agent/main.go`. First, add `"google.golang.org/adk/v2/tool/skilltoolset"` to the `import (...)` block in `app/cmd/agent/main.go`:
-   ```go
-   	"google.golang.org/adk/v2/tool"
-   	"google.golang.org/adk/v2/tool/loadmemorytool"
-   	"google.golang.org/adk/v2/tool/preloadmemorytool"
-   	"google.golang.org/adk/v2/tool/skilltoolset"
-   ```
-
-   Next, replace the `tools := ...` through `llmagent.New(...)` section in `buildRunner` with the code you copy below (and optionally update the default `ACTOR_TEMPLATE` fallback in `main()` to `"sre-agent-v3"`, or compare against `modules/03-skill-registry/solution/main.go`) while **keeping `// WORKSHOP(module-4):` unchanged**:
+   Locate `// WORKSHOP(module-3):` in `app/cmd/agent/main.go`. Replace the `tools := ...` through `llmagent.New(...)` section in `buildRunner` with the code you copy below and save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically add `"google.golang.org/adk/v2/tool/skilltoolset"` to the `import` block while keeping `// WORKSHOP(module-4):` unchanged):
    ```go
    	tools := append([]tool.Tool(nil), workspaceTools...)
    	tools = append(tools, loadmemorytool.New(), preloadmemorytool.New())
@@ -608,7 +586,7 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
    ```bash
    cloudshell edit app/cmd/agent/main.go
    ```
-   Locate `// WORKSHOP(module-4):` in `app/cmd/agent/main.go`. Update the default `ACTOR_TEMPLATE` fallback in `main()` to `"sre-agent-v4"`, and replace the `tools := ...` through `toolsets := ...` section in `buildRunner` with the code you copy below (or compare against `modules/04-agent-registry-mcp-a2a/solution/main.go`):
+   Locate `// WORKSHOP(module-4):` in `app/cmd/agent/main.go`. Replace the `tools := ...` through `toolsets := ...` section in `buildRunner` with the code you copy below and save the file (`Ctrl+S` or `Cmd+S`—or compare against `modules/04-agent-registry-mcp-a2a/solution/main.go`):
    ```go
    	tools := append([]tool.Tool(nil), workspaceTools...)
    	tools = append(tools, loadmemorytool.New(), preloadmemorytool.New())
@@ -945,3 +923,4 @@ Verify Module 07 manifests and teardown readiness before cleaning up your enviro
 ```bash
 make verify MODULE=7
 ```
+

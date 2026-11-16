@@ -70,4 +70,31 @@ for sol in "${solutions[@]}"; do
   fi
 done
 
+# Verify that replacing only buildRunner (without manually editing imports) compiles
+# across Modules 01-04 when scripts/build.sh sync_agent_imports runs.
+sync_fn="$(sed -n '/^sync_agent_imports()/,/^}/p' "$ROOT/scripts/build.sh")"
+for sol in "${solutions[@]}"; do
+  rm -rf "$TMP/app" && cp -R "$ROOT/app" "$TMP/app"
+  awk '
+    /^func buildRunner\(/ { exit }
+    { print }
+  ' "$ROOT/app/cmd/agent/main.go" > "$TMP/app/cmd/agent/main.go.new"
+  awk '
+    /^func buildRunner\(/ { flag=1 }
+    flag { print }
+  ' "$sol" >> "$TMP/app/cmd/agent/main.go.new"
+  mv "$TMP/app/cmd/agent/main.go.new" "$TMP/app/cmd/agent/main.go"
+  (
+    REPO_ROOT="$TMP"
+    eval "$sync_fn"
+    sync_agent_imports
+  )
+  if (cd "$TMP/app" && go build -o /dev/null ./cmd/agent); then
+    echo "ok   ${sol#"$ROOT"/} compiles with auto-synced imports (body-only edit)"
+  else
+    echo "FAIL ${sol#"$ROOT"/} failed to compile with auto-synced imports"
+    fails=$((fails + 1))
+  fi
+done
+
 exit "$fails"

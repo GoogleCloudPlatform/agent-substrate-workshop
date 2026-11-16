@@ -11,7 +11,7 @@ Production SRE agents need two things that appear to conflict:
 1. **Stateful sandbox execution**: Investigating an incident requires cloning source repositories into `/workspace`, inspecting configs and ASTs, running diagnostic scripts, and staging git commits that survive across turns.
 2. **Zero-credential governance**: Multiplexed gVisor sandboxes checkpoint their full memory and `/workspace` filesystem to Cloud Storage (`SNAPSHOT_FIDELITY_MEMORY`). Any bearer token, API key, or OAuth secret fetched inside the sandbox would be written into shared snapshot storage.
 
-**Agent Substrate: Gemini Enterprise Agent Platform** separates those two concerns across the **Actor Boundary**:
+**Agent Substrate 301** separates those two concerns across the **Actor Boundary**:
 
 - **Inside the Actor Boundary (`WorkerPool/sre-workers` + `sre-agent-v1`)**: Each incident (`inc-402`, `inc-403`, `inc-409`) runs in its own isolated `ateworker-gvisor` sandbox listening on port `80` with **zero ambient credentials** (`GOOGLE_APPLICATION_CREDENTIALS`, API keys, and OAuth tokens are never mounted inside the sandbox) and a default-deny `EgressPolicy` allowing outbound HTTP strictly to `sre-gateway.${NAMESPACE}.svc.cluster.local`.
 - **Outside the Actor Boundary (`Deployment/sre-gateway`)**: The always-on **Governed Broker** (`100m` CPU / `128Mi` RAM) serves the Google Cloud Console-modeled **Incident Console**, dials `atenet-router` over mTLS (`podidentity.podcert.ate.dev/identity`), attaches GKE Workload Identity credentials on `/genai/` requests to **Gemini on Agent Platform** (`gemini-3.8-flash`), streams Smart HTTP git clones via `/ops/`, and suspends idle Incident Actors after `15s` (`IDLE_AFTER=15s`).
@@ -53,34 +53,12 @@ In `ops-hub`, three simulated incidents are pre-seeded for the workshop:
    ```
    Notice that `app/.ko.yaml` packages `./cmd/agent` onto `alpine/git:latest` (`< 5s` rebuilds) with `ledger-verify` compiled directly into `/ko-app/agent`, and `app/internal/agentruntime/workspace.go` provides four confined `/workspace` tools (`clone_repo`, `read_workspace_file`, `run_workspace_command`, and `stage_git_patch`).
 
-   In `app/cmd/agent/main.go`, locate the `import (...)` block (lines 22–36) and the starter `buildRunner` function (lines 60–73) containing `// WORKSHOP(module-1):`:
+   In `app/cmd/agent/main.go`, locate the starter `buildRunner` function (lines 60–73) containing `// WORKSHOP(module-1):`:
    ```go
    func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
    	// WORKSHOP(module-1): Wire brokerclient.NewModel, llmagent.New, and runner.New with workspaceTools.
    ```
-   Replace the `import (...)` block and the `buildRunner` function in `app/cmd/agent/main.go` with the code you copy below (keeping `main()`, `listenAddr()`, `envOr()`, `maybeRunLedgerVerify()`, and the three downstream `// WORKSHOP(module-2..4):` comment lines intact, or compare against `modules/01-actor-boundary/solution/main.go`):
-   ```go
-   import (
-   	"context"
-   	"encoding/json"
-   	"fmt"
-   	"log"
-   	"net/http"
-   	"os"
-   	"path/filepath"
-   	"strings"
-
-   	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/agentruntime"
-   	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/brokerclient"
-   	"github.com/GoogleCloudPlatform/agent-substrate-workshop/gemini-platform/app/internal/ledgerverify"
-   	"google.golang.org/adk/v2/agent"
-   	"google.golang.org/adk/v2/agent/llmagent"
-   	"google.golang.org/adk/v2/runner"
-   	"google.golang.org/adk/v2/session"
-   	"google.golang.org/adk/v2/tool"
-   )
-   ```
-   And replace `buildRunner` with:
+   Replace the `buildRunner` function in `app/cmd/agent/main.go` with the code you copy below and save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically add the required Go `import` packages):
    ```go
    func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
    	// 1. Create a keyless Gemini model client that routes /genai/* requests through sre-gateway.

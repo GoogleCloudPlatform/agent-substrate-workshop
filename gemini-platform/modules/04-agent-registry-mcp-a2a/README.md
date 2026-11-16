@@ -29,7 +29,7 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
    ```bash
    cloudshell edit app/cmd/agent/main.go
    ```
-   Locate `// WORKSHOP(module-4):` in `app/cmd/agent/main.go`. Update the default `ACTOR_TEMPLATE` fallback in `main()` to `"sre-agent-v4"`, and replace the `tools := ...` through `toolsets := ...` section in `buildRunner` with the code you copy below (or compare against `modules/04-agent-registry-mcp-a2a/solution/main.go`):
+   Locate `// WORKSHOP(module-4):` in `app/cmd/agent/main.go`. Replace the `tools := ...` through `toolsets := ...` section in `buildRunner` with the code you copy below and save the file (`Ctrl+S` or `Cmd+S`—or compare against `modules/04-agent-registry-mcp-a2a/solution/main.go`):
    ```go
    	tools := append([]tool.Tool(nil), workspaceTools...)
    	tools = append(tools, loadmemorytool.New(), preloadmemorytool.New())
