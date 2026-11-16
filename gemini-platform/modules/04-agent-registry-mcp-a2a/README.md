@@ -176,6 +176,9 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
        }
      }' | jq '{id: .result.id, state: .result.status.state, reply: .result.parts[0].text}'
    ```
+   **What this does and why it matters:**
+   - **Standard peer-agent discovery and interoperability (`/.well-known/agent-card.json` + `/a2a`)**: Any external orchestrator or peer agent (in **Agent Registry**, **Gemini Enterprise**, or another team's service) discovers the **Platform SRE Triage Agent** via its standard **A2A Agent Card** and invokes `message/send` over JSON-RPC 2.0—without needing `kubectl-ate` or any Agent Substrate SDK.
+   - **Transparent `< 400ms` wake from `0 vCPU` across the Actor Boundary**: Behind `POST /a2a`, `sre-gateway` maps `"contextId": "inc-403"` to the `inc-403` **Incident Actor**, wakes its gVisor sandbox from Cloud Storage (`0 vCPU` -> active), recalls **Consolidated Memory** from `INC-402` across the **Actor Boundary**, and returns a standard A2A `"state": "completed"` task response.
 
 ## Checkpoint
 

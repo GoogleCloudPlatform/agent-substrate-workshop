@@ -62,7 +62,9 @@ Notice that Module 05 requires **zero `cmd/agent` code changes or image rebuilds
      -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"drop_ledger_database","arguments":{"confirm":true}}}'
    ```
 
-5. **Complete 3LO OAuth + S256 PKCE authorization and dual-attributed remediation.** Stage a remediation on `INC-402` and test the 3LO gate:
+5. **Complete 3LO OAuth + S256 PKCE authorization and dual-attributed remediation.** In Module 04 (before `REQUIRE_3LO_FOR_REMEDIATION=true` was enabled), calling `POST /api/incidents/INC-402/remediation/approve` immediately woke `inc-402` and merged the pull request without verifying human operator identity. Now that `make governance` enabled 3-legged OAuth (3LO) enforcement on both `sre-gateway` and `ops-hub`, `sre-gateway` requires a short-lived human operator OAuth 2.0 access token in its in-memory vault before it will wake `inc-402` to merge a pull request.
+
+   First, stage a remediation on `INC-402` so `inc-402` pauses at the **Remediation Gate** (`"remediation_gate_pending": true`, suspended at `0 vCPU` in Cloud Storage):
    ```bash
    curl -s -X POST http://localhost:8081/api/chat \
      -H 'Content-Type: application/json' \
@@ -72,16 +74,27 @@ Notice that Module 05 requires **zero `cmd/agent` code changes or image rebuilds
        "prompt": "Stage and remediate INC-402 end-to-end: query MCP logs and health, patch config/pool.yaml and pool/store.go on branch fix/inc-402-pool-leak, verify with ledger-verify, push the branch, and apply_remediation_pr."
      }' | jq '{actor_name, remediation_gate_pending, call_id}'
    ```
-   Try approving **before** authorizing 3LO:
+   Next, try approving the remediation **before** completing 3LO OAuth authorization:
    ```bash
    curl -i -s -X POST http://localhost:8081/api/incidents/INC-402/remediation/approve \
      -H 'Content-Type: application/json' -d '{}'
    ```
-   `sre-gateway` returns `HTTP 401 Unauthorized` with `{"consent_required": true, "auth_url": "..."}` while keeping `inc-402` suspended at `0 vCPU` in Cloud Storage. Now authorize and approve:
-   - **In the Incident Console (`http://localhost:8081/`)**: click **Authorize 3LO** in the yellow **Remediation gate** banner (or press `⌘K` -> **Authorize 3LO**), click **Approve access** on the Operations Hub OAuth consent page, then click **Approve remediation**.
-   - **Or from a headless terminal**: run `source scripts/lib.sh && load_env && complete_3lo_pkce_grant http://localhost:8081`, then re-run the `POST /api/incidents/INC-402/remediation/approve` `curl` above.
+   Because you have not granted a 3LO operator token yet, `sre-gateway` rejects the approval with `HTTP/1.1 401 Unauthorized` (`{"consent_required": true, "auth_url": "..."}`) and keeps `inc-402` suspended at `0 vCPU`.
 
-   Inspect the merged pull request on `ops-hub` to verify dual **human operator + Pod Agent Identity** attribution:
+   Now complete the 3LO OAuth 2.0 + S256 PKCE grant and approve the remediation using **either** the browser UI **or** the terminal (both perform the exact same OAuth 2.0 + S256 PKCE flow and store the short-lived token in `sre-gateway`'s in-memory vault):
+   - **Option A — In the Incident Console UI (`http://localhost:8081/`)**:
+     1. Select `INC-402` and click **Authorize 3LO** in the yellow **Remediation gate** banner (or press `⌘K` -> **Authorize 3LO**).
+     2. Click **Approve access** on the Operations Hub OAuth 2.0 consent page to complete the S256 PKCE callback into `sre-gateway`.
+     3. Click **Approve remediation** in the banner to wake `inc-402` (`< 400ms`) and merge the pull request.
+   - **Option B — From the terminal (equivalent to clicking Authorize 3LO + Approve remediation in the UI)**:
+     ```bash
+     source scripts/env.sh
+     complete_3lo_pkce_grant http://localhost:8081
+     curl -s -X POST http://localhost:8081/api/incidents/INC-402/remediation/approve \
+       -H 'Content-Type: application/json' -d '{}' | jq '{actor_name, remediation_gate_pending, resume_duration_ms, reply}'
+     ```
+
+   Inspect the merged pull request on `ops-hub` to verify dual **human operator (`operator_sub`) + Pod Agent Identity (`agent_identity`)** attribution:
    ```bash
    curl -s http://localhost:8081/ops/api/pulls | jq '.[-1] | {id, status, operator_sub, agent_identity, agentic_delegation}'
    ```

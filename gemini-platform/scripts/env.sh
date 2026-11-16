@@ -26,6 +26,9 @@ if _workshop_env="$(bash scripts/print-env.sh)"; then
     *) export PATH="$REPO_ROOT/bin:$PATH" ;;
   esac
   export WORKSHOP_USER_PATH="$PATH"
+  complete_3lo_pkce_grant() {
+    bash -c 'source "$1/scripts/lib.sh" && load_env && complete_3lo_pkce_grant "${@:2}"' _ "$REPO_ROOT" "$@"
+  }
 else
   unset _workshop_env
   return 1
