@@ -96,6 +96,7 @@
     activeHopIndex: 0,
     hopTimer: null,
     turnsByIncident: {},
+    clearedIncidentChats: {},
     pendingConfirmationByIncident: {},
     busy: false
   };
@@ -346,6 +347,24 @@
 
     const actorName = actorNameForIncident(state.selectedIncidentID);
     state.workspace = await apiFetch("/api/actors/" + encodeURIComponent(actorName) + "/workspace").catch(() => null);
+
+    const existingTurns = state.turnsByIncident[state.selectedIncidentID] || [];
+    if (existingTurns.length === 0 && !state.clearedIncidentChats[state.selectedIncidentID]) {
+      let incLedgerDetail = null;
+      if (state.selectedLedgerDetail && state.selectedLedgerDetail.session_id === actorName) {
+        incLedgerDetail = state.selectedLedgerDetail;
+      } else if ((state.ledgerSessions || []).some((s) => s.session_id === actorName)) {
+        incLedgerDetail = await apiFetch("/api/ledger/sessions/" + encodeURIComponent(actorName)).catch(() => null);
+      }
+      if (incLedgerDetail && Array.isArray(incLedgerDetail.events) && incLedgerDetail.events.length > 0) {
+        const incObj = (state.incidents || []).find((i) => i.id === state.selectedIncidentID);
+        const fallbackTmpl = (incObj && incObj.template) || incLedgerDetail.template || "sre-agent-v1";
+        const hydrated = hydrateTurnsFromLedgerDetail(state.selectedIncidentID, incLedgerDetail, fallbackTmpl);
+        if (hydrated.length > 0) {
+          state.turnsByIncident[state.selectedIncidentID] = hydrated;
+        }
+      }
+    }
 
     renderIncidentSelect();
     renderOverview();
@@ -918,10 +937,242 @@
     det.className = "tool-step-details";
     const sum = document.createElement("summary");
     sum.className = "tool-step-summary";
-    sum.textContent = st.name + " (" + (st.duration_ms || 0) + " ms)";
+    sum.textContent = st.name + (st.duration_ms ? " (" + st.duration_ms + " ms)" : "");
     const pre = el("pre", "code-block", "args: " + (st.args || "{}") + "\n\nresult: " + (st.result || ""));
     det.append(sum, pre);
     return det;
+  }
+
+  function hydrateTurnsFromLedgerDetail(incID, detail, fallbackTemplate) {
+    const events = Array.isArray(detail && detail.events) ? detail.events : [];
+    const out = [];
+    let pendingTools = [];
+    const callById = {};
+
+    for (const ev of events) {
+      if (!ev) {
+        continue;
+      }
+      const isUser = ev.kind === "prompt" || String(ev.author || "").toLowerCase() === "user";
+      if (isUser && ev.text) {
+        out.push({
+          role: "user",
+          text: ev.text,
+          metaRight: incID
+        });
+        continue;
+      }
+
+      for (const tc of ev.tool_calls || []) {
+        if (!tc || !tc.name) {
+          continue;
+        }
+        const stepObj = {
+          name: tc.name,
+          duration_ms: 0,
+          args: tc.payload || "{}",
+          result: ""
+        };
+        pendingTools.push(stepObj);
+        if (tc.id) {
+          callById[tc.id] = stepObj;
+        }
+      }
+
+      for (const tr of ev.tool_responses || []) {
+        if (!tr || !tr.name) {
+          continue;
+        }
+        const matched = (tr.id && callById[tr.id]) ||
+          pendingTools.find((s) => s.name === tr.name && !s.result);
+        if (matched) {
+          matched.result = tr.payload || "";
+        } else {
+          pendingTools.push({
+            name: tr.name,
+            duration_ms: 0,
+            args: "{}",
+            result: tr.payload || ""
+          });
+        }
+      }
+
+      if (!isUser && ev.text && String(ev.text).trim() !== "") {
+        out.push({
+          role: "model",
+          text: ev.text,
+          template: fallbackTemplate || detail.template || "sre-agent-v1",
+          metaRight: ev.timestamp || "Session Ledger",
+          toolSteps: pendingTools
+        });
+        pendingTools = [];
+      }
+    }
+
+    if (pendingTools.length > 0 && out.length > 0) {
+      const last = out[out.length - 1];
+      if (last.role === "model") {
+        last.toolSteps = (last.toolSteps || []).concat(pendingTools);
+      } else {
+        out.push({
+          role: "model",
+          text: "Executed " + pendingTools.length + " tool step(s) in session " + (detail.session_id || incID) + ".",
+          template: fallbackTemplate || detail.template || "sre-agent-v1",
+          metaRight: "Session Ledger",
+          toolSteps: pendingTools
+        });
+      }
+    }
+    return out;
+  }
+
+  function appendCodeTokens(parent, rawText) {
+    const str = String(rawText || "");
+    const codeRe = /`([^`]+)`/g;
+    let lastIdx = 0;
+    let m;
+    while ((m = codeRe.exec(str)) !== null) {
+      if (m.index > lastIdx) {
+        parent.appendChild(document.createTextNode(str.slice(lastIdx, m.index)));
+      }
+      parent.appendChild(el("code", "md-inline-code", m[1]));
+      lastIdx = codeRe.lastIndex;
+    }
+    if (lastIdx < str.length) {
+      parent.appendChild(document.createTextNode(str.slice(lastIdx)));
+    }
+  }
+
+  function appendInlineMarkdown(parent, rawText) {
+    const str = String(rawText || "");
+    const tokenRe = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*\n]+\*)/g;
+    let lastIndex = 0;
+    let match;
+    while ((match = tokenRe.exec(str)) !== null) {
+      if (match.index > lastIndex) {
+        parent.appendChild(document.createTextNode(str.slice(lastIndex, match.index)));
+      }
+      const token = match[0];
+      if (token.startsWith("`") && token.endsWith("`")) {
+        parent.appendChild(el("code", "md-inline-code", token.slice(1, -1)));
+      } else if (token.startsWith("**") && token.endsWith("**")) {
+        const strongEl = document.createElement("strong");
+        appendCodeTokens(strongEl, token.slice(2, -2));
+        parent.appendChild(strongEl);
+      } else if (token.startsWith("*") && token.endsWith("*")) {
+        const emEl = document.createElement("em");
+        appendCodeTokens(emEl, token.slice(1, -1));
+        parent.appendChild(emEl);
+      } else {
+        parent.appendChild(document.createTextNode(token));
+      }
+      lastIndex = tokenRe.lastIndex;
+    }
+    if (lastIndex < str.length) {
+      parent.appendChild(document.createTextNode(str.slice(lastIndex)));
+    }
+  }
+
+  function renderMarkdownBlock(rawText) {
+    const root = el("div", "turn-markdown");
+    const lines = String(rawText || "").replace(/\r\n/g, "\n").split("\n");
+    let inCodeFence = false;
+    let codeLines = [];
+    let currentList = null;
+    let currentListTag = "";
+    let paraLines = [];
+
+    function flushParagraph() {
+      if (paraLines.length === 0) {
+        return;
+      }
+      const p = document.createElement("p");
+      appendInlineMarkdown(p, paraLines.join(" "));
+      root.appendChild(p);
+      paraLines = [];
+    }
+
+    function flushList() {
+      if (currentList) {
+        root.appendChild(currentList);
+        currentList = null;
+        currentListTag = "";
+      }
+    }
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("```")) {
+        flushParagraph();
+        flushList();
+        if (inCodeFence) {
+          root.appendChild(el("pre", "code-block", codeLines.join("\n")));
+          codeLines = [];
+          inCodeFence = false;
+        } else {
+          inCodeFence = true;
+        }
+        continue;
+      }
+      if (inCodeFence) {
+        codeLines.push(line);
+        continue;
+      }
+      if (trimmed === "") {
+        flushParagraph();
+        flushList();
+        continue;
+      }
+
+      const headingMatch = /^(#{1,4})\s+(.*)$/.exec(trimmed);
+      if (headingMatch) {
+        flushParagraph();
+        flushList();
+        const hTag = headingMatch[1].length <= 2 ? "h3" : "h4";
+        const hEl = document.createElement(hTag);
+        appendInlineMarkdown(hEl, headingMatch[2]);
+        root.appendChild(hEl);
+        continue;
+      }
+
+      const ulMatch = /^[-*•]\s+(.*)$/.exec(trimmed);
+      if (ulMatch) {
+        flushParagraph();
+        if (currentListTag !== "ul") {
+          flushList();
+          currentList = document.createElement("ul");
+          currentListTag = "ul";
+        }
+        const li = document.createElement("li");
+        appendInlineMarkdown(li, ulMatch[1]);
+        currentList.appendChild(li);
+        continue;
+      }
+
+      const olMatch = /^\d+\.\s+(.*)$/.exec(trimmed);
+      if (olMatch) {
+        flushParagraph();
+        if (currentListTag !== "ol") {
+          flushList();
+          currentList = document.createElement("ol");
+          currentListTag = "ol";
+        }
+        const li = document.createElement("li");
+        appendInlineMarkdown(li, olMatch[1]);
+        currentList.appendChild(li);
+        continue;
+      }
+
+      flushList();
+      paraLines.push(trimmed);
+    }
+
+    if (inCodeFence && codeLines.length > 0) {
+      root.appendChild(el("pre", "code-block", codeLines.join("\n")));
+    }
+    flushParagraph();
+    flushList();
+    return root;
   }
 
   function renderAssistStream() {
@@ -951,8 +1202,10 @@
         el("span", "", turn.role === "user" ? "Operator" : "SRE triage agent (" + (turn.template || "sre-agent-v1") + ")"),
         el("span", "mono", turn.metaRight || "")
       );
-      const p = el("p", "turn-text", turn.text);
-      card.append(meta, p);
+      const bodyNode = turn.role === "user"
+        ? el("p", "turn-text", turn.text)
+        : renderMarkdownBlock(turn.text);
+      card.append(meta, bodyNode);
       for (const st of turn.toolSteps || []) {
         card.appendChild(makeToolStepElement(st));
       }
@@ -982,6 +1235,7 @@
     if (!state.turnsByIncident[incID]) {
       state.turnsByIncident[incID] = [];
     }
+    delete state.clearedIncidentChats[incID];
     if (opts?.confirmationCallID) {
       state.turnsByIncident[incID].push({
         role: "user",
@@ -1138,12 +1392,12 @@
           }
 
           tr.append(
-            el("td", "mono", s.session_id),
-            el("td", "mono", s.incident_id || "-"),
-            el("td", "mono", s.template || "sre-agent-v2"),
+            el("td", "mono nowrap-cell", s.session_id),
+            el("td", "mono nowrap-cell", s.incident_id || "-"),
+            el("td", "mono nowrap-cell", s.template || "sre-agent-v2"),
             computeTd,
-            el("td", "mono", String(s.event_count || 0) + " events"),
-            el("td", "mono", s.updated_at || "-"),
+            el("td", "mono nowrap-cell", String(s.event_count || 0) + " events"),
+            el("td", "mono nowrap-cell", s.updated_at || "-"),
             actionsTd
           );
           return tr;
@@ -1280,15 +1534,17 @@
 
     const rows = state.memories.map((m) => {
       const tr = document.createElement("tr");
-      const topicsTd = el("td", "chip-row");
+      const topicsTd = document.createElement("td");
+      const topicsWrap = el("div", "chip-row");
       for (const t of m.topics || []) {
-        topicsTd.appendChild(el("span", "stroked-pill mono", t));
+        topicsWrap.appendChild(el("span", "stroked-pill mono", t));
       }
+      topicsTd.appendChild(topicsWrap);
       tr.append(
         el("td", "", m.fact || ""),
-        el("td", "mono", m.source_session_id || "-"),
+        el("td", "mono nowrap-cell", m.source_session_id || "-"),
         topicsTd,
-        el("td", "mono", m.timestamp || "-")
+        el("td", "mono nowrap-cell", m.timestamp || "-")
       );
       return tr;
     });
@@ -1380,10 +1636,10 @@
           actionsTd.appendChild(inspectBtn);
 
           tr.append(
-            el("td", "mono", sk.name),
+            el("td", "mono nowrap-cell", sk.name),
             revTd,
             shaTd,
-            el("td", "mono", revCountText),
+            el("td", "mono nowrap-cell", revCountText),
             el("td", "", sk.description || ""),
             actionsTd
           );
@@ -1415,10 +1671,10 @@
     tbody.replaceChildren(...caps.map((item) => {
       const tr = document.createElement("tr");
       tr.append(
-        el("td", "mono", item.capability),
-        el("td", "", item.kind),
+        el("td", "mono nowrap-cell", item.capability),
+        el("td", "nowrap-cell", item.kind),
         el("td", "", item.boundary),
-        el("td", "", item.stage)
+        el("td", "nowrap-cell", item.stage)
       );
       return tr;
     }));
@@ -1467,40 +1723,44 @@
           const nameTd = document.createElement("td");
           nameTd.append(
             el("strong", "", ag.displayName || ag.name || "Agent"),
-            el("div", "mono secondary-copy", gkeAuto && cardURL ? "/.well-known/agent-card.json" : (ag.name || ""))
+            el("div", "mono secondary-copy break-cell", gkeAuto && cardURL ? "/.well-known/agent-card.json" : (ag.name || ""))
           );
 
           const endpointURL = firstAgentInterfaceURL(ag);
-          const discTd = el("td", "chip-row");
+          const discTd = document.createElement("td");
+          const discWrap = el("div", "chip-row");
           if (gkeAuto) {
-            discTd.append(
+            discWrap.append(
               el("span", "status-pill status-success mono", "registry.gke.io/functional-type: AGENT"),
               el("span", "stroked-pill mono", "a2a-protocol.org/agent-card")
             );
           } else {
-            discTd.appendChild(
+            discWrap.appendChild(
               el("span", "status-pill status-neutral mono", ag.source || "agent-registry-cloud")
             );
             const protoType = firstAgentProtocolType(ag);
             if (protoType) {
-              discTd.appendChild(el("span", "stroked-pill mono", protoType));
+              discWrap.appendChild(el("span", "stroked-pill mono", protoType));
             }
           }
+          discTd.appendChild(discWrap);
 
-          const skillsTd = el("td", "chip-row");
+          const skillsTd = document.createElement("td");
+          const skillsWrap = el("div", "chip-row");
           const skills = Array.isArray(ag.skills) ? ag.skills : [];
           if (skills.length === 0) {
-            skillsTd.appendChild(el("span", "secondary-copy mono", "-"));
+            skillsWrap.appendChild(el("span", "secondary-copy mono", "-"));
           } else {
             for (const sk of skills) {
-              skillsTd.appendChild(el("span", "stroked-pill mono", sk.id || sk.name || "skill"));
+              skillsWrap.appendChild(el("span", "stroked-pill mono", sk.id || sk.name || "skill"));
             }
           }
+          skillsTd.appendChild(skillsWrap);
 
           tr.append(
             nameTd,
-            el("td", "mono", ag.version || "-"),
-            el("td", "mono", endpointURL),
+            el("td", "mono nowrap-cell", ag.version || "-"),
+            el("td", "mono break-cell", endpointURL),
             discTd,
             skillsTd
           );
@@ -1528,7 +1788,7 @@
           const tr = document.createElement("tr");
           const idTd = document.createElement("td");
           idTd.append(
-            el("strong", "mono", srv.mcpServerId || srv.displayName || "mcp-server"),
+            el("strong", "mono nowrap-cell", srv.mcpServerId || srv.displayName || "mcp-server"),
             el("div", "secondary-copy", srv.displayName || "")
           );
 
@@ -1536,7 +1796,8 @@
             ? (srv.interfaces[0].url || "")
             : "";
 
-          const toolsTd = el("td", "chip-row");
+          const toolsTd = document.createElement("td");
+          const toolsWrap = el("div", "chip-row");
           for (const tl of srv.tools || []) {
             const ann = tl.annotations || {};
             const isDestructive = Boolean(ann.destructiveHint);
@@ -1545,12 +1806,13 @@
             const badgeCls = isDestructive ? "status-error" : (isReadOnly ? "status-success" : "status-neutral");
             const pill = el("span", "status-pill mono " + badgeCls, tl.name + " · " + hintLabel);
             pill.title = tl.description || tl.name;
-            toolsTd.appendChild(pill);
+            toolsWrap.appendChild(pill);
           }
+          toolsTd.appendChild(toolsWrap);
 
           tr.append(
             idTd,
-            el("td", "mono", ifaceURL),
+            el("td", "mono break-cell", ifaceURL),
             toolsTd,
             el("td", "", srv.description || "")
           );
@@ -1659,8 +1921,8 @@
     modBody.replaceChildren(...(cat.modules || []).map((m) => {
       const tr = document.createElement("tr");
       tr.append(
-        el("td", "mono", "Module " + m.number),
-        el("td", "", m.title),
+        el("td", "mono nowrap-cell", "Module " + m.number),
+        el("td", "nowrap-cell", m.title),
         el("td", "", m.summary)
       );
       return tr;
@@ -1680,11 +1942,116 @@
     }
   }
 
+  function makeArrowMarker(id, cls) {
+    const marker = document.createElementNS(SVG_NS, "marker");
+    marker.setAttribute("id", id);
+    marker.setAttribute("viewBox", "0 0 10 10");
+    marker.setAttribute("refX", "8");
+    marker.setAttribute("refY", "5");
+    marker.setAttribute("markerWidth", "6");
+    marker.setAttribute("markerHeight", "6");
+    marker.setAttribute("orient", "auto-start-reverse");
+    const p = document.createElementNS(SVG_NS, "path");
+    p.setAttribute("d", "M 0 1.5 L 8.5 5 L 0 8.5 z");
+    p.setAttribute("class", cls);
+    marker.appendChild(p);
+    return marker;
+  }
+
+  function edgeRoutePoints(edge, from, to) {
+    switch (edge.id) {
+      case "op-to-gw":
+      case "gw-to-broker":
+      case "router-to-actor":
+      case "actor-to-gcs":
+        return [
+          { x: from.x + from.width / 2, y: from.y + from.height },
+          { x: to.x + to.width / 2, y: to.y }
+        ];
+      case "broker-to-router":
+        return [
+          { x: from.x + from.width, y: from.y + 34 },
+          { x: 350, y: from.y + 34 },
+          { x: 350, y: to.y + 46 },
+          { x: to.x, y: to.y + 46 }
+        ];
+      case "actor-to-broker":
+        return [
+          { x: from.x, y: from.y + 56 },
+          { x: 360, y: from.y + 56 },
+          { x: 360, y: to.y + 72 },
+          { x: to.x + to.width, y: to.y + 72 }
+        ];
+      case "broker-to-platform":
+        return [
+          { x: from.x + from.width, y: from.y + 102 },
+          { x: 352, y: from.y + 102 },
+          { x: 352, y: 462 },
+          { x: 708, y: 462 },
+          { x: 708, y: to.y + 92 },
+          { x: to.x, y: to.y + 92 }
+        ];
+      case "broker-to-sim":
+        return [
+          { x: from.x + from.width, y: from.y + 124 },
+          { x: 344, y: from.y + 124 },
+          { x: 344, y: 474 },
+          { x: 718, y: 474 },
+          { x: 718, y: to.y + 68 },
+          { x: to.x, y: to.y + 68 }
+        ];
+      default:
+        return [nodeCenter(from), nodeCenter(to)];
+    }
+  }
+
+  function pointsToSVGPath(pts) {
+    if (!pts || pts.length === 0) {
+      return "";
+    }
+    return pts.map((pt, i) => (i === 0 ? "M " : "L ") + pt.x + " " + pt.y).join(" ");
+  }
+
+  function edgeMidpoint(edge, pts) {
+    if (!pts || pts.length < 2) {
+      return { x: 540, y: 250 };
+    }
+    if (pts.length === 2) {
+      return {
+        x: (pts[0].x + pts[1].x) / 2,
+        y: (pts[0].y + pts[1].y) / 2
+      };
+    }
+    if (edge.id === "broker-to-router") {
+      return { x: 350, y: 224 };
+    }
+    if (edge.id === "actor-to-broker") {
+      return { x: 360, y: 320 };
+    }
+    if (edge.id === "broker-to-platform") {
+      return { x: 534, y: 462 };
+    }
+    if (edge.id === "broker-to-sim") {
+      return { x: 534, y: 474 };
+    }
+    const midIdx = Math.floor(pts.length / 2);
+    return {
+      x: (pts[midIdx - 1].x + pts[midIdx].x) / 2,
+      y: (pts[midIdx - 1].y + pts[midIdx].y) / 2
+    };
+  }
+
   function renderArchitectureSVG(cat, activeFlow) {
     const host = document.getElementById("arch-svg-host");
     const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("id", "arch-svg");
     svg.setAttribute("viewBox", "0 0 1080 500");
     svg.setAttribute("class", "arch-svg");
+
+    const defs = document.createElementNS(SVG_NS, "defs");
+    defs.appendChild(makeArrowMarker("arch-arrow", "svg-edge-arrow"));
+    defs.appendChild(makeArrowMarker("arch-arrow-active", "svg-edge-arrow-active"));
+    svg.appendChild(defs);
 
     const nodesByID = {};
     for (const n of cat.nodes || []) {
@@ -1712,11 +2079,13 @@
       sub.setAttribute("x", String(z.x + 14));
       sub.setAttribute("y", String(z.y + 42));
       sub.setAttribute("class", "svg-zone-sub");
-      sub.textContent = z.subtitle.slice(0, 52);
+      sub.textContent = z.subtitle;
       svg.appendChild(sub);
     }
 
     const activeHop = activeFlow && activeFlow.hops ? activeFlow.hops[state.activeHopIndex] : null;
+    let activeEdgeObj = null;
+    let activeEdgePts = null;
 
     for (const edge of cat.edges || []) {
       const from = nodesByID[edge.from];
@@ -1724,30 +2093,29 @@
       if (!from || !to) {
         continue;
       }
-      const p1 = nodeCenter(from);
-      const p2 = nodeCenter(to);
-      const line = document.createElementNS(SVG_NS, "line");
-      line.setAttribute("x1", String(p1.x));
-      line.setAttribute("y1", String(p1.y));
-      line.setAttribute("x2", String(p2.x));
-      line.setAttribute("y2", String(p2.y));
-      const isActive = activeHop && activeHop.edge_id === edge.id;
-      line.setAttribute("class", "svg-edge-line" + (isActive ? " active-edge" : ""));
-      svg.appendChild(line);
-
+      const pts = edgeRoutePoints(edge, from, to);
+      const isActive = Boolean(activeHop && activeHop.edge_id === edge.id);
       if (isActive) {
-        const dot = document.createElementNS(SVG_NS, "circle");
-        dot.setAttribute("cx", String((p1.x + p2.x) / 2));
-        dot.setAttribute("cy", String((p1.y + p2.y) / 2));
-        dot.setAttribute("r", "5");
-        dot.setAttribute("class", "svg-pulse-dot");
-        svg.appendChild(dot);
+        activeEdgeObj = edge;
+        activeEdgePts = pts;
       }
+      const pathEl = document.createElementNS(SVG_NS, "path");
+      pathEl.setAttribute("d", pointsToSVGPath(pts));
+      pathEl.setAttribute("class", "svg-edge-line" + (isActive ? " active-edge" : ""));
+      pathEl.setAttribute("marker-end", isActive ? "url(#arch-arrow-active)" : "url(#arch-arrow)");
+      svg.appendChild(pathEl);
     }
 
     for (const n of cat.nodes || []) {
       const g = document.createElementNS(SVG_NS, "g");
-      g.setAttribute("class", "svg-node-group" + (n.id === state.selectedNodeID ? " selected" : ""));
+      const isEndpoint = Boolean(activeEdgeObj && (activeEdgeObj.from === n.id || activeEdgeObj.to === n.id));
+      g.setAttribute("data-node-id", n.id);
+      g.setAttribute(
+        "class",
+        "svg-node-group" +
+          (n.id === state.selectedNodeID ? " selected" : "") +
+          (isEndpoint ? " active-endpoint" : "")
+      );
       g.addEventListener("click", () => {
         state.selectedNodeID = n.id;
         renderArchitectureInspector(cat);
@@ -1760,7 +2128,7 @@
       rect.setAttribute("width", String(n.width));
       rect.setAttribute("height", String(n.height));
       rect.setAttribute("rx", "4");
-      rect.setAttribute("class", "svg-node-rect");
+      rect.setAttribute("class", "svg-node-rect svg-node");
       g.appendChild(rect);
 
       const t = document.createElementNS(SVG_NS, "text");
@@ -1785,6 +2153,44 @@
       g.appendChild(b);
 
       svg.appendChild(g);
+    }
+
+    if (activeHop && activeEdgeObj && activeEdgePts) {
+      const overlay = document.createElementNS(SVG_NS, "g");
+      overlay.setAttribute("class", "svg-overlay-group");
+
+      const mid = edgeMidpoint(activeEdgeObj, activeEdgePts);
+      const dot = document.createElementNS(SVG_NS, "circle");
+      dot.setAttribute("cx", String(mid.x));
+      dot.setAttribute("cy", String(mid.y));
+      dot.setAttribute("r", "5");
+      dot.setAttribute("class", "svg-pulse-dot");
+      overlay.appendChild(dot);
+
+      const labelStr = "Step " + activeHop.step + " · " + (activeEdgeObj.protocol || activeEdgeObj.label);
+      const pillW = Math.max(128, labelStr.length * 6.8 + 20);
+      const pillH = 22;
+      const pillX = Math.max(24, Math.min(1056 - pillW, mid.x - pillW / 2));
+      const pillY = Math.max(12, Math.min(474, mid.y - 26));
+
+      const pillBg = document.createElementNS(SVG_NS, "rect");
+      pillBg.setAttribute("x", String(pillX));
+      pillBg.setAttribute("y", String(pillY));
+      pillBg.setAttribute("width", String(pillW));
+      pillBg.setAttribute("height", String(pillH));
+      pillBg.setAttribute("rx", "11");
+      pillBg.setAttribute("class", "svg-step-pill-bg");
+      overlay.appendChild(pillBg);
+
+      const pillTxt = document.createElementNS(SVG_NS, "text");
+      pillTxt.setAttribute("x", String(pillX + pillW / 2));
+      pillTxt.setAttribute("y", String(pillY + 15));
+      pillTxt.setAttribute("text-anchor", "middle");
+      pillTxt.setAttribute("class", "svg-step-pill-text");
+      pillTxt.textContent = labelStr;
+      overlay.appendChild(pillTxt);
+
+      svg.appendChild(overlay);
     }
 
     host.replaceChildren(svg);
@@ -1823,9 +2229,6 @@
     document.getElementById("arch-node-summary").textContent = node.summary;
     document.getElementById("arch-node-invariants").replaceChildren(
       ...(node.invariants || []).map((inv) => el("li", "", inv))
-    );
-    document.getElementById("arch-node-adrs").replaceChildren(
-      ...(node.adr_refs || []).map((adr) => el("span", "stroked-pill mono", adr))
     );
   }
 
@@ -1977,6 +2380,7 @@
       submitChatTurn({});
     });
     document.getElementById("btn-clear-chat").addEventListener("click", () => {
+      state.clearedIncidentChats[state.selectedIncidentID] = true;
       state.turnsByIncident[state.selectedIncidentID] = [];
       renderAssistStream();
     });

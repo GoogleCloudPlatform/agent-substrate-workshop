@@ -29,7 +29,7 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
    ```bash
    cloudshell edit app/cmd/agent/main.go
    ```
-   Locate `func buildRunner` in `app/cmd/agent/main.go`. Replace the entire `buildRunner` function with the code you copy below and save the file (`Ctrl+S` or `Cmd+S`—or compare against `modules/04-agent-registry-mcp-a2a/solution/main.go`):
+   In `app/cmd/agent/main.go`, select the **entire `buildRunner` function** (from `func buildRunner(...)` through its closing `}`) and replace it with the complete `buildRunner` function below, then save the file (`Ctrl+S` or `Cmd+S`—or compare against `modules/04-agent-registry-mcp-a2a/solution/main.go`):
    ```go
    func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
    	llm, err := brokerclient.NewModel(ctx, cfg.BrokerURL, cfg.ModelName, nil)

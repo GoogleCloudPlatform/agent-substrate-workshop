@@ -53,12 +53,24 @@ In `ops-hub`, three simulated incidents are pre-seeded for the workshop:
    ```
    Notice that `app/.ko.yaml` packages `./cmd/agent` onto `alpine/git:latest` (`< 5s` rebuilds) with `ledger-verify` compiled directly into `/ko-app/agent`, and `app/internal/agentruntime/workspace.go` provides four confined `/workspace` tools (`clone_repo`, `read_workspace_file`, `run_workspace_command`, and `stage_git_patch`).
 
-   In `app/cmd/agent/main.go`, locate the starter `buildRunner` function (lines 60–73) containing `// WORKSHOP(module-1):`:
+   In `app/cmd/agent/main.go`, locate the starter `buildRunner` function (lines 60–73):
    ```go
    func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
    	// WORKSHOP(module-1): Wire brokerclient.NewModel, llmagent.New, and runner.New with workspaceTools.
+   	_ = ctx
+   	_ = cfg
+   	_ = workspaceTools
+
+   	// WORKSHOP(module-2): Replace session.InMemoryService() with brokerclient.NewSessionService and wire brokerclient.NewMemoryService.
+
+   	// WORKSHOP(module-3): Attach SkillToolset backed by RegistrySkillSource so procedural runbooks load without rebuilding the Actor.
+
+   	// WORKSHOP(module-4): Discover MCP toolsets from Agent Registry and enable RequireConfirmation on apply_remediation_pr.
+
+   	return nil, nil
+   }
    ```
-   Replace the `buildRunner` function in `app/cmd/agent/main.go` with the code you copy below and save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically add the required Go `import` packages):
+   Replace the **entire `buildRunner` function** (from `func buildRunner(...)` through its closing `}`) in `app/cmd/agent/main.go` with the complete `buildRunner` function below and save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically add the required Go `import` packages):
    ```go
    func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
    	// 1. Create a keyless Gemini model client that routes /genai/* requests through sre-gateway.

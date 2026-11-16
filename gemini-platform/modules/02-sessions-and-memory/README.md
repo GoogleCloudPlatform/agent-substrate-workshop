@@ -22,7 +22,7 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
    ```bash
    cloudshell edit app/cmd/agent/main.go
    ```
-   Locate `// WORKSHOP(module-2):` inside `buildRunner` in `app/cmd/agent/main.go`. Replace the `buildRunner` function with the code you copy below and save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically update the Go `import` block for you):
+   In `app/cmd/agent/main.go`, select the **entire `buildRunner` function** (from `func buildRunner(...)` through its closing `}`) and replace it with the complete `buildRunner` function below, then save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically update the Go `import` block for you):
    ```go
    func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
    	llm, err := brokerclient.NewModel(ctx, cfg.BrokerURL, cfg.ModelName, nil)
