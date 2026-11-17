@@ -392,8 +392,17 @@ func (s *Server) isAllowedRedirectURI(raw string) bool {
 		if host == "127.0.0.1" || host == "localhost" {
 			return true
 		}
-		if strings.HasSuffix(host, ".googleapis.com") || strings.HasSuffix(host, ".cloudshell.dev") || strings.HasSuffix(host, ".svc.cluster.local") {
-			return true
+		for _, suffix := range []string{
+			".googleapis.com",
+			".cloudshell.dev",
+			".cloudworkstations.dev",
+			".googleusercontent.com",
+			".github.dev",
+			".svc.cluster.local",
+		} {
+			if len(host) > len(suffix) && strings.HasSuffix(host, suffix) {
+				return true
+			}
 		}
 		if s.publicBaseURL != "" {
 			if pub, err := url.Parse(s.publicBaseURL); err == nil && strings.EqualFold(pub.Hostname(), host) {
@@ -475,8 +484,15 @@ func (s *Server) handleOAuthToken(w http.ResponseWriter, r *http.Request) {
 	rec.used = true
 
 	if now.After(rec.expiresAt) || (clientID != "" && clientID != rec.clientID) || redirectURI != rec.redirectURI {
+		errDesc := "redirect_uri mismatch"
+		switch {
+		case now.After(rec.expiresAt):
+			errDesc = "authorization code expired"
+		case clientID != "" && clientID != rec.clientID:
+			errDesc = "client_id mismatch"
+		}
 		delete(s.authCodes, code)
-		writeJSONResp(w, http.StatusBadRequest, map[string]string{"error": "invalid_grant"})
+		writeJSONResp(w, http.StatusBadRequest, map[string]string{"error": "invalid_grant", "error_description": errDesc})
 		return
 	}
 

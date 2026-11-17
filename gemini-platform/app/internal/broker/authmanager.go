@@ -576,7 +576,7 @@ func (m *authManager) exchangePKCECallback(ctx context.Context, code, stateNonce
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 256<<10))
 	_ = resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return activeGrantMeta{}, fmt.Errorf("token endpoint returned HTTP %d", resp.StatusCode)
+		return activeGrantMeta{}, formatTokenEndpointError(resp.StatusCode, raw)
 	}
 
 	var tokResp struct {
@@ -620,6 +620,39 @@ func (m *authManager) exchangePKCECallback(ctx context.Context, code, stateNonce
 		})
 	}
 	return meta, nil
+}
+
+func formatTokenEndpointError(statusCode int, raw []byte) error {
+	var errPayload struct {
+		Error            string `json:"error"`
+		ErrorDescription string `json:"error_description"`
+	}
+	if len(raw) > 0 && json.Unmarshal(raw, &errPayload) == nil {
+		code := sanitizeOAuthErrorText(errPayload.Error, 64)
+		desc := sanitizeOAuthErrorText(errPayload.ErrorDescription, 160)
+		switch {
+		case code != "" && desc != "":
+			return fmt.Errorf("token endpoint returned HTTP %d (%s: %s)", statusCode, code, desc)
+		case code != "":
+			return fmt.Errorf("token endpoint returned HTTP %d (%s)", statusCode, code)
+		case desc != "":
+			return fmt.Errorf("token endpoint returned HTTP %d (%s)", statusCode, desc)
+		}
+	}
+	return fmt.Errorf("token endpoint returned HTTP %d", statusCode)
+}
+
+func sanitizeOAuthErrorText(s string, maxLen int) string {
+	collapsed := strings.Join(strings.Fields(s), " ")
+	for _, secretPrefix := range []string{"opshub_at_", "ya29.", "gho_", "ghu_"} {
+		if strings.Contains(collapsed, secretPrefix) {
+			return "[redacted]"
+		}
+	}
+	if len(collapsed) > maxLen {
+		return collapsed[:maxLen] + "..."
+	}
+	return collapsed
 }
 
 func (m *authManager) fetchOpsHubOperatorSub(ctx context.Context, accessToken string) string {
