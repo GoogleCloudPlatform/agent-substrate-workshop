@@ -1589,14 +1589,142 @@ func isLoopbackHostPort(hostPort string) bool {
 	return h == "localhost" || h == "127.0.0.1" || h == "::1"
 }
 
-func isTrustedDevProxyHost(hostPort string) bool {
-	h := hostOnly(hostPort)
-	for _, suffix := range []string{".cloudshell.dev", ".cloudworkstations.dev", ".googleusercontent.com", ".github.dev"} {
-		if strings.HasSuffix(h, suffix) {
-			return true
+var trustedDevProxySuffixes = []string{
+	".cloudshell.dev",
+	".cloudworkstations.dev",
+	".googleusercontent.com",
+	".github.dev",
+}
+
+func isValidPort(p string) bool {
+	if len(p) == 0 || len(p) > 5 {
+		return false
+	}
+	n := 0
+	for i := 0; i < len(p); i++ {
+		if p[i] < '0' || p[i] > '9' {
+			return false
+		}
+		n = n*10 + int(p[i]-'0')
+	}
+	return n >= 1 && n <= 65535
+}
+
+func isValidDNSName(h string) bool {
+	if len(h) == 0 || len(h) > 253 || strings.HasPrefix(h, ".") || strings.HasSuffix(h, ".") || strings.Contains(h, "..") {
+		return false
+	}
+	for _, label := range strings.Split(h, ".") {
+		if len(label) == 0 || len(label) > 63 || strings.HasPrefix(label, "-") || strings.HasSuffix(label, "-") {
+			return false
+		}
+		for i := 0; i < len(label); i++ {
+			c := label[i]
+			if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') {
+				return false
+			}
 		}
 	}
-	return false
+	return true
+}
+
+func normalizeTrustedDevProxyHost(hostPort string) (string, bool) {
+	raw := strings.TrimSpace(hostPort)
+	if raw == "" {
+		return "", false
+	}
+	var host, port string
+	if strings.Contains(raw, ":") {
+		h, p, err := net.SplitHostPort(raw)
+		if err != nil || !isValidPort(p) {
+			return "", false
+		}
+		host = strings.ToLower(h)
+		port = p
+	} else {
+		host = strings.ToLower(raw)
+	}
+	if !isValidDNSName(host) {
+		return "", false
+	}
+	matched := false
+	for _, suffix := range trustedDevProxySuffixes {
+		if len(host) > len(suffix) && strings.HasSuffix(host, suffix) {
+			matched = true
+			break
+		}
+	}
+	if !matched {
+		return "", false
+	}
+	if port != "" && port != "443" {
+		return host + ":" + port, true
+	}
+	return host, true
+}
+
+func isTrustedDevProxyHost(hostPort string) bool {
+	_, ok := normalizeTrustedDevProxyHost(hostPort)
+	return ok
+}
+
+func trustedForwardedHost(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	xfhVals := r.Header.Values("X-Forwarded-Host")
+	for i := len(xfhVals) - 1; i >= 0; i-- {
+		parts := strings.Split(xfhVals[i], ",")
+		for j := len(parts) - 1; j >= 0; j-- {
+			if norm, ok := normalizeTrustedDevProxyHost(parts[j]); ok {
+				return norm
+			}
+		}
+	}
+	fwdVals := r.Header.Values("Forwarded")
+	for i := len(fwdVals) - 1; i >= 0; i-- {
+		elems := strings.Split(fwdVals[i], ",")
+		for j := len(elems) - 1; j >= 0; j-- {
+			for _, param := range strings.Split(elems[j], ";") {
+				k, v, ok := strings.Cut(param, "=")
+				if !ok || !strings.EqualFold(strings.TrimSpace(k), "host") {
+					continue
+				}
+				v = strings.Trim(strings.TrimSpace(v), `"`)
+				if norm, ok := normalizeTrustedDevProxyHost(v); ok {
+					return norm
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func forwardedProto(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	for _, raw := range r.Header.Values("X-Forwarded-Proto") {
+		for _, part := range strings.Split(raw, ",") {
+			if p := strings.TrimSpace(part); p != "" {
+				return p
+			}
+		}
+	}
+	for _, raw := range r.Header.Values("Forwarded") {
+		for _, elem := range strings.Split(raw, ",") {
+			for _, param := range strings.Split(elem, ";") {
+				k, v, ok := strings.Cut(param, "=")
+				if !ok || !strings.EqualFold(strings.TrimSpace(k), "proto") {
+					continue
+				}
+				if p := strings.Trim(strings.TrimSpace(v), `"`); p != "" {
+					return p
+				}
+			}
+		}
+	}
+	return ""
 }
 
 func hasBrowserContext(r *http.Request) bool {
@@ -1649,7 +1777,13 @@ func readCookieValue(r *http.Request, name string) string {
 }
 
 func isHTTPSRequest(r *http.Request) bool {
-	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+	if r == nil {
+		return false
+	}
+	if r.TLS != nil || strings.EqualFold(forwardedProto(r), "https") {
+		return true
+	}
+	return isTrustedDevProxyHost(r.Host) || trustedForwardedHost(r) != ""
 }
 
 func randomHex(nBytes int) (string, error) {
