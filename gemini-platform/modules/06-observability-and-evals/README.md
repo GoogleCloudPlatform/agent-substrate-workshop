@@ -6,7 +6,7 @@ In Modules 01–05, you built a stateful **ADK Go v2** **Incident Actor** (`sre-
 2. **End-to-end W3C `traceparent` propagation & secret-scrubbed OpenTelemetry GenAI waterfalls** across `sre-gateway -> atenet-router -> Incident Actor -> /otlp/v1/traces -> Google Cloud Trace`, stamping `gen_ai.*` and `ate.*` attributes while stripping `Authorization`/`Cookie` headers, bearer tokens, PII, and raw tool payloads.
 3. **Pure-Go Online Evals (`make eval` / `cmd/evalrunner`) + out-of-band Security Command Center Anomaly Detection** scoring live **Session Ledger**, **Consolidated Memory**, **Skill Registry**, and **Cloud Trace** evidence across 4 rubrics with **Gemini on Agent Platform**, while **Security Command Center** monitors `GKE_WORKLOAD` logs and traces asynchronously with zero inline latency.
 
-Like Module 05, Module 06 requires **zero `cmd/agent` edits or `ActorTemplate` rebuilds**: `sre-agent-v4` and `sre-gateway` already carry the keyless OTLP bridge and W3C context propagation.
+Like Module 05, Module 06 requires **zero** `cmd/agent` **edits or** `ActorTemplate` **rebuilds**: `sre-agent-v4` and `sre-gateway` already carry the keyless OTLP bridge and W3C context propagation.
 
 ![End-to-end W3C traceparent waterfall, secret scrubbing, Managed Prometheus metrics, pure-Go Online Evals, and SCC Anomaly Detection](../img/06-observability-flywheel.svg)
 

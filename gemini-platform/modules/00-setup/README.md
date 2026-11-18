@@ -1,6 +1,6 @@
 # Setup (10 min)
 
-In this section, you point the workshop at your Google Cloud project, validate that your GKE **1.37+** cluster meets cross-worker memory snapshot requirements, provision cloud storage and **Gemini Enterprise Agent Platform** prerequisites, apply a quota-safe `ComputeClass`, start **Agent Substrate (`v1.0.0`)** installation in the background, and deploy the live degraded `prod-sim` incident environment.
+In this section, you point the workshop at your Google Cloud project, validate that your GKE **1.37+** cluster meets cross-worker memory snapshot requirements, provision cloud storage and **Gemini Enterprise Agent Platform** prerequisites, apply a quota-safe `ComputeClass`, start **Agent Substrate** (`v1.0.0`) installation in the background, and deploy the live degraded `prod-sim` incident environment.
 
 If you create a new GKE cluster in Step 3 rather than using a pre-provisioned classroom cluster, allow ~20 minutes total.
 
@@ -45,7 +45,7 @@ Throughout the workshop, `ops-hub` serves three pre-seeded incidents so you can 
    export PATH="$(go env GOPATH)/bin:$PATH"
    ```
 
-2. **Clone the repository.** (While the staging repository is private, authenticate Git first in Cloud Shell via `gh auth login && gh auth setup-git` or clone over SSH.)
+2. **Clone the repository.** Clone the workshop repository and move into the `gemini-platform/` directory:
    ```bash
    git clone https://github.com/GoogleCloudPlatform/agent-substrate-workshop
    cd agent-substrate-workshop/gemini-platform
@@ -79,7 +79,7 @@ Throughout the workshop, `ops-hub` serves three pre-seeded incidents so you can 
      --add-maintenance-exclusion-scope no_minor_or_node_upgrades
    ```
 
-4. **Configure `workshop.env`.** Copy `workshop.env.example` and set `PROJECT_ID` and `CLUSTER_LOCATION` (`NAME` and `LOCATION` from `gcloud container clusters list`). Notice that `NAMESPACE` and `ATESPACE` default to `workshop-301` so Track 301 can run side-by-side on a cluster that already hosts Track 101 (`workshop`).
+4. **Configure `workshop.env`.** Copy `workshop.env.example` and set `PROJECT_ID` and `CLUSTER_LOCATION` (`NAME` and `LOCATION` from `gcloud container clusters list`). Notice that `NAMESPACE` and `ATESPACE` default to `workshop-301` so this workshop can run side-by-side on a cluster that already hosts the intro workshop (`workshop`).
    ```bash
    gcloud container clusters list --project YOUR_PROJECT_ID
    cp workshop.env.example workshop.env

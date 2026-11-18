@@ -4,9 +4,9 @@
 
 **Measured live benchmarks (published images):**
 - **Cold Module 00 setup (`make gcp` + `make install-bg` + `make prod-sim` + `make verify MODULE=0`)**: **`2m 45s`** end-to-end.
-- **Incremental `ko` agent build (`make build-agent` on `alpine/git:latest`)**: **`< 5s`**.
+- **Incremental `ko` agent build (`make build-agent` on `alpine/git:latest`)**: **under 5 s**.
 - **`ActorTemplate` Golden Snapshot creation (`sre-agent-v1..v4`)**: **`15–25s`**.
-- **Suspended Incident Actor wake latency (`ResumeDurationMs` via `atenet-router` from Cloud Storage `SNAPSHOT_FIDELITY_MEMORY`)**: **`< 100ms`** (classroom SLO: `< 400ms`).
+- **Suspended Incident Actor wake latency (`ResumeDurationMs` via `atenet-router` from Cloud Storage `SNAPSHOT_FIDELITY_MEMORY`)**: **under 100 ms** (classroom SLO: under 400 ms).
 
 ## One week before
 
@@ -70,7 +70,7 @@
 | 1 Actor boundary | 12 | Stateful `/workspace` git tools inside gVisor vs. zero ambient credentials; `sre-gateway` holds identity. | Paste `WORKSHOP(module-1)` from `modules/01-actor-boundary/solution/main.go`. |
 | 2 Sessions & memory | 15 | Raw GCS snapshot (`1` actor, `1` template) vs. `0 vCPU` **Gemini Sessions** ledger vs. cross-actor **Gemini Memory Bank**. | Demo `INC-403` sibling recall on screen and move to `make verify MODULE=2`. |
 | 3 Skill registry | 12 | Baking `SKILL.md` into images churns Golden Snapshots; `SkillToolset` pulls SHA-256 `v1 -> v2` archives live. | Inspect `v1` vs. `v2` diffs together instead of editing `SKILL.md` manually. |
-| 4 Agent registry, MCP & A2A | 14 | GKE Agent Card discovery, governed MCP toolsets, and `toolconfirmation` parking at `0 vCPU` (`< 100ms` wake). | Demo step 6 (`POST /a2a` peer call) from the instructor terminal. |
+| 4 Agent registry, MCP & A2A | 14 | GKE Agent Card discovery, governed MCP toolsets, and `toolconfirmation` parking at `0 vCPU` (under 100 ms wake). | Demo step 6 (`POST /a2a` peer call) from the instructor terminal. |
 | 5 Zero-trust governance | 14 | Zero agent rebuilds: `GCPAgentGateway` + `GCPAuthzPolicy`, Pod **Agent Identity**, **Model Armor** `403` on `INC-409`, 3LO PKCE, `0`-token snapshots. | Use headless `complete_3lo_pkce_grant` if browser popup blockers slow down OAuth consent. |
 | 6 Observability & evals | 10 | `ActorTemplate`-scoped Prometheus metrics vs. scrubbed W3C `gen_ai.*` traces + pure-Go `make eval` + SCC Anomaly Detection. | Inspect the **Incident Console** **Trace & online evals** waterfall instead of waiting for Cloud Monitoring chart lag. |
 | 7 Wrap-up | 3 | Inside vs. outside the **Actor Boundary** summary, optional Ambient + SWP egress overlay, and teardown. | Point self-paced readers to the Appendix for `ambient-swp-egress-overlay.yaml.tmpl`. |
@@ -84,7 +84,7 @@ When delivering this workshop in a 60-minute conference breakout slot:
 1. **Pre-warm Module 00 (`0 min` in-room)**: Run `make catch-up MODULE=1` during classroom provisioning so `ate-system`, `prod-sim`, `ComputeClass/substrate-gvisor`, and the regional `Gateway` are already running when attendees open Cloud Shell.
 2. **Modules 01–02 hands-on (`25 min`)**: Attendees deploy `WorkerPool/sre-workers` and `sre-gateway`, complete `WORKSHOP(module-1)` and `WORKSHOP(module-2)`, inspect `inc-402` at `0 vCPU` in `/sessions`, and test `INC-403` memory recall.
 3. **Module 03 live demo + `catch-up MODULE=5` (`10 min`)**: Demonstrate `make publish-skill REV=v1` -> `REV=v2` hot-reloading on the instructor screen (`SNAP_BEFORE == SNAP_AFTER`), then have attendees run `make catch-up MODULE=5` to stage `sre-agent-v4`.
-4. **Module 04 Remediation Gate (`10 min`)**: Attendees trigger `INC-402` remediation, verify `inc-402` suspends to `0 vCPU` at `adk_request_confirmation`, and click **Approve remediation** in the **Incident Console** to watch `< 100ms` wake and `ledger-api` recovery.
+4. **Module 04 Remediation Gate (`10 min`)**: Attendees trigger `INC-402` remediation, verify `inc-402` suspends to `0 vCPU` at `adk_request_confirmation`, and click **Approve remediation** in the **Incident Console** to watch under-100ms wake and `ledger-api` recovery.
 5. **Modules 05–06 governance & evals (`15 min`)**: Neither module rebuilds `cmd/agent`. Attendees run `make governance`, trigger the `INC-409` **Model Armor** `403` block, complete 3LO authorization, run `make audit-snapshot` (`0` token matches), and run `make eval` (`>= 0.80` across all 4 rubrics).
 
 ## After the event

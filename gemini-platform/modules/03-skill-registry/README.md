@@ -12,7 +12,7 @@ In Module 03, you decouple operational procedures from the container image by pa
 |---|---|---|
 | **1. Package & publish (`make publish-skill REV=v1\|v2`)** | `scripts/publish-skill.sh` -> **Skill Registry** & `sre-gateway` | Builds a deterministic `ZIP_STORED` archive from `SKILL.md` + `scripts/diagnose_pool.sh`, computes its `SHA-256` digest, publishes the immutable `SkillRevision` (`gcloud alpha agent-registry skills --location=global`), and updates `defaultRevision`. |
 | **2. Progressive disclosure (`available_skills` -> `load_skill`)** | ADK Go v2 `skilltoolset.New` + `brokerclient.NewSkillSource` | On each turn, `RegistrySkillSource` queries keyless `http://sre-gateway.${NAMESPACE}.svc.cluster.local:8080/agentregistry/skills` for the active `defaultRevision` and injects the lightweight `available_skills` XML catalog into the model prompt before loading full `SKILL.md` instructions via `load_skill`. |
-| **3. Integrity & archive hardening** | `app/internal/brokerclient/skills.go` | When `SKILL@REVISION` is not yet unpacked in `/workspace/.skills/`, the Actor downloads the `.zip` over `sre-gateway`, verifies its `SHA-256` digest in memory before touching disk, enforces zip-slip (`filepath.Clean` + separator prefix), symlink, file-count (`<= 64`), and uncompressed size (`<= 10 MiB`) bounds, and atomically activates `/workspace/.skills/ledger-pool-triage/` (`0755` on `scripts/*.sh`). |
+| **3. Integrity & archive hardening** | `app/internal/brokerclient/skills.go` | When `SKILL@REVISION` is not yet unpacked in `/workspace/.skills/`, the Actor downloads the `.zip` over `sre-gateway`, verifies its `SHA-256` digest in memory before touching disk, enforces zip-slip (`filepath.Clean` + separator prefix), symlink, file-count (≤ 64), and uncompressed size (≤ 10 MiB) bounds, and atomically activates `/workspace/.skills/ledger-pool-triage/` (`0755` on `scripts/*.sh`). |
 | **4. Sandboxed execution (`run_workspace_command`)** | gVisor **Incident Actor** (`/workspace/ledger-api`) | Executes `sh .skills/ledger-pool-triage/scripts/diagnose_pool.sh` inside the isolated `/workspace/ledger-api` git checkout with zero ambient cloud credentials. |
 
 ## Steps
@@ -31,7 +31,7 @@ In Module 03, you decouple operational procedures from the container image by pa
    ```bash
    cloudshell edit app/cmd/agent/main.go
    ```
-   In `app/cmd/agent/main.go`, select the **entire `buildRunner` function** (from `func buildRunner(...)` through its closing `}`) and replace it with the complete `buildRunner` function below, then save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically add `"google.golang.org/adk/v2/tool/skilltoolset"` to the `import` block while keeping `// WORKSHOP(module-4):` unchanged):
+   In `app/cmd/agent/main.go`, select the entire `buildRunner` function (from `func buildRunner(...)` through its closing `}`) and replace it with the complete `buildRunner` function below, then save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically add `"google.golang.org/adk/v2/tool/skilltoolset"` to the `import` block while keeping `// WORKSHOP(module-4):` unchanged):
    ```go
    func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
    	llm, err := brokerclient.NewModel(ctx, cfg.BrokerURL, cfg.ModelName, nil)
@@ -103,7 +103,8 @@ In Module 03, you decouple operational procedures from the container image by pa
    ```bash
    make build-agent
    scripts/render.sh modules/03-skill-registry/manifests/template-v3.yaml.tmpl | kubectl ate create actor-template -f -
-   until kubectl ate get actor-template sre-agent-v3 -a "$ATESPACE" -o json | jq -e '.status.goldenSnapshotStatus.goldenTag.name' >/dev/null; do sleep 2; done
+   until kubectl ate get actor-template sre-agent-v3 -a "$ATESPACE" -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus | (.goldenTag.name // .errorMessage)' >/dev/null; do sleep 2; done
+   kubectl ate get actor-template sre-agent-v3 -a "$ATESPACE"
    DEFAULT_ACTOR_TEMPLATE=sre-agent-v3 make gateway
    make forward-gateway
    ```
@@ -183,7 +184,7 @@ In Module 03, you decouple operational procedures from the container image by pa
      ]
    }
    ```
-   **What changed in `skill_output` between Step 3 (`v1`) and Step 4 (`v2`):**
+   **What changed between Step 3 and Step 4** (`skill_output`, `v1` vs. `v2`):
    - `SKILL_REVISION` flipped from `SKILL_REVISION=v1` -> `SKILL_REVISION=v2` and `CHECK_SCOPE` expanded from `pool_config_baseline` -> `pool_config_and_cursor_leak`.
    - Three new diagnostic lines appear at the bottom of `skill_output`: `CURSOR_LEAK_DETECTED=true`, `CURSOR_LEAK_LOCATION=pool/store.go:ReconcileTransfer`, and `CURSOR_LEAK_DETAIL=rows.ValidateChecksum() returns on checksum error before rows.Close() releases the pool slot`.
    - All of this happened on the resumed `inc-402` Actor without rebuilding the container image or touching `ActorTemplate/sre-agent-v3`.
@@ -202,6 +203,6 @@ Verify your Module 03 state:
 make verify MODULE=3
 ```
 
-**Need to catch up or reset `sre-agent-v3`?** Run `make catch-up MODULE=4` (add `RESET=1` to rebuild `sre-agent-v3` from `modules/03-skill-registry/solution/main.go`).
+**Need to catch up?** Run `make catch-up MODULE=4` (add `RESET=1` to rebuild `sre-agent-v3` from `modules/03-skill-registry/solution/main.go`).
 
 Next: [Agent Registry discovery and zero-compute remediation gate](../04-agent-registry-mcp-a2a/README.md)
