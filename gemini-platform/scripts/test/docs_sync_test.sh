@@ -112,7 +112,7 @@ fm = "\n".join(lines[1:end_idx])
 required_fm = [
     r"^id:\s*agent-substrate-gemini-platform\s*$",
     r"^summary:\s*.+$",
-    r"^categories:\s*GKE,\s*Gemini Enterprise Agent Platform,\s*Agent Substrate\s*$",
+    r"^categories:\s*GKE,\s*Gemini platform,\s*Agent Substrate\s*$",
     r"^tags:\s*GKE,\s*Gemini,\s*Agent Substrate,\s*ADK\s*$",
     r"^feedback_link:\s*https://github\.com/googlecodelabs/feedback/issues/new\?title=\[agent-substrate-gemini-platform\]:",
     r"language:GoLang",
@@ -135,9 +135,15 @@ for stale in (
     "Track 301",
     "Track 101",
     "BackendVertexAI",
+    "Gemini" + " Enterprise Agent Platform",
+    "Gemini" + " Agent Platform",
+    "Gemini" + " on Agent Platform",
+    "Qwiklabs",
+    "Terraform",
+    "Google Skills",
 ):
-    if stale in text:
-        sys.stderr.write(f"  stale staging/branding reference {stale!r} in codelabs/en.md\n")
+    if stale.lower() in text.lower():
+        sys.stderr.write(f"  stale staging/branding/platform reference {stale!r} in codelabs/en.md\n")
         sys.exit(1)
 
 in_fence = False

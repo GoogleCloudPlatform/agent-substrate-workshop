@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	// GenAISystemValue identifies Gemini Enterprise Agent Platform on all GenAI spans.
-	GenAISystemValue = "gemini_enterprise_agent_platform"
+	// GenAISystemValue identifies Gemini platform on all GenAI spans.
+	GenAISystemValue = "gemini_platform"
 	// DefaultAgentName is the canonical gen_ai.agent.name for the workshop agent.
 	DefaultAgentName = "platform-sre-triage-agent"
 )

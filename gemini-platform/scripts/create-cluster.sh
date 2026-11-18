@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Idempotently enables core GKE APIs, creates a uniform-CPU GKE 1.37+ cluster matching the
-# Qwiklabs Terraform topology (Workload Identity, Managed Prometheus, managed OpenTelemetry,
-# Standard Gateway API, 100 GiB pd-balanced boot disks), freezes node auto-upgrades for 48 hours,
+# Idempotently enables core GKE APIs, creates a uniform-CPU GKE 1.37+ cluster
+# (Workload Identity, Managed Prometheus, managed OpenTelemetry, Standard Gateway API,
+# 100 GiB pd-balanced boot disks), freezes node auto-upgrades for 48 hours,
 # and fetches kubectl credentials.
 source "$(dirname "$0")/lib.sh"
 load_env
@@ -28,8 +28,8 @@ CLUSTER_DISK_TYPE="${CLUSTER_DISK_TYPE:-pd-balanced}"
 CLUSTER_DISK_SIZE="${CLUSTER_DISK_SIZE:-100}"
 CLUSTER_MIN_CPU_PLATFORM="${CLUSTER_MIN_CPU_PLATFORM:-}"
 
-# Pin n1-* node pools to Intel Skylake when caller did not specify CLUSTER_MIN_CPU_PLATFORM,
-# matching Qwiklabs Terraform so SNAPSHOT_FIDELITY_MEMORY checkpoints restore across workers.
+# Pin n1-* node pools to Intel Skylake when caller did not specify CLUSTER_MIN_CPU_PLATFORM
+# so SNAPSHOT_FIDELITY_MEMORY checkpoints restore across workers.
 if [[ -z "$CLUSTER_MIN_CPU_PLATFORM" && "$CLUSTER_MACHINE_TYPE" == n1-* ]]; then
   CLUSTER_MIN_CPU_PLATFORM="Intel Skylake"
 fi

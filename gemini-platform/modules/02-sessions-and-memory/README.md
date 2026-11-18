@@ -6,7 +6,7 @@ In Module 01, your keyless **Incident Actor** (`sre-agent-v1`) cloned `ledger-ap
 
 ## Snapshots vs. Session Ledger vs. Consolidated Memory
 
-Agent Substrate's Cloud Storage checkpoints and **Gemini Enterprise Agent Platform**'s state services solve distinct layers of stateful agent operations:
+Agent Substrate's Cloud Storage checkpoints and **Gemini platform**'s state services solve distinct layers of stateful agent operations:
 
 | Layer | Where it lives | What it preserves | Lifecycle & visibility |
 |---|---|---|---|

@@ -79,7 +79,7 @@ Uses **Roboto** for UI/prose and **Roboto Mono** for logs, diffs, resource names
 The application uses clean path-based routing (never `?view=` query params) inside a persistent 3-zone **Google Cloud Console** shell:
 
 1. **Global Console Platform Bar (`48px` top header, `Elevation 2` + bottom hairline)**:
-   - Left: Collapsible nav menu icon + Google Cloud four-color mark + product title `Gemini Agent Platform · Agent Substrate` + stroked project selector pill (`${PROJECT_ID}`).
+   - Left: Collapsible nav menu icon + Google Cloud four-color mark + product title `Gemini platform · Agent Substrate` + stroked project selector pill (`${PROJECT_ID}`).
    - Right: Live Broker SPIFFE status indicator, discrete `⌘K` Operator & Scenario Controls icon button, and the icon-only **Moon / Sun Theme Toggle** (`light_mode` / `dark_mode`).
 2. **Collapsible Left Section Navigation (`240px` expanded / `56px` rail, `1px` right hairline)**:
    - `/` — **Investigations** (Incident Console & Cloud Assist Triage Agent)

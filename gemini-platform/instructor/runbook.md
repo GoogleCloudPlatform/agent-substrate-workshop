@@ -25,7 +25,7 @@
      MOCK_LLM=false make gateway
      ```
 3. **Verify external pins that drift independently of Agent Substrate.**
-   - Confirm `GEMINI_MODEL=gemini-3.8-flash` is active at `MODEL_LOCATION=global` on **Gemini Enterprise Agent Platform**.
+   - Confirm `GEMINI_MODEL=gemini-3.8-flash` is active at `MODEL_LOCATION=global` on **Gemini platform**.
    - Confirm `github.com/google/ko@v0.19.1` builds cleanly on the current Cloud Shell Go version.
    - On Linux workstations with context-aware client certificates enabled in `gcloud`, set `export CLOUDSDK_CORE_DISABLE_USAGE_REPORTING=true` (already exported inside `scripts/lib.sh`) so background telemetry subprocesses do not race on `~/.config/gcloud/caa_cert.pem`.
 4. **Provision attendee projects and GKE `1.37+` clusters.**

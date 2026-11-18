@@ -1,10 +1,10 @@
 # Wrap-up and production patterns (3 min)
 
-You have built, upgraded, governed, traced, and evaluated a stateful **ADK Go v2** **Platform SRE Triage Agent** running inside **Agent Substrate** (`v1.0.0`) on GKE and integrated across the **Actor Boundary** with **Gemini Enterprise Agent Platform**.
+You have built, upgraded, governed, traced, and evaluated a stateful **ADK Go v2** **Platform SRE Triage Agent** running inside **Agent Substrate** (`v1.0.0`) on GKE and integrated across the **Actor Boundary** with **Gemini platform**.
 
 ## Architectural synthesis: inside vs. outside the Actor Boundary
 
-| Layer | Inside the Actor Boundary (Agent Substrate on GKE) | Across the Actor Boundary (Governed Broker & Gemini Enterprise Agent Platform) |
+| Layer | Inside the Actor Boundary (Agent Substrate on GKE) | Across the Actor Boundary (Governed Broker & Gemini platform) |
 |---|---|---|
 | **Compute & state** | Per-incident `gVisor` **Incident Actor** (`inc-402`, `inc-403`) booted in under 400 ms from a shared **Golden Snapshot** with a durable `/workspace` git checkout; suspends to Cloud Storage at **`0 vCPU` / `0 MB RAM`** when idle or awaiting human approval. | **Session Ledger** (**Gemini Sessions**) serves zero-wake `ListEvents` while Actors sleep; **Consolidated Memory** (**Gemini Memory Bank**) distills root causes across `v1 -> v4` rollouts and sibling incidents. |
 | **Capabilities & rollout** | `ADK Go v2` `SkillToolset` unpacks verified archives into `/workspace/.skills/`; `toolconfirmation` pauses high-blast-radius remediations cleanly. | **Skill Registry** ships SHA-256-verified `SKILL.md` + POSIX scripts (`v1 -> v2`) with zero container rebuilds; **Agent Registry** advertises `/.well-known/agent-card.json` (**A2A**) and governed **MCP** servers. |

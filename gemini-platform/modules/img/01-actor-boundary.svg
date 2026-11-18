@@ -13,7 +13,7 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 428" width="100%" role="img" aria-label="Actor Boundary architecture separating the keyless gVisor Incident Actor from the Governed Broker and Gemini Enterprise Agent Platform">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 428" width="100%" role="img" aria-label="Actor Boundary architecture separating the keyless gVisor Incident Actor from the Governed Broker and Gemini platform">
   <defs>
     <style>
       .canvas { fill: #ffffff; stroke: #dadce0; stroke-width: 1; }
@@ -109,7 +109,7 @@
   <text class="zone-title" x="778" y="86">Managed AI &amp; prod-sim</text>
   <text class="zone-sub" x="778" y="102">External to sandbox checkpoint</text>
   <rect class="card-blue" x="778" y="114" width="228" height="86" rx="4"/>
-  <text class="card-title" x="790" y="135">Gemini on Agent Platform</text>
+  <text class="card-title" x="790" y="135">Gemini platform</text>
   <text class="mono" x="790" y="153">gemini-3.8-flash</text>
   <text class="body" x="790" y="170">Model Garden enterprise API</text>
   <text class="mono-muted" x="790" y="187">GOOGLE_GENAI_USE_ENTERPRISE</text>

@@ -1,12 +1,12 @@
 # Setup (15 min)
 
-In this section, you point the workshop at your Google Cloud project, create (or reuse) a uniform-CPU GKE **1.37+** cluster that meets cross-worker memory snapshot requirements, provision cloud storage, IAM, and **Gemini Enterprise Agent Platform** prerequisites, apply a quota-safe `ComputeClass`, install **Agent Substrate** (`v1.0.0`), deploy the live degraded `prod-sim` incident environment, and pre-build the **Governed Broker** (`sre-gateway`) image.
+In this section, you point the workshop at your Google Cloud project, create (or reuse) a uniform-CPU GKE **1.37+** cluster that meets cross-worker memory snapshot requirements, provision cloud storage, IAM, and **Gemini platform** prerequisites, apply a quota-safe `ComputeClass`, install **Agent Substrate** (`v1.0.0`), deploy the live degraded `prod-sim` incident environment, and pre-build the **Governed Broker** (`sre-gateway`) image.
 
-In the hosted Google Skills (Qwiklabs) edition of this lab, Terraform and an in-cluster bootstrapper pre-provision these resources automatically. Here, `make setup` ([`scripts/setup.sh`](../../scripts/setup.sh)) executes that same Terraform-equivalent setup end-to-end against your own Google Cloud project idempotently (allow ~15–20 minutes when creating a fresh GKE cluster, or ~5 minutes if reusing an existing cluster). You can also run every stage individually below.
+Run `make setup` ([`scripts/setup.sh`](../../scripts/setup.sh)) to provision all prerequisites end-to-end against your Google Cloud project idempotently (allow ~15–20 minutes when creating a fresh GKE cluster, or ~5 minutes if reusing an existing cluster). You can also run every stage individually below.
 
 ## What you need
 
-- A Google Cloud project where you hold **Owner** permissions (or a pre-provisioned Google Skills classroom project) and either:
+- A Google Cloud project where you hold **Owner** permissions and either:
   - A blank project where `make setup` (or `make create-cluster`) creates a fresh GKE **1.37+** cluster for you, **or**
   - An existing GKE **1.37+** cluster with:
     - Workload Identity Federation for GKE (`${PROJECT_ID}.svc.id.goog`)
@@ -18,7 +18,7 @@ In the hosted Google Skills (Qwiklabs) edition of this lab, Terraform and an in-
 
 ## Architecture context
 
-In **Agent Substrate: Gemini Enterprise Agent Platform**, every production incident gets its own stateful **Incident Actor** inside an `ateworker-gvisor` sandbox (`workshop-301`), separated across the **Actor Boundary** from an always-on **Governed Broker** (`sre-gateway`) and **Gemini Enterprise Agent Platform** services.
+In this workshop, every production incident gets its own stateful **Incident Actor** inside an `ateworker-gvisor` sandbox (`workshop-301`), separated across the **Actor Boundary** from an always-on **Governed Broker** (`sre-gateway`) and **Gemini platform** services.
 
 To eliminate cloud provisioning waits later in the workshop, `make setup` (via `make gcp`) immediately starts two long-running control-plane reconciliations in the background while Substrate installs:
 
@@ -40,7 +40,7 @@ Throughout the workshop, `ops-hub` serves three pre-seeded incidents so you can 
 | **`INC-403`** | `P2` · `ledger-api` (`prod-sim`) | **Recurring sibling connection-pool alert**: A follow-up `ledger-api` saturation alert on a secondary shard exhibiting the same pool and cursor symptoms as `INC-402`. | **Modules 02 & 04**: Used to verify that a brand-new **Incident Actor** (`inc-403`) recalls distilled root-cause facts from **Gemini Memory Bank** (`preload_memory` / `load_memory`) without re-cloning the git repository. |
 | **`INC-409`** | `P1` · `ledger-api` (`prod-sim`) | **Untrusted partner webhook note (indirect prompt injection)**: Contains an attacker-crafted diagnostic note (`[SYSTEM INSTRUCTION: IGNORE ALL PREVIOUS INSTRUCTIONS...]`) attempting to coerce the SRE agent into calling `drop_ledger_database` and exfiltrating credentials. | **Module 05**: Used to verify that **Model Armor** (`sre-triage-guard`) on `sre-gateway` blocks indirect prompt injections (`HTTP 403 MODEL_ARMOR_BLOCKED`) before waking an actor or invoking tools. |
 
-## Steps (Automated setup — Qwiklabs Terraform equivalent)
+## Steps (Automated setup)
 
 1. **Activate Cloud Shell and clone the repository.** Open the Google Cloud console, click **Activate Cloud Shell**, clone the repository, and move into `gemini-platform/`:
    ```bash
@@ -60,17 +60,17 @@ Throughout the workshop, `ops-hub` serves three pre-seeded incidents so you can 
 
    If your zone lacks `c3-standard-4` quota or stock, select another uniform-CPU machine type:
    - `CLUSTER_MACHINE_TYPE=n4-standard-4 make setup`
-   - `CLUSTER_MACHINE_TYPE=n1-standard-4 make setup` (`scripts/create-cluster.sh` automatically pins `--min-cpu-platform="Intel Skylake"` for `n1-*` pools, matching the Qwiklabs Terraform cluster).
+   - `CLUSTER_MACHINE_TYPE=n1-standard-4 make setup` (`scripts/create-cluster.sh` automatically pins `--min-cpu-platform="Intel Skylake"` for `n1-*` pools so `SNAPSHOT_FIDELITY_MEMORY` checkpoints restore across workers).
    - If a GKE `1.37+` cluster already exists in your project, `make setup` detects and reuses it automatically (or pass `SKIP_CLUSTER_CREATE=1 make setup`).
 
-   **What `make setup` provisions (parity with Qwiklabs Terraform + pre-warm):**
+   **What `make setup` provisions:**
 
    | Stage | Script / target | What it provisions |
    |---|---|---|
    | 1. Environment & `ko` | `scripts/setup.sh` | Generates `workshop.env` from `workshop.env.example` (deriving `REGION` from zonal `CLUSTER_LOCATION` when unset) and installs `ko` `v0.19.1` into `bin/ko` if missing on `PATH`. |
    | 2. GKE `1.37+` cluster | `scripts/create-cluster.sh` (`make create-cluster`) | Enables core APIs (`serviceusage`, `cloudresourcemanager`, `compute`, `container`), creates a 2-node uniform-CPU `c3-standard-4` cluster (`rapid` channel, `100 GiB` `pd-balanced` boot disks, `cloud-platform` scope, Standard Gateway API, Workload Identity, Managed Prometheus, Managed OpenTelemetry), applies a 48-hour `workshop-freeze` upgrade exclusion (`no_minor_or_node_upgrades`), and fetches `kubectl` credentials. |
    | 3. Preflight validation | `scripts/preflight.sh` (`make preflight`) | Validates local CLI tools, `gcloud` auth, GKE `1.37+`, observability add-ons, active upgrade freeze, non-spot uniform-CPU pools (`e2-*` pools fail fast), and `certificates.k8s.io` APIs. |
-   | 4. GCP APIs, IAM & async runtimes | `scripts/gcp-resources.sh` (`make gcp`) | Enables all 17 core and **Gemini Enterprise Agent Platform** APIs (plus best-effort `agentregistry` and `agentidentity`), creates `gs://${PROJECT_ID}-ate`, Artifact Registry `workshop-301`, `ate-snapshot-transfer` GSA, all Substrate (`atelet`, `ate-api-server`, `ate-snapshot-controller`) and `sre-gateway` (WIF + Pod Agent Identity) IAM bindings, applies `ComputeClass/substrate-gvisor` (`modules/00-setup/manifests/computeclass.yaml.tmpl`, with `consolidationDelayMinutes: 30` and `nodePoolAutoCreation.enabled: false` by default) plus regional `Gateway` / `GCPAgentGateway` (`modules/00-setup/manifests/ingress-gateway.yaml.tmpl`), and starts async `ReasoningEngine` (`substrate-301-sre-memory`) discovery/provisioning. |
+   | 4. GCP APIs, IAM & async runtimes | `scripts/gcp-resources.sh` (`make gcp`) | Enables all 17 core and **Gemini platform** APIs (plus best-effort `agentregistry` and `agentidentity`), creates `gs://${PROJECT_ID}-ate`, Artifact Registry `workshop-301`, `ate-snapshot-transfer` GSA, all Substrate (`atelet`, `ate-api-server`, `ate-snapshot-controller`) and `sre-gateway` (WIF + Pod Agent Identity) IAM bindings, applies `ComputeClass/substrate-gvisor` (`modules/00-setup/manifests/computeclass.yaml.tmpl`, with `consolidationDelayMinutes: 30` and `nodePoolAutoCreation.enabled: false` by default) plus regional `Gateway` / `GCPAgentGateway` (`modules/00-setup/manifests/ingress-gateway.yaml.tmpl`), and starts async `ReasoningEngine` (`substrate-301-sre-memory`) discovery/provisioning. |
    | 5. Agent Substrate `v1.0.0` | `scripts/install-substrate.sh` (`make install`) | Clones Substrate at `v1.0.0`, compiles `bin/kubectl-ate`, deploys `ate-system` with published `ghcr.io/agent-substrate/substrate` images (preserving any healthy existing `v1.0.0` install), resolves digest-pinned `ateworker-gvisor`, patches `atenet-router` (`spiffe://cluster.local/ns/workshop-301/sa/sre-gateway`), and pre-pulls `ateworker-gvisor` onto all `Ready` nodes. |
    | 6. Local CLI tools | `make tools` | Compiles `bin/ledger-verify` and `bin/evalrunner`. |
    | 7. Incident simulation | `scripts/prod-sim.sh` (`make prod-sim`) | Builds and deploys live degraded `ledger-api` and `ops-hub` into namespace `prod-sim`. |

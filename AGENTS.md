@@ -8,7 +8,7 @@ Hands-on workshop repository for building, running, and governing stateful AI ag
 
 The repository is structured into two self-contained workshops:
 - **`intro/`**: *Untrusted Code on Secure Runtimes: Agent Substrate on Kubernetes* (Substrate fundamentals, Actor lifecycle, golden snapshots, suspend/resume, density/idle, and 10 advanced optional labs in `intro/optional/`).
-- **`gemini-platform/`**: *Enterprise AI Agents with Agent Substrate and Gemini Agent Platform on GKE* (ADK Go v2 SRE Triage Agent, Actor Boundary, Gemini Sessions, Gemini Memory Bank, Skill Registry, Agent Registry MCP & A2A, Agent Identity, Ingress `GCPAgentGateway`, Model Armor & Auth Manager 3LO, and OpenTelemetry GenAI traces & online evals).
+- **`gemini-platform/`**: *Enterprise AI Agents with Agent Substrate and Gemini platform on GKE* (ADK Go v2 SRE Triage Agent, Actor Boundary, Gemini Sessions, Gemini Memory Bank, Skill Registry, Agent Registry MCP & A2A, Agent Identity, Ingress `GCPAgentGateway`, Model Armor & Auth Manager 3LO, and OpenTelemetry GenAI traces & online evals).
 
 ## Repository Layout
 
@@ -26,7 +26,7 @@ The repository is structured into two self-contained workshops:
 │   ├── Makefile           # Intro build and test orchestration
 │   ├── AGENTS.md          # Intro agent guide and sync contract
 │   └── README.md          # Intro curriculum landing page
-├── gemini-platform/       # Gemini Platform workshop: Enterprise Agent Platform
+├── gemini-platform/       # Gemini platform workshop: Enterprise AI Agents on GKE
 │   ├── app/               # ADK Go v2 SRE triage agent, broker, & simulation binaries
 │   ├── modules/           # 8 core modules (00-setup .. 07-wrap-up)
 │   ├── codelabs/          # Consolidated Codelabs edition (claat)
@@ -47,7 +47,7 @@ The repository is structured into two self-contained workshops:
 
 ## Branding & Hygiene Rules
 
-- **Platform Branding**: Always use **Gemini Enterprise Agent Platform** (or shorthand **Agent Platform** / **Gemini on Agent Platform**), never retired platform naming.
+- **Platform Branding**: Always use **Gemini platform** (never retired platform naming; keep technical DevSite Nomenclature tag `product:AgentPlatform` in `keywords:` frontmatter where required by DevSite).
 - **Personal Identifiers**: Never hardcode personal GKE cluster, project, org, or node names in docs, Makefiles, manifests, or scripts; derive defaults from `workshop.env`, `kubectl config current-context`, or `gcloud config get-value project`.
 - **Public Compute Terminology**: Never use internal compute terminology in public-facing prose, manifests, or comments (use "compute obtainability" where relevant).
 

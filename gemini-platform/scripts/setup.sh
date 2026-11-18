@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Full Qwiklabs-equivalent environment setup script for self-paced codelab and BYO-project users.
-# Automates every step that Terraform + substrate-prewarm provision in Google Skills:
+# Full environment setup script for running the workshop in your own Google Cloud project.
+# Automates end-to-end provisioning idempotently:
 #   1. Initialize workshop.env from workshop.env.example (if missing or blank)
 #   2. Ensure `ko` v0.19.1 is installed (auto-installs into bin/ko if missing on PATH)
 #   3. Create (or reuse) the uniform-CPU GKE 1.37+ cluster + 48h upgrade exclusion + kubeconfig
@@ -200,7 +200,7 @@ wait_reasoning_engine() {
   fi
 }
 
-step "Full workshop setup (Terraform-equivalent bootstrap)"
+step "Full workshop setup"
 init_workshop_env
 load_env
 require_cluster_location

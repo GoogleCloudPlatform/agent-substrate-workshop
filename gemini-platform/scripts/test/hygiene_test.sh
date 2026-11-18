@@ -48,10 +48,13 @@ t_no_personal_identifiers() {
 }
 
 t_no_retired_branding() {
-  local retired="Ver""tex([[:space:]]+AI|[^a-zA-Z0-9_.-]|$)"
+  local retired_v="Ver""tex([[:space:]]+AI|[^a-zA-Z0-9_.-]|$)"
+  local retired_geap="Gemini"" Enterprise Agent Platform"
+  local retired_gap="Gemini"" Agent Platform"
+  local retired_goap="Gemini"" on Agent Platform"
   local bad=0 f
   while IFS= read -r f; do
-    if grep -En "$retired" "$f" >&2; then
+    if grep -En "${retired_v}|${retired_geap}|${retired_gap}|${retired_goap}" "$f" >&2; then
       echo "  retired platform branding in $f" >&2
       bad=1
     fi

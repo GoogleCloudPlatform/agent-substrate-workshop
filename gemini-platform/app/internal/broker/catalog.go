@@ -174,7 +174,7 @@ func BuildArchitectureCatalog(p CatalogParams) ArchitectureCatalog {
 
 	return ArchitectureCatalog{
 		Title:                "Actor boundary & governed broker topology",
-		Subtitle:             "Stateful ADK Go v2 Incident Actors inside gVisor paired with Gemini Enterprise Agent Platform outside the Actor Boundary.",
+		Subtitle:             "Stateful ADK Go v2 Incident Actors inside gVisor paired with Gemini platform outside the Actor Boundary.",
 		Namespace:            ns,
 		Atespace:             as,
 		SimNamespace:         sim,
@@ -210,7 +210,7 @@ func BuildArchitectureCatalog(p CatalogParams) ArchitectureCatalog {
 			},
 			{
 				ID:       "cloud-and-sim",
-				Title:    "Gemini Enterprise Agent Platform & " + sim,
+				Title:    "Gemini platform & " + sim,
 				Subtitle: "Models, Sessions, Memory, Catalogs & Target Service",
 				X:        728,
 				Y:        20,
@@ -319,10 +319,10 @@ func BuildArchitectureCatalog(p CatalogParams) ArchitectureCatalog {
 			{
 				ID:       "agent-platform",
 				ZoneID:   "cloud-and-sim",
-				Title:    "Gemini Enterprise Agent Platform",
+				Title:    "Gemini platform",
 				Subtitle: "Models · Sessions · Memory · Catalogs",
 				Badge:    modelName,
-				Summary:  "Managed enterprise services reached exclusively through sre-gateway: Gemini on Agent Platform, Session Ledger (Gemini Sessions), Consolidated Memory (Gemini Memory Bank), Procedural Skill Registry, Agent Registry, Model Armor, Auth Manager, Cloud Trace, Online Evals, and Security Command Center Anomaly Detection.",
+				Summary:  "Managed enterprise services reached exclusively through sre-gateway: Gemini platform models, Session Ledger (Gemini Sessions), Consolidated Memory (Gemini Memory Bank), Procedural Skill Registry, Agent Registry, Model Armor, Auth Manager, Cloud Trace, Online Evals, and Security Command Center Anomaly Detection.",
 				Invariants: []string{
 					"Session Ledger & Consolidated Memory survive v1 -> v2 template rollouts",
 					"Procedural Skill revisions ship without Golden Snapshot churn",
@@ -403,7 +403,7 @@ func BuildArchitectureCatalog(p CatalogParams) ArchitectureCatalog {
 				ID:          "broker-to-platform",
 				From:        "sre-gateway",
 				To:          "agent-platform",
-				Label:       "WIF · Gemini & Agent Platform",
+				Label:       "WIF · Gemini platform",
 				Protocol:    "HTTPS + Workload Identity",
 				CrossesGate: false,
 			},
@@ -420,7 +420,7 @@ func BuildArchitectureCatalog(p CatalogParams) ArchitectureCatalog {
 			{
 				ID:          "turn-1-triage",
 				Title:       "Turn 1 keyless incident triage",
-				Description: "Operator dispatches INC-402; sre-gateway wakes inc-402 from the Golden Snapshot, clones ledger-api via /ops, and calls Gemini on Agent Platform with zero sandbox credentials.",
+				Description: "Operator dispatches INC-402; sre-gateway wakes inc-402 from the Golden Snapshot, clones ledger-api via /ops, and calls Gemini platform with zero sandbox credentials.",
 				Hops: []ArchitectureHop{
 					{Step: 1, EdgeID: "op-to-gw", Caption: "Operator submits INC-402 triage turn in Incident Console", Tone: "primary"},
 					{Step: 2, EdgeID: "gw-to-broker", Caption: "Gateway forwards turn to sre-gateway Governed Broker", Tone: "primary"},
@@ -428,7 +428,7 @@ func BuildArchitectureCatalog(p CatalogParams) ArchitectureCatalog {
 					{Step: 4, EdgeID: "router-to-actor", Caption: "atenet-router wakes keyless Incident Actor inc-402 on WorkerPool/sre-workers", Tone: "success"},
 					{Step: 5, EdgeID: "actor-to-broker", Caption: "ADK Go v2 Runner calls /ops/git and /genai across strict EgressPolicy", Tone: "primary"},
 					{Step: 6, EdgeID: "broker-to-sim", Caption: "sre-gateway streams ledger-api.git from Operations Hub into /workspace", Tone: "primary"},
-					{Step: 7, EdgeID: "broker-to-platform", Caption: "sre-gateway attaches Workload Identity and calls Gemini on Agent Platform", Tone: "success"},
+					{Step: 7, EdgeID: "broker-to-platform", Caption: "sre-gateway attaches Workload Identity and calls Gemini platform", Tone: "success"},
 				},
 			},
 			{

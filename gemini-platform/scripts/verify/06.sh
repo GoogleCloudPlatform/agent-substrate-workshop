@@ -80,7 +80,7 @@ check "GET /api/traces/${verify_trace_id} links broker + actor spans with gen_ai
   jq -e '
     .trace_id == "4bf92f3577b34da6a3ce929d0e0e4736" and
     ([.spans[].name] | (index("invoke_gateway_turn") != null and index("atenet.wake_and_route") != null and index("invoke_agent") != null)) and
-    (.spans[0].attributes["gen_ai.system"] == "gemini_enterprise_agent_platform") and
+    (.spans[0].attributes["gen_ai.system"] == "gemini_platform") and
     ((tostring | test("ya29\\.|gho_|opshub_at_|gcp\\.vertex\\.agent\\.tool_call_args")) | not)
   ' <<<"$trace_json"
 

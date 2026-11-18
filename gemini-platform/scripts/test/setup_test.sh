@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # Offline behavioral tests for scripts/create-cluster.sh, scripts/setup.sh, and
-# Qwiklabs Terraform parity in scripts/gcp-resources.sh.
+# core API / Workload Identity bindings in scripts/gcp-resources.sh.
 # shellcheck disable=SC2329,SC2030,SC2031 # t_* run via check(); per-test exports are subshell-local
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -136,7 +136,7 @@ STUB
     grep -Fq "container clusters get-credentials ate-cluster" "$d/cc.log"
 }
 
-t_gcp_resources_parity_with_terraform() {
+t_gcp_resources_core_apis_and_controller_wi() {
   local d; d="$(mktemp -d "$TMP/gcp-par.XXXXXX")"
   mkdir -p "$d/bin" "$d/state"
   cat >"$d/env" <<'EOF'
@@ -324,7 +324,7 @@ t_setup_sh_derives_region_from_cluster_location() {
 check "create-cluster.sh creates uniform-CPU c3-standard-4 GKE 1.37+ cluster, freezes upgrades, and fetches credentials" t_create_cluster_fresh_default_c3
 check "create-cluster.sh auto-pins Intel Skylake for n1-standard-4 pools and skips update when autoUpgrade is false" t_create_cluster_auto_pins_skylake_for_n1
 check "create-cluster.sh is idempotent when cluster exists with an active maintenance exclusion" t_create_cluster_idempotent_when_exists_with_active_exclusion
-check "gcp-resources.sh enables core compute APIs and binds ate-snapshot-controller Workload Identity" t_gcp_resources_parity_with_terraform
-check "setup.sh auto-generates workshop.env, installs ko, runs full Terraform-equivalent pipeline, and skips cached work on rerun" t_setup_sh_orchestrates_full_bootstrap_and_idempotent_rerun
+check "gcp-resources.sh enables core compute APIs and binds ate-snapshot-controller Workload Identity" t_gcp_resources_core_apis_and_controller_wi
+check "setup.sh auto-generates workshop.env, installs ko, runs full bootstrap pipeline, and skips cached work on rerun" t_setup_sh_orchestrates_full_bootstrap_and_idempotent_rerun
 check "setup.sh derives REGION from zonal CLUSTER_LOCATION when REGION is unset" t_setup_sh_derives_region_from_cluster_location
 exit "$fails"

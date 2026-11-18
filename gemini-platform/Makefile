@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Enterprise AI Agents with Agent Substrate and Gemini Agent Platform on GKE. Run `make help` for targets.
+# Enterprise AI Agents with Agent Substrate and Gemini platform on GKE. Run `make help` for targets.
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 MODULE ?=
@@ -27,7 +27,7 @@ help: ## Show targets
 	@echo "  Knobs in [brackets] go after the target: make verify MODULE=0"
 	@echo "  Everything else is set in workshop.env (WORKSHOP_ENV_FILE=path picks another file)."
 
-setup: ## Run full Terraform-equivalent setup end-to-end (env, ko, cluster, APIs, IAM, Substrate, prod-sim, tools, verify)
+setup: ## Run full setup end-to-end (env, ko, cluster, APIs, IAM, Substrate, prod-sim, tools, verify)
 	@scripts/setup.sh
 create-cluster: ## Enable core APIs, create the uniform-CPU GKE 1.37+ cluster, freeze upgrades, and fetch credentials
 	@scripts/create-cluster.sh

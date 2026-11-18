@@ -34,7 +34,7 @@ resolve_spiffe_identity
 WI="principal://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${PROJECT_ID}.svc.id.goog/subject"
 COMPUTE_SA="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 
-step "Enable core and Gemini Enterprise Agent Platform APIs"
+step "Enable core and Gemini platform APIs"
 gcloud services enable --project "$PROJECT_ID" \
   serviceusage.googleapis.com cloudresourcemanager.googleapis.com compute.googleapis.com \
   container.googleapis.com storage.googleapis.com artifactregistry.googleapis.com \
@@ -103,7 +103,7 @@ if $CREATED_TRANSFER_GSA && kubectl -n ate-system get deploy ate-api-server >/de
 fi
 ok "Substrate IAM bound"
 
-step "IAM for Governed Broker (${NAMESPACE}/sre-gateway -> Gemini Enterprise Agent Platform)"
+step "IAM for Governed Broker (${NAMESPACE}/sre-gateway -> Gemini platform)"
 WIF_GATEWAY_MEMBER="${WI}/ns/${NAMESPACE}/sa/sre-gateway"
 AGENT_GATEWAY_MEMBER="${WORKLOAD_PRINCIPAL_PREFIX}/ns/${NAMESPACE}/sa/sre-gateway"
 GATEWAY_MEMBERS=("$WIF_GATEWAY_MEMBER")
@@ -173,7 +173,7 @@ nohup bash -c '
     exit 0
   fi
   op="$(curl -fsS -X POST -H "Authorization: Bearer $tok" -H "Content-Type: application/json" \
-    -d "{\"displayName\":\"substrate-301-sre-memory\",\"description\":\"Managed session ledger and consolidated memory runtime for Agent Substrate on Gemini Agent Platform\"}" \
+    -d "{\"displayName\":\"substrate-301-sre-memory\",\"description\":\"Managed session ledger and consolidated memory runtime for Agent Substrate on Gemini platform\"}" \
     "${api}/reasoningEngines" 2>/dev/null | jq -r ".name // empty" || true)"
   if [[ -z "$op" ]]; then
     state_put reasoning-engine-id auto

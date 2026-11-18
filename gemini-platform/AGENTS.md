@@ -1,14 +1,14 @@
 # AGENTS.md
 
-Context for AI coding agents working in `GoogleCloudPlatform/agent-substrate-workshop/gemini-platform` (**Enterprise AI Agents with Agent Substrate and Gemini Agent Platform on GKE**).
+Context for AI coding agents working in `GoogleCloudPlatform/agent-substrate-workshop/gemini-platform` (**Enterprise AI Agents with Agent Substrate and Gemini platform on GKE**).
 
 ## Project overview
 
-Enterprise AI Agents workshop of `GoogleCloudPlatform/agent-substrate-workshop`. Participants build and govern a stateful **ADK Go v2** (`google.golang.org/adk/v2`) **Platform SRE Triage Agent** running inside an **Agent Substrate** (`v1.0.0`) gVisor Actor on Google Kubernetes Engine (GKE), integrated across the Actor Boundary with **Gemini Enterprise Agent Platform** (Model Garden, Gemini Sessions, Gemini Memory Bank, Skill Registry, Agent Registry MCP & A2A, Agent Identity, Ingress `GCPAgentGateway` + governed broker with Model Armor & Auth Manager, and OpenTelemetry GenAI Traces & Online Evals).
+Enterprise AI Agents workshop of `GoogleCloudPlatform/agent-substrate-workshop`. Participants build and govern a stateful **ADK Go v2** (`google.golang.org/adk/v2`) **Platform SRE Triage Agent** running inside an **Agent Substrate** (`v1.0.0`) gVisor Actor on Google Kubernetes Engine (GKE), integrated across the Actor Boundary with **Gemini platform** (Model Garden, Gemini Sessions, Gemini Memory Bank, Skill Registry, Agent Registry MCP & A2A, Agent Identity, Ingress `GCPAgentGateway` + governed broker with Model Armor & Auth Manager, and OpenTelemetry GenAI Traces & Online Evals).
 
 ## Branding & hygiene rules
 
-- Always use **Gemini Enterprise Agent Platform** (or shorthand **Agent Platform** / **Gemini on Agent Platform**), never retired platform naming.
+- Always use **Gemini platform** (never retired platform naming; keep technical DevSite Nomenclature tag `product:AgentPlatform` in `keywords:` frontmatter where required by DevSite).
 - Never hardcode personal GKE cluster, project, org, or node names in docs, Makefiles, manifests, or scripts; derive defaults from `workshop.env`, `kubectl config current-context`, or `gcloud config get-value project`.
 - Never use internal-only compute terminology in public-facing prose, manifests, or comments (use "compute obtainability" where relevant).
 
@@ -20,7 +20,7 @@ Workshop content is maintained in **three synchronized places** (enforced automa
    - Module titles use `# Title (NN min)` with subsections starting at `##` and diagram embeds at `../img/0N-*.svg`.
    - Modules `00` through `06` end with a `Next: [...]` relative link.
 2. **DevSite Codelabs edition ([`codelabs/en.md`](codelabs/en.md) + `codelabs/img/*.svg`)**:
-   - Starts with `claat` YAML frontmatter (`id: agent-substrate-gemini-platform`, `categories: GKE, Gemini Enterprise Agent Platform, Agent Substrate`, `tags: GKE, Gemini, Agent Substrate, ADK`, `language:GoLang`, `product:AgentPlatform`).
+   - Starts with `claat` YAML frontmatter (`id: agent-substrate-gemini-platform`, `categories: GKE, Gemini platform, Agent Substrate`, `tags: GKE, Gemini, Agent Substrate, ADK`, `language:GoLang`, `product:AgentPlatform`).
    - Contains a condensed `## Introduction` (`Duration: 02:00`), all 8 core modules (`## Setup` through `## Wrap-up and production patterns`, each immediately followed by `Duration: MM:SS` with subsections shifted down one level to `###`/`####`), and a trailing `## Appendix: Optional content` (`Duration: 10:00`) covering the GKE Ambient Networking + Secure Web Proxy (`AGENT_TO_ANYWHERE`) egress overlay and ending with `### When you're done`.
    - Rewrites diagram paths to `img/0N-*.svg`, omits `Next:` lines, links repository files via full GitHub URLs (`https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/...`), keeps zero raw `<` characters inside single-backtick inline code spans (`claat` sets `shouldEsc = false` inside `<code>`), and avoids nesting inline backticks inside `**...**` in top-level paragraphs (`claat` splits those across multiple `<p>` tags).
 3. **Google Skills / Qwiklabs edition ([`qwiklabs/en.md`](qwiklabs/en.md) + `qwiklabs/img/*.svg`)**:
