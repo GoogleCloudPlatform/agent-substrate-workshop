@@ -18,7 +18,7 @@ In ~90 minutes across 8 modules, you:
 
 | # | Section | Min | What you build & learn |
 |---|---|---|---|
-| 0 | [Setup](modules/00-setup/README.md) | 10 | Uniform-CPU preflight, quota-safe `ComputeClass`, Substrate `v1.0.0`, async gateway/runtime bootstrap, live `prod-sim` (`ledger-api` + `ops-hub`) |
+| 0 | [Setup](modules/00-setup/README.md) | 15 | One-command Terraform-equivalent `make setup` (or step-by-step `make create-cluster`, uniform-CPU preflight, quota-safe `ComputeClass`, Substrate `v1.0.0`, async gateway/runtime bootstrap, live `prod-sim`, pre-built `sre-gateway`) |
 | 1 | [Actor boundary](modules/01-actor-boundary/README.md) | 12 | Keyless ADK Go v2 **Incident Actor** (`v1`), **Governed Broker** (`sre-gateway`), Cloud Console **Incident Console**, Turn 1 repo clone & triage |
 | 2 | [Sessions & memory](modules/02-sessions-and-memory/README.md) | 15 | **Gemini Sessions** zero-wake `ListEvents` (`0 vCPU`) and **Gemini Memory Bank** cross-rollout (`v1` -> `v2`) & sibling-actor recall |
 | 3 | [Skill registry](modules/03-skill-registry/README.md) | 12 | **Skill Registry** SHA-256 bundle (`SKILL.md` + diagnostic script) and zero-rebuild `v1` -> `v2` rollout via `SkillToolset` |
@@ -33,10 +33,23 @@ In ~90 minutes across 8 modules, you:
 - **Local tools**: `gcloud`, `kubectl`, `go` 1.26+ (with `GOTOOLCHAIN=auto` fetching `go1.27` from `app/go.mod`, or `go` 1.27+), `ko`, `jq`, `envsubst`, `curl`, `git`, `python3`.
 ## Quick start
 
+One-command automated setup (equivalent to the hosted Google Skills Terraform stack; creates or reuses the uniform-CPU GKE `1.37+` cluster, enables APIs, configures IAM, installs Agent Substrate `v1.0.0`, builds local tools, deploys `prod-sim`, pre-builds `sre-gateway`, and verifies Module 00):
+
 ```bash
 git clone https://github.com/GoogleCloudPlatform/agent-substrate-workshop
 cd agent-substrate-workshop/gemini-platform
+export PROJECT_ID="$(gcloud config get-value project)"
+export CLUSTER_LOCATION="us-central1-a"
+make setup
+export PATH="$PWD/bin:$PATH"
+source scripts/env.sh
+```
+
+Or run the individual setup stages against an existing cluster:
+
+```bash
 cp workshop.env.example workshop.env   # set PROJECT_ID and CLUSTER_LOCATION
+make create-cluster                    # optional: create uniform-CPU GKE 1.37+ cluster
 make preflight
 make gcp
 export PATH="$PWD/bin:$PATH"
@@ -44,6 +57,7 @@ source scripts/env.sh
 make tools
 make install-bg
 make prod-sim
+make build-gateway
 make install-status                    # wait until "install finished"
 make verify MODULE=0
 ```

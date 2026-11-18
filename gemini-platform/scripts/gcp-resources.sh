@@ -36,6 +36,7 @@ COMPUTE_SA="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.c
 
 step "Enable core and Gemini Enterprise Agent Platform APIs"
 gcloud services enable --project "$PROJECT_ID" \
+  serviceusage.googleapis.com cloudresourcemanager.googleapis.com compute.googleapis.com \
   container.googleapis.com storage.googleapis.com artifactregistry.googleapis.com \
   iam.googleapis.com iamcredentials.googleapis.com \
   aiplatform.googleapis.com modelarmor.googleapis.com \
@@ -92,6 +93,7 @@ done
 bind_bucket "serviceAccount:${TRANSFER_GSA_EMAIL}" roles/storage.objectAdmin
 bind_bucket "serviceAccount:${TRANSFER_GSA_EMAIL}" roles/storage.bucketViewer
 bind_gsa    "$TRANSFER_GSA_EMAIL" "${WI}/ns/ate-system/sa/ate-api-server" roles/iam.serviceAccountTokenCreator
+bind_gsa    "$TRANSFER_GSA_EMAIL" "${WI}/ns/ate-system/sa/ate-snapshot-controller" roles/iam.workloadIdentityUser
 bind_bucket "$COMPUTE_SA" roles/storage.objectViewer
 bind_repo   "$COMPUTE_SA" roles/artifactregistry.reader
 if $CREATED_TRANSFER_GSA && kubectl -n ate-system get deploy ate-api-server >/dev/null 2>&1; then
@@ -171,7 +173,7 @@ nohup bash -c '
     exit 0
   fi
   op="$(curl -fsS -X POST -H "Authorization: Bearer $tok" -H "Content-Type: application/json" \
-    -d "{\"displayName\":\"substrate-301-sre-memory\",\"description\":\"Managed session ledger and consolidated memory runtime for Agent Substrate 301\"}" \
+    -d "{\"displayName\":\"substrate-301-sre-memory\",\"description\":\"Managed session ledger and consolidated memory runtime for Agent Substrate on Gemini Agent Platform\"}" \
     "${api}/reasoningEngines" 2>/dev/null | jq -r ".name // empty" || true)"
   if [[ -z "$op" ]]; then
     state_put reasoning-engine-id auto

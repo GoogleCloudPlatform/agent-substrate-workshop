@@ -493,6 +493,12 @@ t_svg_parity_and_license_hygiene() {
 t_instructor_and_oss_docs() {
   [[ -s "$ROOT/instructor/runbook.md" ]] &&
     [[ -s "$ROOT/instructor/troubleshooting.md" ]] &&
+    [[ -x "$ROOT/scripts/setup.sh" ]] &&
+    [[ -x "$ROOT/scripts/create-cluster.sh" ]] &&
+    grep -Fq "make setup" "$ROOT/codelabs/en.md" &&
+    grep -Fq "make create-cluster" "$ROOT/codelabs/en.md" &&
+    grep -Fq "make setup" "$ROOT/modules/00-setup/README.md" &&
+    grep -Fq "make create-cluster" "$ROOT/modules/00-setup/README.md" &&
     [[ -s "$ROOT/CONTRIBUTING.md" || -s "$ROOT/../CONTRIBUTING.md" ]] &&
     grep -Fq "2m 45s" "$ROOT/instructor/runbook.md" &&
     grep -Fq "gcp_medium_extra" "$ROOT/instructor/runbook.md" &&
