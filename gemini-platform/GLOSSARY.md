@@ -1,4 +1,4 @@
-# Enterprise AI Agents with Agent Substrate and Gemini Agent Platform on GKE
+# Enterprise AI Agents with Agent Substrate and Gemini platform on GKE
 
 Hands-on curriculum where platform and AI engineers build a stateful incident-response agent inside an isolated sandbox and govern it with managed enterprise state, catalog, security, and observability services.
 

@@ -33,7 +33,7 @@ import (
 const maxGenAIPayloadBytes = 4 << 20 // 4 MiB request cap for /genai proxy.
 
 // genaiProxy forwards keyless /genai requests from Incident Actors to Gemini on
-// Gemini Enterprise Agent Platform via Workload Identity, or serves a deterministic
+// Gemini platform via Workload Identity, or serves a deterministic
 // multi-step ADK tool-calling responder when MockLLM is enabled.
 type genaiProxy struct {
 	server        *Server
@@ -72,13 +72,13 @@ func newGenAIProxy(ctx context.Context, srv *Server, cfg Config, record func(Pol
 		Scopes: []string{"https://www.googleapis.com/auth/cloud-platform"},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("detect Workload Identity credentials for Gemini on Agent Platform: %w", err)
+		return nil, fmt.Errorf("detect Workload Identity credentials for Gemini platform: %w", err)
 	}
 	hc, err := httptransport.NewClient(&httptransport.Options{
 		Credentials: creds,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("build authenticated HTTP client for Gemini on Agent Platform: %w", err)
+		return nil, fmt.Errorf("build authenticated HTTP client for Gemini platform: %w", err)
 	}
 	hc.Timeout = 90 * time.Second
 	p.authedClient = hc
@@ -110,7 +110,7 @@ func (p *genaiProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			reqCtx,
 			"genai.generate_content",
 			"CLIENT",
-			"Gemini on Agent Platform",
+			"Gemini platform",
 			map[string]any{
 				"gen_ai.operation.name": "generate_content",
 				"gen_ai.request.model":  modelName,
@@ -181,10 +181,10 @@ func (p *genaiProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				Boundary:  "Model Garden (/genai)",
 				Action:    method + " (" + modelName + ")",
 				Verdict:   "ERROR",
-				Detail:    "Upstream Gemini on Agent Platform call failed: " + err.Error(),
+				Detail:    "Upstream Gemini platform call failed: " + err.Error(),
 			})
 		}
-		writeBrokerJSON(w, http.StatusBadGateway, map[string]string{"error": "upstream Gemini on Agent Platform call failed: " + err.Error()})
+		writeBrokerJSON(w, http.StatusBadGateway, map[string]string{"error": "upstream Gemini platform call failed: " + err.Error()})
 		return
 	}
 	defer resp.Body.Close()
@@ -214,7 +214,7 @@ func (p *genaiProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Boundary:  "Model Garden (/genai)",
 			Action:    method + " (" + modelName + ")",
 			Verdict:   verdict,
-			Detail:    "Attached Workload Identity outside sandbox -> Gemini Enterprise Agent Platform (" + p.modelLocation + ")",
+			Detail:    "Attached Workload Identity outside sandbox -> Gemini platform (" + p.modelLocation + ")",
 		})
 	}
 

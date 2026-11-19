@@ -77,8 +77,8 @@ for path in sys.argv[1:]:
             continue
         for match in re.finditer(r"(?<!`)`([^`\n]+)`(?!`)", line):
             span = match.group(1)
-            if re.search(r"<[^>]*>", span):
-                sys.stderr.write(f"  claat-unsafe <...> in inline code at {path}:{lineno}: {match.group(0)}\n")
+            if "<" in span:
+                sys.stderr.write(f"  claat-unsafe '<' in inline code at {path}:{lineno}: {match.group(0)}\n")
                 bad = 1
 sys.exit(bad)
 PY
@@ -104,12 +104,17 @@ for idx in range(1, min(len(lines), 30)):
 if end_idx is None:
     sys.stderr.write("  codelabs/en.md missing closing --- frontmatter delimiter\n")
     sys.exit(1)
+if end_idx < 2 or lines[end_idx - 1].strip() != "":
+    sys.stderr.write("  codelabs/en.md must have a blank line before closing --- for claat metadata parsing\n")
+    sys.exit(1)
 
 fm = "\n".join(lines[1:end_idx])
 required_fm = [
     r"^id:\s*agent-substrate-gemini-platform\s*$",
     r"^summary:\s*.+$",
-    r"^categories:\s*AgentPlatform,\s*Kubernetes\s*$",
+    r"^categories:\s*GKE,\s*Gemini platform,\s*Agent Substrate\s*$",
+    r"^tags:\s*GKE,\s*Gemini,\s*Agent Substrate,\s*ADK\s*$",
+    r"^feedback_link:\s*https://github\.com/googlecodelabs/feedback/issues/new\?title=\[agent-substrate-gemini-platform\]:",
     r"language:GoLang",
     r"product:AgentPlatform",
 ]
@@ -123,6 +128,24 @@ for bad_tag in ("product:GeminiEnterpriseAgentPlatform", "language:Go,", "langua
         sys.stderr.write(f"  unrecognized DevSite nomenclature tag in frontmatter: {bad_tag.strip()}\n")
         sys.exit(1)
 
+for stale in (
+    "gke-demos/substrate-agent-platform",
+    "agent-substrate-301",
+    "Agent Substrate 301",
+    "Track 301",
+    "Track 101",
+    "BackendVertexAI",
+    "Gemini" + " Enterprise Agent Platform",
+    "Gemini" + " Agent Platform",
+    "Gemini" + " on Agent Platform",
+    "Qwiklabs",
+    "Terraform",
+    "Google Skills",
+):
+    if stale.lower() in text.lower():
+        sys.stderr.write(f"  stale staging/branding/platform reference {stale!r} in codelabs/en.md\n")
+        sys.exit(1)
+
 in_fence = False
 step_headers = []
 for i, line in enumerate(lines[end_idx + 1:], start=end_idx + 2):
@@ -134,6 +157,13 @@ for i, line in enumerate(lines[end_idx + 1:], start=end_idx + 2):
     if line.startswith("Next:"):
         sys.stderr.write(f"  unexpected Next: line in codelabs/en.md:{i}\n")
         sys.exit(1)
+    if not re.match(r"^(\s*[-*]\s|\s*\d+\.\s|\||\s*>|#)", line):
+        for m in re.finditer(r"\*\*([^*\n]+)\*\*", line):
+            if "`" in m.group(1):
+                sys.stderr.write(
+                    f"  claat splits paragraphs on inline code nested inside **bold** at codelabs/en.md:{i}: {m.group(0)}\n"
+                )
+                sys.exit(1)
     if line.startswith("## "):
         step_headers.append(line)
         nxt = lines[i] if i < len(lines) else ""
@@ -469,6 +499,12 @@ t_svg_parity_and_license_hygiene() {
 t_instructor_and_oss_docs() {
   [[ -s "$ROOT/instructor/runbook.md" ]] &&
     [[ -s "$ROOT/instructor/troubleshooting.md" ]] &&
+    [[ -x "$ROOT/scripts/setup.sh" ]] &&
+    [[ -x "$ROOT/scripts/create-cluster.sh" ]] &&
+    grep -Fq "make setup" "$ROOT/codelabs/en.md" &&
+    grep -Fq "make create-cluster" "$ROOT/codelabs/en.md" &&
+    grep -Fq "make setup" "$ROOT/modules/00-setup/README.md" &&
+    grep -Fq "make create-cluster" "$ROOT/modules/00-setup/README.md" &&
     [[ -s "$ROOT/CONTRIBUTING.md" || -s "$ROOT/../CONTRIBUTING.md" ]] &&
     grep -Fq "2m 45s" "$ROOT/instructor/runbook.md" &&
     grep -Fq "gcp_medium_extra" "$ROOT/instructor/runbook.md" &&

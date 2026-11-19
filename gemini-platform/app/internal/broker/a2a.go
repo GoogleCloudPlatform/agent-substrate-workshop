@@ -117,7 +117,7 @@ func (s *Server) buildAgentCard(baseURL string) A2AAgentCardDTO {
 	a2aURL := strings.TrimRight(baseURL, "/") + "/a2a"
 	return A2AAgentCardDTO{
 		Name:            a2aAgentDisplayName,
-		Description:     "Stateful ADK Go v2 incident triage and workspace remediation agent running inside a keyless Agent Substrate gVisor Incident Actor on GKE, governed across the Actor Boundary by Gemini Enterprise Agent Platform.",
+		Description:     "Stateful ADK Go v2 incident triage and workspace remediation agent running inside a keyless Agent Substrate gVisor Incident Actor on GKE, governed across the Actor Boundary by Gemini platform.",
 		Version:         a2aAgentVersion,
 		ProtocolVersion: a2aProtocolVersion,
 		URL:             a2aURL,

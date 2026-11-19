@@ -784,7 +784,7 @@ func (m *MetricsRegistry) RenderText() string {
 		fmt.Fprintf(&b, "sre_gateway_turn_duration_seconds_count{template=%q} %d\n", tmpl, m.turnDurCount[tmpl])
 	}
 
-	b.WriteString("# HELP sre_gateway_genai_requests_total Outbound Gemini on Agent Platform calls proxied by sre-gateway.\n")
+	b.WriteString("# HELP sre_gateway_genai_requests_total Outbound Gemini platform calls proxied by sre-gateway.\n")
 	b.WriteString("# TYPE sre_gateway_genai_requests_total counter\n")
 	for _, k := range sortedKeys(m.genaiReqsTotal) {
 		mod, st, _ := strings.Cut(k, "|")

@@ -1,8 +1,8 @@
 # Actor boundary and first triage turn (12 min)
 
-In Module 00, you installed **Agent Substrate (`v1.0.0`)** and deployed the live degraded `prod-sim` incident environment (`ledger-api` + `ops-hub`). Now you cross the **Actor Boundary**: deploying the always-on **Governed Broker** (`sre-gateway`), warming a keyless **Incident Actor** (`sre-agent-v1`) backed by a **Golden Snapshot**, completing your first guided **ADK Go v2** code edit, and diagnosing `INC-402` inside `/workspace` before the actor auto-suspends to `0 vCPU` in Cloud Storage.
+In Module 00, you installed **Agent Substrate** (`v1.0.0`) and deployed the live degraded `prod-sim` incident environment (`ledger-api` + `ops-hub`). Now you cross the **Actor Boundary**: deploying the always-on **Governed Broker** (`sre-gateway`), warming a keyless **Incident Actor** (`sre-agent-v1`) backed by a **Golden Snapshot**, completing your first guided **ADK Go v2** code edit, and diagnosing `INC-402` inside `/workspace` before the actor auto-suspends to `0 vCPU` in Cloud Storage.
 
-![Actor Boundary architecture separating the keyless gVisor Incident Actor from the Governed Broker and Gemini Enterprise Agent Platform](../img/01-actor-boundary.svg)
+![Actor Boundary architecture separating the keyless gVisor Incident Actor from the Governed Broker and Gemini platform](../img/01-actor-boundary.svg)
 
 ## Why the Actor Boundary matters
 
@@ -11,10 +11,10 @@ Production SRE agents need two things that appear to conflict:
 1. **Stateful sandbox execution**: Investigating an incident requires cloning source repositories into `/workspace`, inspecting configs and ASTs, running diagnostic scripts, and staging git commits that survive across turns.
 2. **Zero-credential governance**: Multiplexed gVisor sandboxes checkpoint their full memory and `/workspace` filesystem to Cloud Storage (`SNAPSHOT_FIDELITY_MEMORY`). Any bearer token, API key, or OAuth secret fetched inside the sandbox would be written into shared snapshot storage.
 
-**Agent Substrate 301** separates those two concerns across the **Actor Boundary**:
+This architecture separates those two concerns across the **Actor Boundary**:
 
 - **Inside the Actor Boundary (`WorkerPool/sre-workers` + `sre-agent-v1`)**: Each incident (`inc-402`, `inc-403`, `inc-409`) runs in its own isolated `ateworker-gvisor` sandbox listening on port `80` with **zero ambient credentials** (`GOOGLE_APPLICATION_CREDENTIALS`, API keys, and OAuth tokens are never mounted inside the sandbox) and a default-deny `EgressPolicy` allowing outbound HTTP strictly to `sre-gateway.${NAMESPACE}.svc.cluster.local`.
-- **Outside the Actor Boundary (`Deployment/sre-gateway`)**: The always-on **Governed Broker** (`100m` CPU / `128Mi` RAM) serves the Google Cloud Console-modeled **Incident Console**, dials `atenet-router` over mTLS (`podidentity.podcert.ate.dev/identity`), attaches GKE Workload Identity credentials on `/genai/` requests to **Gemini on Agent Platform** (`gemini-3.8-flash`), streams Smart HTTP git clones via `/ops/`, and suspends idle Incident Actors after `15s` (`IDLE_AFTER=15s`).
+- **Outside the Actor Boundary (`Deployment/sre-gateway`)**: The always-on **Governed Broker** (`100m` CPU / `128Mi` RAM) serves the Google Cloud Console-modeled **Incident Console**, dials `atenet-router` over mTLS (`podidentity.podcert.ate.dev/identity`), attaches GKE Workload Identity credentials on `/genai/` requests to **Gemini platform** (`gemini-3.8-flash`), streams Smart HTTP git clones via `/ops/`, and suspends idle Incident Actors after `15s` (`IDLE_AFTER=15s`).
 
 ### Quick reference: simulated `prod-sim` incidents
 
@@ -45,13 +45,13 @@ In `ops-hub`, three simulated incidents are pre-seeded for the workshop:
    - **Investigations** (`/`): Shows the active incident selector (`INC-402`, `INC-403`, `INC-409`), live `Target service telemetry (ledger-api)` SLO metrics, the actor compute state badge (`Ready on demand`, `Running`, or `Suspended · 0 vCPU`), three detail tabs (**Overview & workspace diff**, **Governance & policy log**, and **Trace & online evals**), and the right-docked **SRE triage agent** chat pane.
    - **Session ledger & memory** (`/sessions`): Displays the zero-wake **Session Ledger** (`session.Event` turn history queryable at `0 vCPU` while the actor is `SUSPENDED`) and **Consolidated Memory** (**Gemini Memory Bank**) facts and search bar (wired in Module 02).
    - **Skill & agent catalog** (`/catalog`): Lists versioned **Procedural Skills** (`ledger-pool-triage` `v1`/`v2` with `SHA-256` digests) in **Skill Registry** (wired in Module 03), discovered **A2A** Agent Cards, and governed **MCP** servers (`logging-mcp`, `container-mcp`, `ops-hub-mcp`) with tool safety annotations (`readOnlyHint` vs `destructiveHint`, wired in Module 04).
-   - **Architecture** (`/about`): Click the **Architecture** button in the left navigation (which opens `/about`) to explore the interactive animated SVG diagram of the **Actor Boundary** and click through the five signal flows across the gVisor sandbox, `sre-gateway`, and **Gemini Enterprise Agent Platform**.
+   - **Architecture** (`/about`): Click the **Architecture** button in the left navigation (which opens `/about`) to explore the interactive animated SVG diagram of the **Actor Boundary** and click through the five signal flows across the gVisor sandbox, `sre-gateway`, and **Gemini platform**.
 
 3. **Open `app/cmd/agent/main.go` in Cloud Shell Editor and complete `WORKSHOP(module-1)`.** Run the command below in Cloud Shell to open `app/cmd/agent/main.go` in the browser-based VS Code editor (or click **Open Editor** in the Cloud Shell toolbar):
    ```bash
    cloudshell edit app/cmd/agent/main.go
    ```
-   Notice that `app/.ko.yaml` packages `./cmd/agent` onto `alpine/git:latest` (`< 5s` rebuilds) with `ledger-verify` compiled directly into `/ko-app/agent`, and `app/internal/agentruntime/workspace.go` provides four confined `/workspace` tools (`clone_repo`, `read_workspace_file`, `run_workspace_command`, and `stage_git_patch`).
+   Notice that `app/.ko.yaml` packages `./cmd/agent` onto `alpine/git:latest` (under 5 s rebuilds) with `ledger-verify` compiled directly into `/ko-app/agent`, and `app/internal/agentruntime/workspace.go` provides four confined `/workspace` tools (`clone_repo`, `read_workspace_file`, `run_workspace_command`, and `stage_git_patch`).
 
    In `app/cmd/agent/main.go`, locate the starter `buildRunner` function (lines 60–73):
    ```go
@@ -70,7 +70,7 @@ In `ops-hub`, three simulated incidents are pre-seeded for the workshop:
    	return nil, nil
    }
    ```
-   Replace the **entire `buildRunner` function** (from `func buildRunner(...)` through its closing `}`) in `app/cmd/agent/main.go` with the complete `buildRunner` function below and save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically add the required Go `import` packages):
+   Replace the entire `buildRunner` function (from `func buildRunner(...)` through its closing `}`) in `app/cmd/agent/main.go` with the complete `buildRunner` function below and save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically add the required Go `import` packages):
    ```go
    func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
    	// 1. Create a keyless Gemini model client that routes /genai/* requests through sre-gateway.
@@ -112,7 +112,7 @@ In `ops-hub`, three simulated incidents are pre-seeded for the workshop:
    }
    ```
    **What this code does:**
-   - `brokerclient.NewModel(ctx, cfg.BrokerURL, cfg.ModelName, nil)` initializes an ADK `model.LLM` backed by `google.golang.org/genai` (`BackendVertexAI` / **Gemini on Agent Platform**) pointed at `http://sre-gateway.workshop-301.svc.cluster.local:8080/genai` with a dummy placeholder credential inside the sandbox; `sre-gateway` strips the placeholder and attaches real GKE Workload Identity credentials outside the Actor Boundary.
+   - `brokerclient.NewModel(ctx, cfg.BrokerURL, cfg.ModelName, nil)` initializes an ADK `model.LLM` backed by `google.golang.org/genai` (`genai.BackendEnterprise` / **Gemini platform**) pointed at `http://sre-gateway.workshop-301.svc.cluster.local:8080/genai` with zero API keys or bearer tokens inside the sandbox; `sre-gateway` attaches real GKE Workload Identity credentials outside the Actor Boundary.
    - `session.InMemoryService()` stores turn history in memory inside the sandbox for Module 01 (you will upgrade this to external **Gemini Sessions** and **Gemini Memory Bank** in Module 02).
    - `llmagent.New(...)` and `runner.New(...)` wire the `sre_triage_agent` system instruction (`agentruntime.DefaultInstruction`) and the four `/workspace` tools (`clone_repo`, `read_workspace_file`, `run_workspace_command`, `stage_git_patch`) into an executable ADK Go v2 `Runner`.
 
@@ -122,9 +122,10 @@ In `ops-hub`, three simulated incidents are pre-seeded for the workshop:
    scripts/render.sh modules/01-actor-boundary/manifests/template-v1.yaml.tmpl | kubectl ate create actor-template -f -
    kubectl ate get actor-template sre-agent-v1 -a "$ATESPACE" -o yaml
    ```
-   Wait ~15–25 seconds until `status.goldenSnapshotStatus.goldenTag.name` is populated:
+   Wait ~15–25 seconds until `status.goldenSnapshotStatus.goldenTag.name` is populated (the loop stops early if `.errorMessage` appears):
    ```bash
-   until kubectl ate get actor-template sre-agent-v1 -a "$ATESPACE" -o json | jq -e '.status.goldenSnapshotStatus.goldenTag.name' >/dev/null; do sleep 2; done
+   until kubectl ate get actor-template sre-agent-v1 -a "$ATESPACE" -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus | (.goldenTag.name // .errorMessage)' >/dev/null; do sleep 2; done
+   kubectl ate get actor-template sre-agent-v1 -a "$ATESPACE"
    ```
 
 5. **Dispatch Turn 1 on `INC-402` (via Incident Console or `curl`).** Either click the **Triage INC-402** preset chip above the chat input in the right-docked **SRE triage agent** pane at `http://localhost:8081` (**Investigations** view, or via `⌘K`) and press **Send**, or run:

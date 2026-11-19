@@ -5,9 +5,9 @@ In Module 04, you built `sre-agent-v4` with dynamic **Agent Registry** MCP disco
 1. **Declarative L7 ingress governance (`Gateway/sre-ingress-gateway` + `GCPAuthzPolicy`, paired with `Gateway/sre-agent-gateway` + `GCPAgentGateway`)** at the regional GKE Gateway perimeter so external HTTP callers can reach the **Incident Console**, `/.well-known/agent-card.json`, and `/a2a`, while Actor-internal broker routes (`/genai/*`, `/mcp/*`, `/ops/git/*`, `/agentengine/*`, `/skillregistry/*`) remain unreachable from outside the cluster.
 2. **Pod Agent Identity SPIFFE SVIDs** (`spiffe://agents.global.{org-*,proj-*}.system.id.goog/...`) alongside cluster-local `atenet` mTLS so workload identity is cryptographically verifiable on outbound calls.
 3. **Cloud Model Armor + Sensitive Data Protection (SDP)** screening on user prompts, `/a2a` requests, and untrusted incident/tool payloads (`INC-409`) so indirect prompt injections are hard-blocked (`HTTP 403`) before hijacking tool calls, while PII tokens (`[REDACTED_EMAIL]`, `[REDACTED_API_KEY]`, `[REDACTED_SSN]`) are scrubbed inline.
-4. **Agent Identity Auth Manager & OAuth 2.0 + S256 PKCE 3LO brokering** so short-lived (`<= 15m`) operator bearer tokens live exclusively in `sre-gateway`'s server-side in-memory vault and are injected **only** on the outbound `sre-gateway -> ops-hub` hop, leaving **zero** bearer tokens inside the gVisor **Incident Actor** or its Cloud Storage snapshots.
+4. **Agent Identity Auth Manager & OAuth 2.0 + S256 PKCE 3LO brokering** so short-lived (≤ 15m) operator bearer tokens live exclusively in `sre-gateway`'s server-side in-memory vault and are injected **only** on the outbound `sre-gateway -> ops-hub` hop, leaving **zero** bearer tokens inside the gVisor **Incident Actor** or its Cloud Storage snapshots.
 
-Notice that Module 05 requires **zero `cmd/agent` code changes or image rebuilds**: every control operates across the **Actor Boundary** on the existing `sre-agent-v4` Golden Snapshot.
+Notice that Module 05 requires **zero** `cmd/agent` **code changes or image rebuilds**: every control operates across the **Actor Boundary** on the existing `sre-agent-v4` Golden Snapshot.
 
 ![Defense-in-depth zero-trust governance across GCPAgentGateway, Pod Agent Identity, Model Armor, Auth Manager 3LO, and keyless snapshots](../img/05-zero-trust-governance.svg)
 
@@ -18,7 +18,7 @@ Notice that Module 05 requires **zero `cmd/agent` code changes or image rebuilds
 | **Regional L7 ingress (`CLIENT_TO_AGENT`)** | `Gateway/sre-ingress-gateway` (`HTTPRoute/sre-ingress-route` + `GCPAuthzPolicy/sre-ingress-authz-policy`) + `Gateway/sre-agent-gateway` (`GCPAgentGateway/sre-client-to-agent-gateway`) | `GCPAuthzPolicy` (`spec.action: ALLOW`, `enforcementLevel: L7`, `policyProfile: REQUEST_AUTHZ`) permits only console, Agent Card, `/a2a`, `/api/*`, and `/oauth/*` paths at the external load balancer while `GCPAgentGateway` registers the internal `gke-l7-rilb` Agent Gateway without altering `EXTERNAL_MANAGED`. |
 | **Dual SPIFFE workload identity** | `/var/run/secrets/workload-spiffe-credentials/x509.credential-bundle.private-key.pem` + `/var/run/ate/identity/credential-bundle.pem` | `sre-gateway` inspects its GKE **Pod Agent Identity** X.509 URI SAN (`org-*` / `proj-*`, with standard Workload Identity fallback) and its `atenet` mTLS certificate, attaching `X-Agent-Identity-Principal` on governed outbound writes. |
 | **Model Armor & MCP policy guard** | `projects/${PROJECT_ID}/locations/${REGION}/templates/sre-triage-guard` (`:sanitizeUserPrompt` & `:sanitizeModelResponse`) + `/mcp/*` annotation enforcement | Blocks indirect prompt injections (`INC-409` attempting to invoke `drop_ledger_database`) with `HTTP 403 MODEL_ARMOR_BLOCKED`, redacts PII inline, and denies `destructiveHint: true` MCP tools (`drop_ledger_database`, `delete_production_namespace`). |
-| **3LO token brokering & zero-token snapshots** | `adk/v2/auth/gcp` (`GCP_AUTH_PROVIDER_ID`) + OAuth 2.0 Authorization Code (`S256` PKCE) -> `sre-gateway` `auth.InMemoryCredentialStore` | Approving a **Remediation Gate** without an active grant returns `HTTP 401 consent_required`; once authorized (`<= 15m` TTL), `sre-gateway` injects the `Authorization` bearer token and `X-Agentic-Delegation: true` only on `sre-gateway -> ops-hub`, recording dual `operator + agent` PR attribution while `gs://${BUCKET_NAME}/` snapshots retain `0` tokens. |
+| **3LO token brokering & zero-token snapshots** | `adk/v2/auth/gcp` (`GCP_AUTH_PROVIDER_ID`) + OAuth 2.0 Authorization Code (`S256` PKCE) -> `sre-gateway` `auth.InMemoryCredentialStore` | Approving a **Remediation Gate** without an active grant returns `HTTP 401 consent_required`; once authorized (≤ 15m TTL), `sre-gateway` injects the `Authorization` bearer token and `X-Agentic-Delegation: true` only on `sre-gateway -> ops-hub`, recording dual `operator + agent` PR attribution while `gs://${BUCKET_NAME}/` snapshots retain `0` tokens. |
 
 ## Steps
 
@@ -85,7 +85,7 @@ Notice that Module 05 requires **zero `cmd/agent` code changes or image rebuilds
    - **Option A — In the Incident Console UI (`http://localhost:8081/`)**:
      1. Select `INC-402` and click **Authorize 3LO** in the yellow **Remediation gate** banner (or press `⌘K` -> **Authorize 3LO**).
      2. Click **Approve access** on the Operations Hub OAuth 2.0 consent page to complete the S256 PKCE callback into `sre-gateway`.
-     3. Click **Approve remediation** in the banner to wake `inc-402` (`< 400ms`) and merge the pull request.
+     3. Click **Approve remediation** in the banner to wake `inc-402` (under 400 ms) and merge the pull request.
    - **Option B — From the terminal (equivalent to clicking Authorize 3LO + Approve remediation in the UI)**:
      ```bash
      source scripts/env.sh
@@ -94,7 +94,7 @@ Notice that Module 05 requires **zero `cmd/agent` code changes or image rebuilds
        -H 'Content-Type: application/json' -d '{}' | jq '{actor_name, remediation_gate_pending, resume_duration_ms, reply}'
      ```
 
-   Inspect the merged pull request on `ops-hub` to verify dual **human operator (`operator_sub`) + Pod Agent Identity (`agent_identity`)** attribution:
+   Inspect the merged pull request on `ops-hub` to verify dual **human operator** (`operator_sub`) + **Pod Agent Identity** (`agent_identity`) attribution:
    ```bash
    curl -s http://localhost:8081/ops/api/pulls | jq '.[-1] | {id, status, operator_sub, agent_identity, agentic_delegation}'
    ```

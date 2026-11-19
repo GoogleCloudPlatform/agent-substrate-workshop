@@ -7,7 +7,7 @@ This repository contains two workshops:
 | Workshop | Title | Audience & Focus | Code & Guide |
 |---|---|---|---|
 | **Intro** | [Untrusted Code on Secure Runtimes: Agent Substrate on Kubernetes](intro/README.md) | Platform engineers, Kubernetes operators, and AI infrastructure builders learning Substrate fundamentals. | [`intro/`](intro/) |
-| **Gemini Platform** | [Enterprise AI Agents with Agent Substrate and Gemini Agent Platform on GKE](gemini-platform/README.md) | Enterprise SRE, platform security, and AI agent developers building governed, stateful ADK agents across the Actor Boundary. | [`gemini-platform/`](gemini-platform/) |
+| **Gemini platform** | [Enterprise AI Agents with Agent Substrate and Gemini platform on GKE](gemini-platform/README.md) | Enterprise SRE, platform security, and AI agent developers building governed, stateful ADK agents across the Actor Boundary. | [`gemini-platform/`](gemini-platform/) |
 
 ---
 
@@ -24,15 +24,15 @@ Build and operate your own fleet of AI agents on Agent Substrate, starting from 
 - Monitor fleet metrics and latency with Prometheus, PromQL, and Cloud Monitoring dashboards.
 - Dive deeper with 10 post-workshop optional labs in [`intro/optional/`](intro/optional/) covering `agent-substrate/env`, `google/ax`, custom idle triggers, snapshot branching, direct gRPC clients, HPA, agent swarms, Kata/Cloud-Hypervisor microVMs, and credential injection.
 
-### [Gemini Platform: Enterprise AI Agents on GKE](gemini-platform/README.md)
+### [Gemini platform: Enterprise AI Agents on GKE](gemini-platform/README.md)
 
-Build, upgrade, govern, trace, and evaluate a stateful **ADK Go v2** (`google.golang.org/adk/v2`) **Platform SRE Triage Agent** running inside an **Agent Substrate (`v1.0.0`)** gVisor Actor on GKE, integrated across the Actor Boundary with **Gemini Enterprise Agent Platform**. In ~90 minutes across 8 modules:
+Build, upgrade, govern, trace, and evaluate a stateful **ADK Go v2** (`google.golang.org/adk/v2`) **Platform SRE Triage Agent** running inside an **Agent Substrate (`v1.0.0`)** gVisor Actor on GKE, integrated across the Actor Boundary with **Gemini platform**. In ~95 minutes across 8 modules:
 - Enforce the **Actor Boundary**: a 100% keyless, default-deny gVisor Incident Actor communicating strictly through an always-on **Governed Broker** (`sre-gateway`) serving a Google Cloud Console-styled **Incident Console**.
 - Zero-wake state inspection with **Gemini Sessions** and cross-rollout / sibling-actor knowledge retention with **Gemini Memory Bank**.
 - Dynamic, zero-rebuild runtime diagnostic tool delivery with SHA-256-verified **Skill Registry** procedural skill bundles (`v1` -> `v2`).
 - A2A Agent Card publishing and MCP server discovery with **Agent Registry**, pausing high-blast-radius actions at an ADK **Remediation Gate** that suspends the Actor to Cloud Storage (`0 vCPU`) until operator approval.
 - Defense-in-depth zero-trust governance: GKE `Gateway` + `GCPAgentGateway` + `GCPAuthzPolicy`, Pod **Agent Identity** SPIFFE credentials, **Auth Manager** 3-legged OAuth (`S256` PKCE), live **Model Armor** prompt-injection blocking (`INC-409`), and `0`-token snapshot hygiene audits.
-- Export secret-scrubbed W3C **OpenTelemetry** GenAI spans to **Cloud Trace** and score live triage sessions with a pure-Go **Gemini on Agent Platform** autorater (`make eval`).
+- Export secret-scrubbed W3C **OpenTelemetry** GenAI spans to **Cloud Trace** and score live triage sessions with a pure-Go **Gemini platform** autorater (`make eval`).
 
 ---
 
@@ -51,7 +51,7 @@ cp workshop.env.example workshop.env
 make preflight
 make help
 
-# Or work on the Gemini Platform workshop
+# Or work on the Gemini platform workshop
 cd ../gemini-platform
 cp workshop.env.example workshop.env
 make preflight
@@ -80,7 +80,7 @@ make test-gemini-platform
 Workshop documentation across both tracks is maintained and synchronized for three publishing formats:
 1. **Modular Guide (`modules/`)**: Markdown sources of truth with step-by-step instructions, diagrams, and solution files.
 2. **DevSite Codelabs (`codelabs/en.md`)**: Single-page `claat`-compatible codelabs with step timings and optional appendix labs.
-3. **Google Skills / Qwiklabs (`qwiklabs/en.md`)**: Pre-warmed lab guides aligned with `CloudVLab/gcp-devrel-content` (`labs/gke005-agent-substrate-intro` for the Intro workshop; `labs/gke006-agent-substrate-platform` for the Gemini Platform workshop).
+3. **Google Skills / Qwiklabs (`qwiklabs/en.md`)**: Pre-warmed lab guides aligned with `CloudVLab/gcp-devrel-content` (`labs/gke005-agent-substrate-intro` for the Intro workshop; `labs/gke006-agent-substrate-platform` for the Gemini platform workshop).
 
 ---
 

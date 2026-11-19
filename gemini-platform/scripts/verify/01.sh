@@ -32,7 +32,7 @@ trap 'stop_port_forward verify-gw' EXIT
 
 check "Incident Console serves / and /about on sre-gateway" \
   bash -c '
-    curl -fsS "$1/" | grep -q "Gemini Enterprise Agent Platform" &&
+    curl -fsS "$1/" | grep -q "Gemini platform" &&
       curl -fsS "$1/about" | grep -q "Architecture" &&
       curl -fsS "$1/api/architecture" | jq -e ".nodes | length >= 8"
   ' _ "$GW_URL"
