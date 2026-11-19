@@ -62,11 +62,11 @@
 - Test `make forward-gateway` (`localhost:8081`) or Cloud Shell **Web Preview (port 8081)** over the room's conference Wi-Fi before doors open.
 - Keep [`instructor/troubleshooting.md`](troubleshooting.md) open in a browser tab.
 
-## 90-minute standard timing and talk track
+## 95-minute standard timing and talk track
 
 | Module | Min | Core teaching point | Cut if behind |
 |---|---|---|---|
-| 0 Setup | 10 | Uniform-CPU memory restore requirement, quota-safe `ComputeClass`, async runtime bootstrap (`2m 45s` cold install). | Skip local `forward-ops-hub` / `forward-ledger` curls; jump straight to `make verify MODULE=0`. |
+| 0 Setup | 15 | Uniform-CPU memory restore requirement, quota-safe `ComputeClass`, async runtime bootstrap (`2m 45s` cold install on an existing cluster; ~15 min with fresh cluster creation). | Skip local `forward-ops-hub` / `forward-ledger` curls; jump straight to `make verify MODULE=0`. |
 | 1 Actor boundary | 12 | Stateful `/workspace` git tools inside gVisor vs. zero ambient credentials; `sre-gateway` holds identity. | Paste `WORKSHOP(module-1)` from `modules/01-actor-boundary/solution/main.go`. |
 | 2 Sessions & memory | 15 | Raw GCS snapshot (`1` actor, `1` template) vs. `0 vCPU` **Gemini Sessions** ledger vs. cross-actor **Gemini Memory Bank**. | Demo `INC-403` sibling recall on screen and move to `make verify MODULE=2`. |
 | 3 Skill registry | 12 | Baking `SKILL.md` into images churns Golden Snapshots; `SkillToolset` pulls SHA-256 `v1 -> v2` archives live. | Inspect `v1` vs. `v2` diffs together instead of editing `SKILL.md` manually. |

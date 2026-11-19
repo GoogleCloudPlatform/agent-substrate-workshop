@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Idempotently enables core GKE APIs, creates a uniform-CPU GKE 1.37+ cluster
+# Idempotently enables core GKE and observability APIs, creates a uniform-CPU GKE 1.37+ cluster
 # (Workload Identity, Managed Prometheus, managed OpenTelemetry, Standard Gateway API,
-# 100 GiB pd-balanced boot disks), freezes node auto-upgrades for 48 hours,
+# 100 GiB pd-balanced or hyperdisk-balanced boot disks), freezes node auto-upgrades for 48 hours,
 # and fetches kubectl credentials.
 source "$(dirname "$0")/lib.sh"
 load_env
@@ -24,23 +24,35 @@ require_cluster_location
 CLUSTER_VERSION="${CLUSTER_VERSION:-1.37}"
 CLUSTER_MACHINE_TYPE="${CLUSTER_MACHINE_TYPE:-c3-standard-4}"
 CLUSTER_NUM_NODES="${CLUSTER_NUM_NODES:-2}"
-CLUSTER_DISK_TYPE="${CLUSTER_DISK_TYPE:-pd-balanced}"
+if [[ -z "${CLUSTER_DISK_TYPE:-}" ]]; then
+  case "$CLUSTER_MACHINE_TYPE" in
+    n4-*|c4-*) CLUSTER_DISK_TYPE="hyperdisk-balanced" ;;
+    *)         CLUSTER_DISK_TYPE="pd-balanced" ;;
+  esac
+fi
 CLUSTER_DISK_SIZE="${CLUSTER_DISK_SIZE:-100}"
 CLUSTER_MIN_CPU_PLATFORM="${CLUSTER_MIN_CPU_PLATFORM:-}"
 
-# Pin n1-* node pools to Intel Skylake when caller did not specify CLUSTER_MIN_CPU_PLATFORM
+# Auto-pin multi-generation node pools when the caller did not specify CLUSTER_MIN_CPU_PLATFORM
 # so SNAPSHOT_FIDELITY_MEMORY checkpoints restore across workers.
-if [[ -z "$CLUSTER_MIN_CPU_PLATFORM" && "$CLUSTER_MACHINE_TYPE" == n1-* ]]; then
-  CLUSTER_MIN_CPU_PLATFORM="Intel Skylake"
+if [[ -z "$CLUSTER_MIN_CPU_PLATFORM" ]]; then
+  case "$CLUSTER_MACHINE_TYPE" in
+    n1-*) CLUSTER_MIN_CPU_PLATFORM="Intel Skylake" ;;
+    n2-*) CLUSTER_MIN_CPU_PLATFORM="Intel Ice Lake" ;;
+  esac
 fi
 
-step "Enable core compute and GKE APIs in ${PROJECT_ID}"
+step "Enable core compute, GKE, and observability APIs in ${PROJECT_ID}"
 gcloud services enable --project "$PROJECT_ID" \
   serviceusage.googleapis.com \
   cloudresourcemanager.googleapis.com \
   compute.googleapis.com \
-  container.googleapis.com
-ok "core cluster APIs enabled"
+  container.googleapis.com \
+  monitoring.googleapis.com \
+  logging.googleapis.com \
+  cloudtrace.googleapis.com \
+  telemetry.googleapis.com
+ok "core cluster and observability APIs enabled"
 
 desc="$(gcloud container clusters describe "$CLUSTER_NAME" \
   --location "$CLUSTER_LOCATION" \
@@ -73,6 +85,7 @@ else
     warn "cluster creation failed for machine type ${CLUSTER_MACHINE_TYPE} in ${CLUSTER_LOCATION}."
     warn "If your zone lacks ${CLUSTER_MACHINE_TYPE} quota or stock, retry with:"
     warn "  CLUSTER_MACHINE_TYPE=n4-standard-4 make create-cluster"
+    warn "  CLUSTER_MACHINE_TYPE=n2-standard-4 make create-cluster"
     warn "  CLUSTER_MACHINE_TYPE=n1-standard-4 CLUSTER_MIN_CPU_PLATFORM='Intel Skylake' make create-cluster"
     exit 1
   fi
@@ -86,7 +99,7 @@ fi
 has_upgrade_freeze() {
   [[ -n "${1:-}" ]] || return 1
   jq -e '
-    ([.nodePools[]?.management.autoUpgrade // false] | all(. == false))
+    ([.nodePools[]? | (.management.autoUpgrade // false)] | (length > 0) and all(. == false))
     or ((now | todate) as $t | [.maintenancePolicy.window.maintenanceExclusions // {} | .[]
         | select(.maintenanceExclusionOptions.scope == "NO_MINOR_OR_NODE_UPGRADES" or .maintenanceExclusionOptions.scope == "NO_UPGRADES")
         | select(.startTime <= $t and $t < .endTime)] | length > 0)
@@ -96,6 +109,13 @@ has_upgrade_freeze() {
 if has_upgrade_freeze "$desc"; then
   ok "node auto-upgrade disabled or active maintenance exclusion present"
 else
+  if [[ -n "$desc" ]] && jq -e '.maintenancePolicy.window.maintenanceExclusions // {} | has("workshop-freeze")' <<<"$desc" >/dev/null 2>&1; then
+    step "Remove expired maintenance exclusion (workshop-freeze) on ${CLUSTER_NAME}"
+    gcloud container clusters update "$CLUSTER_NAME" \
+      --project "$PROJECT_ID" \
+      --location "$CLUSTER_LOCATION" \
+      --remove-maintenance-exclusion workshop-freeze
+  fi
   step "Add 48-hour maintenance exclusion (workshop-freeze) on ${CLUSTER_NAME}"
   freeze_start="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   freeze_end="$(date -u -d '+2 days' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+2d +%Y-%m-%dT%H:%M:%SZ)"

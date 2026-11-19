@@ -22,7 +22,7 @@ help:
 	@echo "Available targets:"
 	@echo "  make test                 Run test suites for all workshops (intro and gemini-platform)"
 	@echo "  make test-intro           Run test suite for Intro workshop"
-	@echo "  make test-gemini-platform Run test suite for Gemini Platform workshop"
+	@echo "  make test-gemini-platform Run test suite for Gemini platform workshop"
 	@echo ""
 	@echo "To work in a specific workshop, navigate to its directory:"
 	@echo "  cd intro && make help"

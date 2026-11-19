@@ -26,7 +26,7 @@ Build and operate your own fleet of AI agents on Agent Substrate, starting from 
 
 ### [Gemini platform: Enterprise AI Agents on GKE](gemini-platform/README.md)
 
-Build, upgrade, govern, trace, and evaluate a stateful **ADK Go v2** (`google.golang.org/adk/v2`) **Platform SRE Triage Agent** running inside an **Agent Substrate (`v1.0.0`)** gVisor Actor on GKE, integrated across the Actor Boundary with **Gemini platform**. In ~90 minutes across 8 modules:
+Build, upgrade, govern, trace, and evaluate a stateful **ADK Go v2** (`google.golang.org/adk/v2`) **Platform SRE Triage Agent** running inside an **Agent Substrate (`v1.0.0`)** gVisor Actor on GKE, integrated across the Actor Boundary with **Gemini platform**. In ~95 minutes across 8 modules:
 - Enforce the **Actor Boundary**: a 100% keyless, default-deny gVisor Incident Actor communicating strictly through an always-on **Governed Broker** (`sre-gateway`) serving a Google Cloud Console-styled **Incident Console**.
 - Zero-wake state inspection with **Gemini Sessions** and cross-rollout / sibling-actor knowledge retention with **Gemini Memory Bank**.
 - Dynamic, zero-rebuild runtime diagnostic tool delivery with SHA-256-verified **Skill Registry** procedural skill bundles (`v1` -> `v2`).
@@ -51,7 +51,7 @@ cp workshop.env.example workshop.env
 make preflight
 make help
 
-# Or work on the Gemini Platform workshop
+# Or work on the Gemini platform workshop
 cd ../gemini-platform
 cp workshop.env.example workshop.env
 make preflight
@@ -80,7 +80,7 @@ make test-gemini-platform
 Workshop documentation across both tracks is maintained and synchronized for three publishing formats:
 1. **Modular Guide (`modules/`)**: Markdown sources of truth with step-by-step instructions, diagrams, and solution files.
 2. **DevSite Codelabs (`codelabs/en.md`)**: Single-page `claat`-compatible codelabs with step timings and optional appendix labs.
-3. **Google Skills / Qwiklabs (`qwiklabs/en.md`)**: Pre-warmed lab guides aligned with `CloudVLab/gcp-devrel-content` (`labs/gke005-agent-substrate-intro` for the Intro workshop; `labs/gke006-agent-substrate-platform` for the Gemini Platform workshop).
+3. **Google Skills / Qwiklabs (`qwiklabs/en.md`)**: Pre-warmed lab guides aligned with `CloudVLab/gcp-devrel-content` (`labs/gke005-agent-substrate-intro` for the Intro workshop; `labs/gke006-agent-substrate-platform` for the Gemini platform workshop).
 
 ---
 

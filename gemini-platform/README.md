@@ -4,7 +4,7 @@ Build, upgrade, govern, and evaluate a stateful **ADK Go v2** (`google.golang.or
 
 > Enterprise AI Agents workshop of [`GoogleCloudPlatform/agent-substrate-workshop`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop).
 
-In ~90 minutes across 8 modules, you:
+In ~95 minutes across 8 modules, you:
 
 - Validate uniform-CPU GKE `1.37+` prerequisites, apply a quota-safe `ComputeClass` (`substrate-gvisor`), install Agent Substrate `v1.0.0`, and boot a live degraded microservice (`ledger-api`) alongside a self-contained Git, Ticket, MCP, and OAuth 2.0 **Operations Hub** (`ops-hub`) in `prod-sim`.
 - Wire a keyless **ADK Go v2** triage agent inside a `gVisor` **Incident Actor** (`port 80`, `Golden Snapshot`, `/workspace` durable directory) routed across strict `EgressPolicy` through an always-on **Governed Broker** (`sre-gateway`) serving a **Google Cloud Console**-modeled **Incident Console** over **Gemini** on the **Gemini platform** (Model Garden).
@@ -56,9 +56,8 @@ export PATH="$PWD/bin:$PATH"
 source scripts/env.sh
 make tools
 make install-bg
-make prod-sim
+make install-status                    # wait until "install finished" (installs Substrate + prod-sim)
 make build-gateway
-make install-status                    # wait until "install finished"
 make verify MODULE=0
 ```
 
@@ -70,7 +69,7 @@ make verify MODULE=0
 | `modules/img/` | Cloud Console-styled Apache-2.0 SVG architecture diagrams (`01` through `06`) |
 | `codelabs/` | Consolidated DevSite Codelabs edition (`en.md` + `img/`, including optional overlay appendix) |
 | `qwiklabs/` | Consolidated Google Skills / Qwiklabs classroom edition (`en.md` + `img/`, core modules only) |
-| `instructor/` | Event delivery `runbook.md` (benchmarks, 60m/90m cut lines, HotLab sizing) and `troubleshooting.md` |
+| `instructor/` | Event delivery `runbook.md` (benchmarks, 60m/95m cut lines, HotLab sizing) and `troubleshooting.md` |
 | `app/` | Go `1.27` module: `cmd/ledger-api`, `cmd/ops-hub`, `cmd/ledger-verify`, `cmd/agent`, `cmd/sre-gateway`, and `cmd/evalrunner` |
 | `scripts/` | Automation, rendering, SPIFFE auto-detection, per-module `verify/`, `catch-up.sh`, and offline `scripts/test/` suite |
 | `docs/` | Architecture Decision Records (`docs/adr/0001..0004`) and agent workflow conventions (`docs/agents/`) |

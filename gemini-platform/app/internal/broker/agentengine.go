@@ -319,7 +319,7 @@ func (p *agentEngineProxy) bootstrapReasoningEngine(ctx context.Context) {
 	}
 	createBody := map[string]string{
 		"displayName": wantDisplayName,
-		"description": "Managed session ledger and consolidated memory runtime for Agent Substrate 301",
+		"description": "Managed session ledger and consolidated memory runtime for Agent Substrate on Gemini platform",
 	}
 	if _, err := p.doCloudJSON(ctx, http.MethodPost, enginesURL, createBody, &createOp); err != nil {
 		return

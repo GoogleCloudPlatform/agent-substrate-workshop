@@ -102,7 +102,7 @@ if ! _no_bg_install; then
   step "Waiting for background Agent Substrate install (.workshop/install.log)"
   wait_for 1800 "background install to finish" _no_bg_install
 fi
-if [[ "$(state_get install-complete || true)" != *"SUBSTRATE_REF=$SUBSTRATE_REF" ]]; then
+if [[ " $(state_get install-complete || true) " != *" SUBSTRATE_REF=${SUBSTRATE_REF} "* ]]; then
   "$S/install-substrate.sh"
 fi
 make -s -C "$REPO_ROOT" tools

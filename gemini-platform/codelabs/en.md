@@ -104,27 +104,12 @@ Throughout the workshop, `ops-hub` serves three pre-seeded incidents so you can 
 
    make setup
    ```
+   If your zone lacks `c3-standard-4` quota or stock, see the quota fallback note below.
 
-> aside positive
-> **Machine-type quota fallback & existing clusters:** If your zone lacks `c3-standard-4` quota or stock, retry with `CLUSTER_MACHINE_TYPE=n4-standard-4 make setup` or `CLUSTER_MACHINE_TYPE=n1-standard-4 make setup` (`scripts/create-cluster.sh` automatically pins `--min-cpu-platform="Intel Skylake"` for `n1-*` pools so `SNAPSHOT_FIDELITY_MEMORY` checkpoints restore across workers). If a uniform-CPU GKE `1.37+` cluster already exists, `make setup` reuses it automatically (or pass `SKIP_CLUSTER_CREATE=1 make setup`).
-
-#### What `make setup` provisions
-
-| Stage | Script / `make` target | What it provisions |
-|---|---|---|
-| 1. Environment & `ko` | [`scripts/setup.sh`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/scripts/setup.sh) | Writes `workshop.env` from [`workshop.env.example`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/workshop.env.example) (deriving `REGION` from zonal `CLUSTER_LOCATION` when unset) and installs `ko` `v0.19.1` into `bin/ko` if missing on `PATH`. |
-| 2. GKE `1.37+` cluster | [`scripts/create-cluster.sh`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/scripts/create-cluster.sh) (`make create-cluster`) | Enables core APIs (`serviceusage`, `cloudresourcemanager`, `compute`, `container`), creates a 2-node uniform-CPU `c3-standard-4` cluster (`rapid` channel, `100 GiB` `pd-balanced` boot disks, `cloud-platform` scope, Standard Gateway API, Workload Identity, Managed Prometheus, Managed OpenTelemetry), applies a 48-hour `workshop-freeze` upgrade exclusion (`no_minor_or_node_upgrades`), and fetches `kubectl` credentials. |
-| 3. Preflight validation | [`scripts/preflight.sh`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/scripts/preflight.sh) (`make preflight`) | Validates CLI tools, `gcloud` auth, GKE `1.37+`, observability add-ons, active upgrade freeze, non-spot uniform-CPU pools (`e2-*` pools fail fast), and `certificates.k8s.io` APIs. |
-| 4. GCP APIs, IAM & async runtimes | [`scripts/gcp-resources.sh`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/scripts/gcp-resources.sh) (`make gcp`) | Enables all 17 core and **Gemini platform** APIs (plus best-effort `agentregistry` and `agentidentity`), creates `gs://${PROJECT_ID}-ate`, Artifact Registry `workshop-301`, `ate-snapshot-transfer` GSA, all Substrate (`atelet`, `ate-api-server`, `ate-snapshot-controller`) and `sre-gateway` (WIF + Pod Agent Identity) IAM bindings, applies [`ComputeClass/substrate-gvisor`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/modules/00-setup/manifests/computeclass.yaml.tmpl) (`consolidationDelayMinutes: 30`, `nodePoolAutoCreation.enabled: false` by default) plus regional `Gateway` / `GCPAgentGateway` ([`ingress-gateway.yaml.tmpl`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/modules/00-setup/manifests/ingress-gateway.yaml.tmpl)), and starts async `ReasoningEngine` (`substrate-301-sre-memory`) discovery/provisioning. |
-| 5. Agent Substrate `v1.0.0` | [`scripts/install-substrate.sh`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/scripts/install-substrate.sh) (`make install`) | Clones Substrate at `v1.0.0`, compiles `bin/kubectl-ate`, deploys `ate-system` with published `ghcr.io/agent-substrate/substrate` images (preserving any healthy existing `v1.0.0` install), resolves digest-pinned `ateworker-gvisor`, patches `atenet-router` (`spiffe://cluster.local/ns/workshop-301/sa/sre-gateway`), and pre-pulls `ateworker-gvisor` onto all `Ready` nodes. |
-| 6. Local CLI tools | `make tools` | Compiles `bin/ledger-verify` and `bin/evalrunner`. |
-| 7. Incident simulation | [`scripts/prod-sim.sh`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/scripts/prod-sim.sh) (`make prod-sim`) | Builds and deploys live degraded `ledger-api` and `ops-hub` into namespace `prod-sim`. |
-| 8. Broker image pre-build | `make build-gateway` | Pre-builds and caches the `sre-gateway` digest in `.workshop/gateway-image` so `make gateway` deploys in seconds in Module 01. |
-| 9. Verification | [`scripts/verify/00.sh`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/scripts/verify/00.sh) (`make verify MODULE=0`) | Confirms bucket, Artifact Registry, `ate-system`, `ComputeClass`, `ops-hub` (`INC-402` + `INC-409`), degraded `ledger-api`, `bin/ledger-verify`, and `bin/kubectl-ate`. |
-
-3. **Load `bin/` and `workshop.env` into your current shell.** Because `make setup` runs in a subshell, load `bin/` (`kubectl-ate`, `ko`, `ledger-verify`, `evalrunner`) into your interactive shell `PATH` before starting Module 01:
+3. **Load `bin/` and `workshop.env` into your current shell.** Because `make setup` runs in a subshell, load `bin/` (`kubectl-ate`, `ko`, `ledger-verify`, `evalrunner`) into your interactive shell `PATH` (and persist it to `~/.bashrc` so Cloud Shell reconnects keep `bin/` on `PATH`) before starting Module 01:
    ```bash
    export PATH="$PWD/bin:$PATH"
+   grep -Fq "$PWD/bin" ~/.bashrc 2>/dev/null || echo "export PATH=\"$PWD/bin:\$PATH\"" >> ~/.bashrc
    source scripts/env.sh
    kubectl ate --help
    ```
@@ -139,6 +124,23 @@ Throughout the workshop, `ops-hub` serves three pre-seeded incidents so you can 
    ```
    **What this output means**: `ops-hub` serves `INC-402` (`OPEN`, connection-pool exhaustion) alongside `INC-403` and `INC-409`, and `ledger-api` reports `"status": "degraded"`, `"pool_exhausted": true`, and `"active_leaked_workers": 2`.
 
+> aside positive
+> **Machine-type quota fallback & existing clusters:** If your zone lacks `c3-standard-4` quota or stock, retry with `CLUSTER_MACHINE_TYPE=n4-standard-4 make setup` (`scripts/create-cluster.sh` automatically selects `hyperdisk-balanced` boot disks for `n4-*` and `c4-*`), `CLUSTER_MACHINE_TYPE=n2-standard-4 make setup` (automatically pins `--min-cpu-platform="Intel Ice Lake"`), or `CLUSTER_MACHINE_TYPE=n1-standard-4 make setup` (automatically pins `--min-cpu-platform="Intel Skylake"`). If a uniform-CPU GKE `1.37+` cluster already exists, `make setup` reuses it automatically (or pass `SKIP_CLUSTER_CREATE=1 make setup`).
+
+#### What `make setup` provisions
+
+| Stage | Script / `make` target | What it provisions |
+|---|---|---|
+| 1. Environment & `ko` | [`scripts/setup.sh`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/scripts/setup.sh) | Writes `workshop.env` from [`workshop.env.example`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/workshop.env.example) (deriving `REGION` from zonal or regional `CLUSTER_LOCATION` when unset) and installs `ko` `v0.19.1` into `bin/ko` if missing on `PATH`. |
+| 2. GKE `1.37+` cluster | [`scripts/create-cluster.sh`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/scripts/create-cluster.sh) (`make create-cluster`) | Enables core and observability APIs (`serviceusage`, `cloudresourcemanager`, `compute`, `container`, `monitoring`, `logging`, `cloudtrace`, `telemetry`), creates a 2-node uniform-CPU `c3-standard-4` cluster (`rapid` channel, `100 GiB` `pd-balanced` or `hyperdisk-balanced` for `n4-*`/`c4-*` boot disks, `cloud-platform` scope, Standard Gateway API, Workload Identity, Managed Prometheus, Managed OpenTelemetry), applies a 48-hour `workshop-freeze` upgrade exclusion (`no_minor_or_node_upgrades`), and fetches `kubectl` credentials. |
+| 3. Preflight validation | [`scripts/preflight.sh`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/scripts/preflight.sh) (`make preflight`) | Validates CLI tools, `gcloud` auth, GKE `1.37+`, observability add-ons, active upgrade freeze, non-spot uniform-CPU pools (`e2-*` pools fail fast), and `certificates.k8s.io` APIs. |
+| 4. GCP APIs, IAM & async runtimes | [`scripts/gcp-resources.sh`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/scripts/gcp-resources.sh) (`make gcp`) | Enables all 17 core and **Gemini platform** APIs (plus best-effort `agentregistry` and `agentidentity`), creates `gs://${PROJECT_ID}-ate`, Artifact Registry `workshop-301`, `ate-snapshot-transfer` GSA, all Substrate (`atelet`, `ate-api-server`, `ate-snapshot-controller`) and `sre-gateway` (WIF + Pod Agent Identity) IAM bindings, ensures an active `REGIONAL_MANAGED_PROXY` subnet in the cluster VPC, applies [`ComputeClass/substrate-gvisor`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/modules/00-setup/manifests/computeclass.yaml.tmpl) (`consolidationDelayMinutes: 30`, `nodePoolAutoCreation.enabled: false` by default) plus regional `Gateway` / `GCPAgentGateway` ([`ingress-gateway.yaml.tmpl`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/modules/00-setup/manifests/ingress-gateway.yaml.tmpl)), and starts async `ReasoningEngine` (`substrate-301-sre-memory`) discovery/provisioning. |
+| 5. Agent Substrate `v1.0.0` | [`scripts/install-substrate.sh`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/scripts/install-substrate.sh) (`make install`) | Clones Substrate at `v1.0.0`, compiles `bin/kubectl-ate`, deploys `ate-system` with published `ghcr.io/agent-substrate/substrate` images (preserving any healthy existing `v1.0.0` install), resolves digest-pinned `ateworker-gvisor`, patches `atenet-router` (`spiffe://cluster.local/ns/workshop-301/sa/sre-gateway`), and pre-pulls `ateworker-gvisor` onto all `Ready` nodes. |
+| 6. Local CLI tools | `make tools` | Compiles `bin/ledger-verify` and `bin/evalrunner`. |
+| 7. Incident simulation | [`scripts/prod-sim.sh`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/scripts/prod-sim.sh) (`make prod-sim`) | Builds and deploys live degraded `ledger-api` and `ops-hub` into namespace `prod-sim`. |
+| 8. Broker image pre-build | `make build-gateway` | Pre-builds and caches the `sre-gateway` digest in `.workshop/gateway-image` so `make gateway` deploys in seconds in Module 01. |
+| 9. Verification | [`scripts/verify/00.sh`](https://github.com/GoogleCloudPlatform/agent-substrate-workshop/blob/main/gemini-platform/scripts/verify/00.sh) (`make verify MODULE=0`) | Confirms bucket, Artifact Registry, `ate-system`, `ComputeClass`, `ops-hub` (`INC-402` + `INC-409`), degraded `ledger-api`, `bin/ledger-verify`, and `bin/kubectl-ate`. |
+
 ### Alternative: Run setup stages individually
 
 If you prefer to inspect or execute each setup step manually instead of running `make setup`, run these stages in order:
@@ -147,6 +149,7 @@ If you prefer to inspect or execute each setup step manually instead of running 
    ```bash
    go install github.com/google/ko@v0.19.1
    export PATH="$(go env GOPATH)/bin:$PATH"
+   grep -Fq 'go env GOPATH' ~/.bashrc 2>/dev/null || echo 'export PATH="$(go env GOPATH)/bin:$PATH"' >> ~/.bashrc
    cp workshop.env.example workshop.env
    ${EDITOR:-nano} workshop.env
    ```
@@ -161,7 +164,11 @@ If you prefer to inspect or execute each setup step manually instead of running 
      serviceusage.googleapis.com \
      cloudresourcemanager.googleapis.com \
      compute.googleapis.com \
-     container.googleapis.com
+     container.googleapis.com \
+     monitoring.googleapis.com \
+     logging.googleapis.com \
+     cloudtrace.googleapis.com \
+     telemetry.googleapis.com
 
    gcloud beta container clusters create "$CLUSTER_NAME" \
      --project "$PROJECT_ID" \
@@ -195,19 +202,21 @@ If you prefer to inspect or execute each setup step manually instead of running 
      --project "$PROJECT_ID"
    ```
 
-3. **Run preflight, GCP bootstrap, tools, Agent Substrate, `prod-sim`, and `sre-gateway` pre-build:**
+3. **Run preflight, GCP bootstrap, tools, Agent Substrate + `prod-sim`, and `sre-gateway` pre-build:**
    ```bash
    make preflight
    make gcp
    export PATH="$PWD/bin:$PATH"
+   grep -Fq "$PWD/bin" ~/.bashrc 2>/dev/null || echo "export PATH=\"$PWD/bin:\$PATH\"" >> ~/.bashrc
    source scripts/env.sh
    make tools
    make install-bg
-   make prod-sim
-   make build-gateway
    make install-status
    ```
-   Wait until `make install-status` reports `install finished` (typically 3–5 minutes with published images).
+   Wait until `make install-status` reports `install finished` (typically 3–5 minutes with published images; `make install-bg` installs Agent Substrate and deploys `prod-sim` together), then pre-build the `sre-gateway` image:
+   ```bash
+   make build-gateway
+   ```
 
 ### Checkpoint
 

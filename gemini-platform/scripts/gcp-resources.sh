@@ -122,6 +122,41 @@ for gw_member in "${GATEWAY_MEMBERS[@]}"; do
 done
 ok "Governed Broker IAM bound"
 
+step "Ensure REGIONAL_MANAGED_PROXY subnet for regional GKE Gateways (${REGION})"
+PROXY_SUBNET_NAME="${PROXY_SUBNET_NAME:-proxy-only-${REGION}}"
+PROXY_SUBNET_RANGE="${PROXY_SUBNET_RANGE:-10.127.0.0/23}"
+cluster_net="${CLUSTER_NETWORK:-}"
+if [[ -z "$cluster_net" && -n "${CLUSTER_LOCATION:-}" ]]; then
+  cluster_net="$(gcloud container clusters describe "$CLUSTER_NAME" \
+    --location "$CLUSTER_LOCATION" --project "$PROJECT_ID" \
+    --format='value(network)' 2>/dev/null || true)"
+fi
+cluster_net="${cluster_net:-default}"
+if [[ "$cluster_net" =~ ^projects/([^/]+)/ && "${BASH_REMATCH[1]}" != "$PROJECT_ID" && "${BASH_REMATCH[1]}" != "$PROJECT_NUMBER" ]]; then
+  ok "cluster uses Shared VPC ${cluster_net}; assuming host project manages REGIONAL_MANAGED_PROXY subnet"
+else
+  vpc_name="${cluster_net##*/}"
+  existing_proxy_subnet="$(gcloud compute networks subnets list \
+    --project "$PROJECT_ID" \
+    --network "$vpc_name" \
+    --regions "$REGION" \
+    --filter="purpose=REGIONAL_MANAGED_PROXY AND role=ACTIVE" \
+    --format="value(name)" 2>/dev/null | head -n1 || true)"
+  if [[ -n "$existing_proxy_subnet" ]]; then
+    ok "proxy-only subnet ready: ${existing_proxy_subnet} (${vpc_name}/${REGION})"
+  elif gcloud compute networks subnets create "$PROXY_SUBNET_NAME" \
+    --project "$PROJECT_ID" \
+    --purpose=REGIONAL_MANAGED_PROXY \
+    --role=ACTIVE \
+    --region="$REGION" \
+    --network="$vpc_name" \
+    --range="$PROXY_SUBNET_RANGE" >/dev/null; then
+    ok "created proxy-only subnet ${PROXY_SUBNET_NAME} (${PROXY_SUBNET_RANGE}) in ${vpc_name}/${REGION}"
+  else
+    warn "could not create REGIONAL_MANAGED_PROXY subnet ${PROXY_SUBNET_NAME} (${PROXY_SUBNET_RANGE}) in ${vpc_name}/${REGION}; set PROXY_SUBNET_RANGE=<free-cidr> or pre-create an ACTIVE REGIONAL_MANAGED_PROXY subnet before Module 05"
+  fi
+fi
+
 step "Apply quota-safe ComputeClass and async regional ingress Gateway"
 if kubectl get nodes >/dev/null 2>&1; then
   if kubectl get crd computeclasses.cloud.google.com >/dev/null 2>&1; then

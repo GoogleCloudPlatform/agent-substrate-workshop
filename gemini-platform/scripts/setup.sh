@@ -41,10 +41,19 @@ source "$(dirname "$0")/lib.sh"
 ENV_FILE="${WORKSHOP_ENV_FILE:-$REPO_ROOT/workshop.env}"
 KO_VERSION="${KO_VERSION:-v0.19.1}"
 
+derive_region_from_location() {
+  local loc="${1:-}"
+  if [[ "$loc" =~ ^([a-z]+-[a-z0-9]+)-[a-z]$ ]]; then
+    printf '%s\n' "${BASH_REMATCH[1]}"
+  elif [[ "$loc" =~ ^[a-z]+-[a-z]+[0-9]+$ ]]; then
+    printf '%s\n' "$loc"
+  fi
+}
+
 init_workshop_env() {
   local proj="${PROJECT_ID:-}" region="${REGION:-}" loc="${CLUSTER_LOCATION:-}" cname="${CLUSTER_NAME:-}"
-  if [[ -z "$region" && "$loc" =~ ^([a-z]+-[a-z0-9]+)-[a-z]$ ]]; then
-    region="${BASH_REMATCH[1]}"
+  if [[ -z "$region" && -n "$loc" ]]; then
+    region="$(derive_region_from_location "$loc")"
   fi
   if [[ ! -f "$ENV_FILE" ]]; then
     if [[ -z "$proj" ]] && command -v gcloud >/dev/null 2>&1; then
@@ -69,7 +78,13 @@ repls = {
     "CLUSTER_LOCATION": loc,
 }
 for k, v in repls.items():
-    text = re.sub(rf"^{k}=.*$", f"{k}={v}", text, count=1, flags=re.MULTILINE)
+    pat = rf"^{k}=.*$"
+    if re.search(pat, text, flags=re.MULTILINE):
+        text = re.sub(pat, lambda _, k=k, v=v: f"{k}={v}", text, count=1, flags=re.MULTILINE)
+    else:
+        if text and not text.endswith("\n"):
+            text += "\n"
+        text += f"{k}={v}\n"
 with open(dst, "w", encoding="utf-8") as fh:
     fh.write(text)
 PY
@@ -77,11 +92,13 @@ PY
     return 0
   fi
 
-  # If workshop.env already exists but PROJECT_ID or CLUSTER_LOCATION is still blank, fill from shell env or gcloud defaults.
-  local file_proj file_loc
+  # If workshop.env already exists but PROJECT_ID, CLUSTER_LOCATION, or REGION is missing/blank,
+  # populate or append missing keys from shell env or gcloud defaults.
+  local file_proj file_loc file_reg
   file_proj="$(sed -n 's/^PROJECT_ID=//p' "$ENV_FILE" | head -n1)"
   file_loc="$(sed -n 's/^CLUSTER_LOCATION=//p' "$ENV_FILE" | head -n1)"
-  if [[ -z "$file_proj" || -z "$file_loc" ]]; then
+  file_reg="$(sed -n 's/^REGION=//p' "$ENV_FILE" | head -n1)"
+  if [[ -z "$file_proj" || -z "$file_loc" || -z "$file_reg" ]]; then
     if [[ -z "$file_proj" ]]; then
       if [[ -z "$proj" ]] && command -v gcloud >/dev/null 2>&1; then
         proj="$(gcloud config get-value project 2>/dev/null || true)"
@@ -89,31 +106,48 @@ PY
       fi
       file_proj="$proj"
     fi
-    local file_reg
-    file_reg="$(sed -n 's/^REGION=//p' "$ENV_FILE" | head -n1)"
     if [[ -z "$file_loc" ]]; then
-      file_reg="${region:-${file_reg:-us-central1}}"
-      file_loc="${loc:-${file_reg}-a}"
+      local effective_reg="${region:-${file_reg:-us-central1}}"
+      file_loc="${loc:-${effective_reg}-a}"
     fi
-    if [[ -n "$file_proj" ]]; then
-      step "Populate blank fields in ${ENV_FILE}"
-      python3 - "$ENV_FILE" "$file_proj" "$file_loc" "${region}" "${cname}" <<'PY'
+    if [[ -z "$region" && -z "$file_reg" ]]; then
+      region="$(derive_region_from_location "$file_loc")"
+      region="${region:-us-central1}"
+    fi
+    local updated
+    updated="$(python3 - "$ENV_FILE" "$file_proj" "$file_loc" "${region}" "${cname}" <<'PY'
 import re, sys
 path, proj, loc, region, cname = sys.argv[1:6]
 with open(path, encoding="utf-8") as fh:
-    text = fh.read()
-if re.search(r"^PROJECT_ID=\s*$", text, flags=re.MULTILINE):
-    text = re.sub(r"^PROJECT_ID=\s*$", f"PROJECT_ID={proj}", text, count=1, flags=re.MULTILINE)
-if re.search(r"^CLUSTER_LOCATION=\s*$", text, flags=re.MULTILINE):
-    text = re.sub(r"^CLUSTER_LOCATION=\s*$", f"CLUSTER_LOCATION={loc}", text, count=1, flags=re.MULTILINE)
-if region:
-    text = re.sub(r"^REGION=.*$", f"REGION={region}", text, count=1, flags=re.MULTILINE)
-if cname:
-    text = re.sub(r"^CLUSTER_NAME=.*$", f"CLUSTER_NAME={cname}", text, count=1, flags=re.MULTILINE)
-with open(path, "w", encoding="utf-8") as fh:
-    fh.write(text)
+    orig = fh.read()
+text = orig
+
+def upsert(content: str, key: str, val: str, only_if_blank: bool) -> str:
+    if not val:
+        return content
+    present = re.search(rf"^{key}=(.*)$", content, flags=re.MULTILINE)
+    if present:
+        if only_if_blank and present.group(1).strip():
+            return content
+        return re.sub(rf"^{key}=.*$", lambda _, k=key, v=val: f"{k}={v}", content, count=1, flags=re.MULTILINE)
+    if content and not content.endswith("\n"):
+        content += "\n"
+    return content + f"{key}={val}\n"
+
+text = upsert(text, "PROJECT_ID", proj, only_if_blank=True)
+text = upsert(text, "CLUSTER_LOCATION", loc, only_if_blank=True)
+text = upsert(text, "REGION", region, only_if_blank=False)
+text = upsert(text, "CLUSTER_NAME", cname, only_if_blank=False)
+
+if text != orig:
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    print("changed")
 PY
-      ok "updated ${ENV_FILE} (PROJECT_ID=${file_proj}, CLUSTER_LOCATION=${file_loc})"
+)"
+    if [[ "$updated" == "changed" ]]; then
+      step "Populate missing or blank fields in ${ENV_FILE}"
+      ok "updated ${ENV_FILE} (PROJECT_ID=${file_proj}, REGION=${region:-${file_reg}}, CLUSTER_LOCATION=${file_loc})"
     fi
   fi
 }
@@ -137,22 +171,37 @@ ensure_ko() {
   ok "installed bin/ko (${KO_VERSION})"
 }
 
+PREPULL_PODS=()
+_cleanup_prepull_pods() {
+  local p
+  (( ${#PREPULL_PODS[@]} > 0 )) || return 0
+  for p in "${PREPULL_PODS[@]}"; do
+    kubectl -n kube-system delete pod "$p" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+  done
+}
+
 prepull_worker_image() {
   local worker_image
   worker_image="$(state_get worker-image || true)"
   [[ "$worker_image" == *@sha256:* ]] || return 0
 
-  local nodes=()
+  local nodes=() n
   while IFS= read -r n; do
     [[ -n "$n" ]] && nodes+=("$n")
-  done < <(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
+  done < <(kubectl get nodes -o json 2>/dev/null \
+    | jq -r '.items[]? | select(any(.status.conditions[]?; .type == "Ready" and .status == "True")) | .metadata.name' 2>/dev/null || true)
   (( ${#nodes[@]} > 0 )) || return 0
 
-  step "Pre-pull ${worker_image} onto ${#nodes[@]} node(s)"
-  local pods=() idx=0 node pod_name
+  step "Pre-pull ${worker_image} onto ${#nodes[@]} Ready node(s)"
+  PREPULL_PODS=()
+  trap '_cleanup_prepull_pods' EXIT
+  trap '_cleanup_prepull_pods; exit 130' INT
+  trap '_cleanup_prepull_pods; exit 143' TERM
+
+  local idx=0 node pod_name
   for node in "${nodes[@]}"; do
     pod_name="ate-prepull-${idx}"
-    pods+=("$pod_name")
+    PREPULL_PODS+=("$pod_name")
     kubectl -n kube-system delete pod "$pod_name" --ignore-not-found >/dev/null 2>&1 || true
     kubectl apply -f - >/dev/null <<EOF
 apiVersion: v1
@@ -172,12 +221,43 @@ EOF
     idx=$((idx + 1))
   done
 
-  for pod_name in "${pods[@]}"; do
-    if ! kubectl -n kube-system wait --for=jsonpath='{.status.phase}'=Succeeded "pod/${pod_name}" --timeout=5m >/dev/null 2>&1; then
-      warn "pre-pull pod ${pod_name} did not reach Succeeded cleanly (WorkerPool will pull on startup)"
+  local timeout="${PREPULL_TIMEOUT:-300}"
+  local poll_interval="${PREPULL_POLL_INTERVAL:-2}"
+  local deadline=$((SECONDS + timeout))
+  local pending=("${PREPULL_PODS[@]}")
+  while (( ${#pending[@]} > 0 && SECONDS < deadline )); do
+    local next_pending=() phase
+    for pod_name in "${pending[@]}"; do
+      phase="$(kubectl -n kube-system get pod "$pod_name" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+      case "$phase" in
+        Succeeded)
+          kubectl -n kube-system delete pod "$pod_name" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+          ;;
+        Failed)
+          warn "pre-pull pod ${pod_name} failed (WorkerPool will pull on startup)"
+          kubectl -n kube-system delete pod "$pod_name" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+          ;;
+        *)
+          next_pending+=("$pod_name")
+          ;;
+      esac
+    done
+    if (( ${#next_pending[@]} > 0 )); then
+      pending=("${next_pending[@]}")
+      sleep "$poll_interval"
+    else
+      pending=()
     fi
-    kubectl -n kube-system delete pod "$pod_name" --ignore-not-found >/dev/null 2>&1 || true
   done
+
+  if (( ${#pending[@]} > 0 )); then
+    for pod_name in "${pending[@]}"; do
+      warn "pre-pull pod ${pod_name} did not reach Succeeded within ${timeout}s (WorkerPool will pull on startup)"
+    done
+  fi
+  _cleanup_prepull_pods
+  PREPULL_PODS=()
+  trap - EXIT INT TERM
   ok "ateworker-gvisor pre-pull complete"
 }
 
