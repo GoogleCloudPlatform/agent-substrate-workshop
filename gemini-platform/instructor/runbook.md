@@ -29,18 +29,14 @@
    - Confirm `github.com/google/ko@v0.19.1` builds cleanly on the current Cloud Shell Go version.
    - On Linux workstations with context-aware client certificates enabled in `gcloud`, set `export CLOUDSDK_CORE_DISABLE_USAGE_REPORTING=true` (already exported inside `scripts/lib.sh`) so background telemetry subprocesses do not race on `~/.config/gcloud/caa_cert.pem`.
 4. **Provision attendee projects and GKE `1.37+` clusters.**
-   - **Bring-your-own / scratch projects (`2× c3-standard-4`, or `n2-standard-4 --min-cpu-platform="Intel Ice Lake"` / `n1-standard-4 --min-cpu-platform="Intel Skylake"` if `C3_CPUS` quota is unavailable; do not use `e2-*`)**:
+   - **Bring-your-own / scratch projects (`2× c3-standard-4`)**:
      ```bash
-     gcloud services enable container.googleapis.com monitoring.googleapis.com logging.googleapis.com cloudtrace.googleapis.com \
-       --project "$PROJECT_ID"
      gcloud beta container clusters create "$CLUSTER_NAME" \
        --project "$PROJECT_ID" \
        --location us-central1-a \
        --release-channel rapid \
        --cluster-version 1.37 \
        --machine-type c3-standard-4 \
-       --disk-type pd-balanced \
-       --disk-size 100 \
        --num-nodes 2 \
        --gateway-api=standard \
        --workload-pool "$PROJECT_ID.svc.id.goog" \

@@ -77,39 +77,31 @@ Throughout the workshop, `ops-hub` serves three pre-seeded incidents so you can 
 
 ### Steps
 
-1. **Activate Cloud Shell and install `ko`.** Open the Google Cloud console, click **Activate Cloud Shell**, install `ko`, and add `$(go env GOPATH)/bin` to your `PATH`:
+1. **Activate Cloud Shell and install `ko`.** Open the Google Cloud console, click **Activate Cloud Shell**, and install `ko`:
    ```bash
    go install github.com/google/ko@v0.19.1
    export PATH="$(go env GOPATH)/bin:$PATH"
-   echo 'export PATH="$(go env GOPATH)/bin:$PATH"' >> ~/.bashrc
    ```
 
-2. **Clone the repository and enter the workshop directory.**
+2. **Clone the repository.** (While the staging repository is private, authenticate Git first in Cloud Shell via `gh auth login && gh auth setup-git` or clone over SSH.)
    ```bash
-   git clone https://github.com/GoogleCloudPlatform/agent-substrate-workshop
-   cd agent-substrate-workshop/gemini-platform
+   git clone https://github.com/gke-demos/substrate-agent-platform
+   cd substrate-agent-platform
    ```
 
-3. **Create a GKE 1.37+ cluster (skip if pre-provisioned).** Check whether an instructor or Google Skills classroom already created a cluster (`gcloud container clusters list`). If none exists, create a two-node `c3-standard-4` cluster with 100 GB `pd-balanced` boot disks and freeze node upgrades for 48 hours:
+3. **Create a GKE 1.37+ cluster (skip if pre-provisioned).** Check whether an instructor or Google Skills classroom already created a cluster (`gcloud container clusters list`). If none exists, create a two-node `c3-standard-4` cluster and freeze node upgrades for 48 hours:
    ```bash
    export PROJECT_ID="YOUR_PROJECT_ID"
    export CLUSTER_LOCATION="us-central1-a"
    export CLUSTER_NAME="ate-cluster"
 
-   gcloud services enable \
-     container.googleapis.com \
-     monitoring.googleapis.com \
-     logging.googleapis.com \
-     cloudtrace.googleapis.com \
-     --project "$PROJECT_ID"
+   gcloud services enable container.googleapis.com --project "$PROJECT_ID"
    gcloud beta container clusters create "$CLUSTER_NAME" \
      --project "$PROJECT_ID" \
      --location "$CLUSTER_LOCATION" \
      --release-channel rapid \
      --cluster-version 1.37 \
      --machine-type c3-standard-4 \
-     --disk-type pd-balanced \
-     --disk-size 100 \
      --num-nodes 2 \
      --gateway-api=standard \
      --workload-pool "$PROJECT_ID.svc.id.goog" \
@@ -124,24 +116,12 @@ Throughout the workshop, `ops-hub` serves three pre-seeded incidents so you can 
      --add-maintenance-exclusion-end "$(date -u -d '+2 days' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+2d +%Y-%m-%dT%H:%M:%SZ)" \
      --add-maintenance-exclusion-scope no_minor_or_node_upgrades
    ```
-   If your project doesn't have `C3_CPUS` quota for `c3-standard-4`, use `--machine-type n2-standard-4 --min-cpu-platform="Intel Ice Lake"` (or `--machine-type n1-standard-4 --min-cpu-platform="Intel Skylake"`) instead. Do **not** use `e2-standard-4`, which mixes CPU platforms across nodes and breaks cross-worker `MEMORY` snapshot restores.
 
-4. **Configure `workshop.env` and cluster credentials.** Copy `workshop.env.example`, set `PROJECT_ID`, `CLUSTER_LOCATION` (`NAME` and `LOCATION` from `gcloud container clusters list`), and `CLUSTER_NAME`, and fetch `kubectl` credentials for the cluster. Notice that `NAMESPACE` and `ATESPACE` default to `workshop-301` so Track 301 can run side-by-side on a cluster that already hosts Track 101 (`workshop`).
+4. **Configure `workshop.env`.** Copy `workshop.env.example` and set `PROJECT_ID` and `CLUSTER_LOCATION` (`NAME` and `LOCATION` from `gcloud container clusters list`). Notice that `NAMESPACE` and `ATESPACE` default to `workshop-301` so Track 301 can run side-by-side on a cluster that already hosts Track 101 (`workshop`).
    ```bash
-   # If you skipped Step 3, set these to match `gcloud container clusters list`:
-   export PROJECT_ID="${PROJECT_ID:-YOUR_PROJECT_ID}"
-   export CLUSTER_LOCATION="${CLUSTER_LOCATION:-us-central1-a}"
-   export CLUSTER_NAME="${CLUSTER_NAME:-ate-cluster}"
-
+   gcloud container clusters list --project YOUR_PROJECT_ID
    cp workshop.env.example workshop.env
-   sed -i \
-     -e "s|^PROJECT_ID=.*|PROJECT_ID=${PROJECT_ID}|" \
-     -e "s|^CLUSTER_NAME=.*|CLUSTER_NAME=${CLUSTER_NAME}|" \
-     -e "s|^CLUSTER_LOCATION=.*|CLUSTER_LOCATION=${CLUSTER_LOCATION}|" \
-     workshop.env
-   gcloud container clusters get-credentials "$CLUSTER_NAME" \
-     --location "$CLUSTER_LOCATION" \
-     --project "$PROJECT_ID"
+   ${EDITOR:-nano} workshop.env
    ```
 
 5. **Run preflight checks.** Validate your local tools, cluster credentials, GKE `1.37+` control plane, observability add-ons, and uniform-CPU node pools (`e2-*` pools fail preflight because mixed Intel/AMD hosts cannot restore `MEMORY`-fidelity gVisor snapshots across workers):
@@ -158,7 +138,6 @@ Throughout the workshop, `ops-hub` serves three pre-seeded incidents so you can 
 7. **Add `bin/` to your shell `PATH` and build local verification tools.**
    ```bash
    export PATH="$PWD/bin:$PATH"
-   echo 'export PATH="'"$PWD"'/bin:$PATH"' >> ~/.bashrc
    source scripts/env.sh
    make tools
    ```

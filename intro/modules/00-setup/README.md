@@ -59,12 +59,12 @@ If you create your own cluster in this section, plan for about 20 minutes.
      --add-maintenance-exclusion-end "$(date -u -d '+2 days' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+2d +%Y-%m-%dT%H:%M:%SZ)" \
      --add-maintenance-exclusion-scope no_minor_or_node_upgrades
    ```
-   If your project doesn't have `C3_CPUS` quota for `c3-standard-4`, use `--machine-type n2-standard-4` (or `--machine-type n1-standard-4 --min-cpu-platform="Intel Skylake"`) instead. Do **not** use `e2-standard-4`, which mixes CPU platforms across nodes and breaks cross-worker `MEMORY` snapshot restores.
+   If your project doesn't have `C3_CPUS` quota for `c3-standard-4`, use `--machine-type n2-standard-4 --min-cpu-platform="Intel Ice Lake"` (or `--machine-type n1-standard-4 --min-cpu-platform="Intel Skylake"`) instead. Do **not** use `e2-standard-4`, which mixes CPU platforms across nodes and breaks cross-worker `MEMORY` snapshot restores.
 
    Creating the cluster takes several minutes. While you wait, follow its progress in the Google Cloud console under
    **Kubernetes Engine** > **Clusters**, and read the next section, "Architecture tour", up to "Look around", which needs the
    installation from step 8.
-4. **Configure the environment and cluster credentials.** Copy the example environment file, set `PROJECT_ID`, `CLUSTER_LOCATION` (your cluster's exact zone or
+4. **Configure the environment and cluster credentials.** Generate `workshop.env` from the example file, set `PROJECT_ID`, `CLUSTER_LOCATION` (your cluster's exact zone or
    region from `gcloud container clusters list`; a zonal cluster such as `us-central1-a` won't match
    `us-central1`), and `CLUSTER_NAME`, and fetch `kubectl` credentials for the cluster. Leave `REGION` as `us-central1`:
    it's a region, not a zone, and it sets where the snapshot bucket and the Artifact Registry repository live. Every other
@@ -75,12 +75,11 @@ If you create your own cluster in this section, plan for about 20 minutes.
    export CLUSTER_LOCATION="${CLUSTER_LOCATION:-us-central1-a}"
    export CLUSTER_NAME="${CLUSTER_NAME:-ate-cluster}"
 
-   cp workshop.env.example workshop.env
-   sed -i \
+   sed \
      -e "s|^PROJECT_ID=.*|PROJECT_ID=${PROJECT_ID}|" \
      -e "s|^CLUSTER_NAME=.*|CLUSTER_NAME=${CLUSTER_NAME}|" \
      -e "s|^CLUSTER_LOCATION=.*|CLUSTER_LOCATION=${CLUSTER_LOCATION}|" \
-     workshop.env
+     workshop.env.example > workshop.env
    gcloud container clusters get-credentials "$CLUSTER_NAME" \
      --location "$CLUSTER_LOCATION" \
      --project "$PROJECT_ID"

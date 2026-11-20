@@ -311,7 +311,7 @@ with **VOLUMES** fidelity (`SNAPSHOT_FIDELITY_VOLUMES`): Substrate saves only th
    ```
 6. Follow the actor's logs in a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`). The log stream follows the actor across workers and restarts:
    ```bash
-   source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
+   source scripts/env.sh     # in the new terminal, from agent-substrate-workshop/intro: puts bin/ (kubectl ate) on PATH
    kubectl ate logs actor memo -a workshop -f
    ```
    Most of the output comes from gVisor's runtime logging (`I…` and `W…` lines from `cli.go`,
@@ -587,7 +587,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    ```
 2. **Generate traffic.** In a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`), send bursty chat traffic across the swarm for 3 minutes:
    ```bash
-   source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
+   source scripts/env.sh     # in the new terminal, from agent-substrate-workshop/intro: puts bin/ (kubectl ate) on PATH
    make load
    ```
 3. **Run queries in the Prometheus UI** (`http://localhost:9090` → **Graph**, or Web Preview `:9090` in Cloud Shell). More queries
@@ -616,7 +616,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    ```
    In a second terminal, resume `buddy` and record its worker Pod name:
    ```bash
-   source scripts/env.sh     # if this is a fresh terminal, from the repo root: puts bin/ (kubectl ate) on PATH
+   source scripts/env.sh     # if this is a fresh terminal, from agent-substrate-workshop/intro: puts bin/ (kubectl ate) on PATH
    kubectl ate resume actor buddy -a workshop
    FIRST=$(kubectl ate get actor buddy -a workshop -o json | jq -r .status.workerAssignment.workerPod)
    echo "$FIRST"

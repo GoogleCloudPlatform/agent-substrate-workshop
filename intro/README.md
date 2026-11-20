@@ -38,12 +38,14 @@ doesn't break an earlier one (see [Wrap-up](modules/07-wrap-up/README.md#keep-go
 
 ## Prerequisites
 - A Google Cloud project where you have the **Owner** role, with a GKE **1.37+** cluster that has Workload Identity, managed
-  OpenTelemetry, Managed Service for Prometheus, no node auto-upgrade, no spot nodes, and 2× `c3-standard-4` nodes. `make preflight`
-  verifies all of these settings. If you don't have a cluster yet, the [Setup](modules/00-setup/README.md) section creates one
-  with these settings.
+  OpenTelemetry, Managed Service for Prometheus, no node auto-upgrade, no spot nodes, and 2× `c3-standard-4` nodes (or
+  `n2-standard-4` with `--min-cpu-platform="Intel Ice Lake"` / `n1-standard-4` with `--min-cpu-platform="Intel Skylake"` if
+  `C3_CPUS` quota is unavailable; do **not** use `e2-*`, which mixes CPU platforms across nodes and breaks cross-worker
+  `MEMORY` snapshot restores). `make preflight` verifies all of these settings. If you don't have a cluster yet, the
+  [Setup](modules/00-setup/README.md) section creates one with these settings.
 - Local tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst`, `curl`, `git`, `python3`, and, only to
   build Substrate from source, a running Docker daemon with `buildx`. Cloud Shell includes all of these tools except `ko`
-  (`go install github.com/google/ko@v0.19.1`).
+  (`go install github.com/google/ko@v0.19.1` and add `$(go env GOPATH)/bin` to your `PATH`).
 - Familiarity with Kubernetes. You don't need prior Substrate knowledge.
 
 For comparison, [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) solves a
@@ -51,11 +53,11 @@ similar problem with a Pod per agent session and no Substrate integration. See t
 for the full comparison.
 
 ## Ways to take this workshop
-- **Instructor-led:** Follow the sections in order. If you fall behind, run `make catch-up MODULE=<n>` to bring your
-  environment to the start of section `n`, and continue from there.
-- **Self-paced:** Follow the same path. After each section, run `make verify MODULE=<n>` to verify your state.
+- **Instructor-led:** Follow the sections in order. If you fall behind, run `make catch-up MODULE=N` to bring your
+  environment to the start of section `N`, and continue from there.
+- **Self-paced:** Follow the same path. After each section, run `make verify MODULE=N` to verify your state.
   See `instructor/troubleshooting.md` for common failures. Add `bin/` to your `PATH`
-  (`export PATH="$PWD/bin:$PATH"` from the repository root, as shown in the [Setup](modules/00-setup/README.md) section) before you run any `kubectl ate …`
+  (`export PATH="$PWD/bin:$PATH"` from `agent-substrate-workshop/intro`, as shown in the [Setup](modules/00-setup/README.md) section) before you run any `kubectl ate …`
   commands yourself; `make catch-up` doesn't modify your shell environment.
 - **Qwiklabs (`GKE004` / `GKE005`):** Uses [`qwiklabs/en.md`](qwiklabs/en.md) (synced with `labs/gke004-kubecon-2026/` and `labs/gke005-agent-substrate-intro/` in `CloudVLab/gcp-devrel-content`), where the cluster, GCP resources, dashboards, and `ate-system`
   control plane are pre-warmed at lab startup so learners unpack `.prewarm/workshop-prewarm.tar.gz` in Setup, inspect the

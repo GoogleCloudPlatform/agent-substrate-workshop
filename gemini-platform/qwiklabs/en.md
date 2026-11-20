@@ -77,7 +77,6 @@ When the lab started, Terraform and the bootstrapper pre-provisioned:
    tar -xzf /tmp/gemini-platform-prewarm.tar.gz
    rm -f /tmp/gemini-platform-prewarm.tar.gz
    export PATH="$PWD/bin:$PATH"
-   echo 'export PATH="'"$PWD"'/bin:$PATH"' >> ~/.bashrc
    source scripts/env.sh
    kubectl ate --help
    </ql-code-block>

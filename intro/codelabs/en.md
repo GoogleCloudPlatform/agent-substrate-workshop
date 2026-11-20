@@ -98,12 +98,12 @@ If you create your own cluster in this section, plan for about 20 minutes.
      --add-maintenance-exclusion-end "$(date -u -d '+2 days' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+2d +%Y-%m-%dT%H:%M:%SZ)" \
      --add-maintenance-exclusion-scope no_minor_or_node_upgrades
    ```
-   If your project doesn't have `C3_CPUS` quota for `c3-standard-4`, use `--machine-type n2-standard-4` (or `--machine-type n1-standard-4 --min-cpu-platform="Intel Skylake"`) instead. Do **not** use `e2-standard-4`, which mixes CPU platforms across nodes and breaks cross-worker `MEMORY` snapshot restores.
+   If your project doesn't have `C3_CPUS` quota for `c3-standard-4`, use `--machine-type n2-standard-4 --min-cpu-platform="Intel Ice Lake"` (or `--machine-type n1-standard-4 --min-cpu-platform="Intel Skylake"`) instead. Do **not** use `e2-standard-4`, which mixes CPU platforms across nodes and breaks cross-worker `MEMORY` snapshot restores.
 
    Creating the cluster takes several minutes. While you wait, follow its progress in the Google Cloud console under
    **Kubernetes Engine** > **Clusters**, and read the next section, "Architecture tour", up to "Look around", which needs the
    installation from step 8.
-4. **Configure the environment and cluster credentials.** Copy the example environment file, set `PROJECT_ID`, `CLUSTER_LOCATION` (your cluster's exact zone or
+4. **Configure the environment and cluster credentials.** Generate `workshop.env` from the example file, set `PROJECT_ID`, `CLUSTER_LOCATION` (your cluster's exact zone or
    region from `gcloud container clusters list`; a zonal cluster such as `us-central1-a` won't match
    `us-central1`), and `CLUSTER_NAME`, and fetch `kubectl` credentials for the cluster. Leave `REGION` as `us-central1`:
    it's a region, not a zone, and it sets where the snapshot bucket and the Artifact Registry repository live. Every other
@@ -114,12 +114,11 @@ If you create your own cluster in this section, plan for about 20 minutes.
    export CLUSTER_LOCATION="${CLUSTER_LOCATION:-us-central1-a}"
    export CLUSTER_NAME="${CLUSTER_NAME:-ate-cluster}"
 
-   cp workshop.env.example workshop.env
-   sed -i \
+   sed \
      -e "s|^PROJECT_ID=.*|PROJECT_ID=${PROJECT_ID}|" \
      -e "s|^CLUSTER_NAME=.*|CLUSTER_NAME=${CLUSTER_NAME}|" \
      -e "s|^CLUSTER_LOCATION=.*|CLUSTER_LOCATION=${CLUSTER_LOCATION}|" \
-     workshop.env
+     workshop.env.example > workshop.env
    gcloud container clusters get-credentials "$CLUSTER_NAME" \
      --location "$CLUSTER_LOCATION" \
      --project "$PROJECT_ID"
@@ -415,7 +414,7 @@ with **VOLUMES** fidelity (`SNAPSHOT_FIDELITY_VOLUMES`): Substrate saves only th
    ```
 6. Follow the actor's logs in a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`). The log stream follows the actor across workers and restarts:
    ```bash
-   source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
+   source scripts/env.sh     # in the new terminal, from agent-substrate-workshop/intro: puts bin/ (kubectl ate) on PATH
    kubectl ate logs actor memo -a workshop -f
    ```
    Most of the output comes from gVisor's runtime logging (`I…` and `W…` lines from `cli.go`,
@@ -694,7 +693,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    ```
 2. **Generate traffic.** In a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`), send bursty chat traffic across the swarm for 3 minutes:
    ```bash
-   source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
+   source scripts/env.sh     # in the new terminal, from agent-substrate-workshop/intro: puts bin/ (kubectl ate) on PATH
    make load
    ```
 3. **Run queries in the Prometheus UI** (`http://localhost:9090` → **Graph**, or Web Preview `:9090` in Cloud Shell). More queries
@@ -723,7 +722,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    ```
    In a second terminal, resume `buddy` and record its worker Pod name:
    ```bash
-   source scripts/env.sh     # if this is a fresh terminal, from the repo root: puts bin/ (kubectl ate) on PATH
+   source scripts/env.sh     # if this is a fresh terminal, from agent-substrate-workshop/intro: puts bin/ (kubectl ate) on PATH
    kubectl ate resume actor buddy -a workshop
    FIRST=$(kubectl ate get actor buddy -a workshop -o json | jq -r .status.workerAssignment.workerPod)
    echo "$FIRST"
@@ -1610,7 +1609,7 @@ done
   a quota, or a worker pod that cannot start."*
 - **`alert-resume-latency.json`** and **`alert-router-503.json`** are easier to trigger live. For the second
   one, turn the idle-suspender off, so nothing frees a worker once it's used (`internal/idle/idle.go`:
-  `IdleAfter <= 0` is a no-op), and saturate both workers for 7 minutes. Parked requests hit the router's
+  `IdleAfter` ≤ 0 is a no-op), and saturate both workers for 7 minutes. Parked requests hit the router's
   60s budget, error turns climb, and the alert's 5-minute condition holds while the load is still running:
   ```bash
   make idle-off                            # IDLE_AFTER=0s; restarts the gateway port-forward

@@ -93,7 +93,7 @@ check "workshop.env.example keeps pre-warm resource defaults (bucket, AR repo, n
 check "app/cmd/egressctl/main.go exists for GKE004 prewarm build" \
   "[[ -f '$ROOT/app/cmd/egressctl/main.go' ]]"
 
-bad_backtick_angles="$(python3 - "$ROOT/codelabs/en.md" "$ROOT/qwiklabs/en.md" "$ROOT"/modules/*/README.md "$ROOT"/optional/*/README.md <<'PY'
+bad_backtick_angles="$(python3 - "$ROOT/README.md" "$ROOT/codelabs/en.md" "$ROOT/qwiklabs/en.md" "$ROOT"/modules/*/README.md "$ROOT"/optional/*/README.md <<'PY'
 import re, sys
 for path in sys.argv[1:]:
     with open(path, encoding="utf-8") as fh:
@@ -115,11 +115,13 @@ for path in sys.argv[1:]:
             continue
         for match in re.finditer(r"(?<!`)`([^`\n]+)`(?!`)", line):
             span = match.group(1)
-            if re.search(r"<[^>]*>", span) and not span.startswith("<ql-variable"):
+            cleaned = re.sub(r"</?ql-variable\b[^>]*>", "", span)
+            if "<" in cleaned:
                 print(f"{path}:{lineno}: {match.group(0)}")
 PY
 )"
 # shellcheck disable=SC2034 # bad_backtick_angles is read inside eval'd check()
-check "zero claat-unsafe <...> inline backtick spans across intro docs" "[[ -z \"\$bad_backtick_angles\" ]]"
+check "zero claat-unsafe < inline backtick spans across intro docs" \
+  '[[ -z "$bad_backtick_angles" ]] || { printf "%s\n" "$bad_backtick_angles" >&2; false; }'
 
 exit "$fails"
