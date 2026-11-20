@@ -63,8 +63,15 @@ It is separate from a Kubernetes namespace. Your `WorkerPool` lives in the Kuber
 
 ## Look around
 
+First, confirm that the background installation from Setup has finished (re-run `make install-status` until it prints `Agent Substrate is ready`):
+
 ```bash
-make install-status                              # wait for "Agent Substrate is ready"
+make install-status                              # repeat until "Agent Substrate is ready"
+```
+
+Once the installation is ready, inspect the control plane and cluster resources:
+
+```bash
 kubectl -n ate-system get deploy,ds,sts,svc
 kubectl get crd | grep ate.dev
 kubectl get sandboxconfigs                       # gvisor-default — the runtime profile actors use
