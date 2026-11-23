@@ -498,3 +498,127 @@ func computeS256Challenge(verifier string) string {
 	sum := sha256.Sum256([]byte(verifier))
 	return base64.RawURLEncoding.EncodeToString(sum[:])
 }
+
+func TestOpsHubDevProxyRedirectURIsAndMismatchDescription(t *testing.T) {
+	ledger := ledgersvc.NewServer(ledgersvc.Options{
+		Config:    ledgersvc.RuntimeConfig{MaxOpenConns: 2, IdleTimeoutSeconds: 0, AcquireTimeoutMs: 50},
+		LogOutput: io.Discard,
+	})
+	t.Cleanup(ledger.Close)
+	ledgerTS := httptest.NewServer(ledger.Handler())
+	t.Cleanup(ledgerTS.Close)
+
+	hub, err := opshub.NewServer(opshub.Options{
+		DataDir:       t.TempDir(),
+		LedgerAPIURL:  ledgerTS.URL,
+		Require3LO:    true,
+		OAuthClientID: "sre-gateway-client",
+	})
+	if err != nil {
+		t.Fatalf("opshub.NewServer: %v", err)
+	}
+	opsTS := httptest.NewServer(hub.Handler())
+	t.Cleanup(opsTS.Close)
+
+	verifier := generatePKCEVerifier(t)
+	challenge := computeS256Challenge(verifier)
+
+	for _, allowed := range []string{
+		"https://8081-cs-test.ql-us-west1.cloudshell.dev/api/oauth/callback",
+		"https://8081-myws.cluster.cloudworkstations.dev/api/oauth/callback",
+		"https://8081-idx.googleusercontent.com/api/oauth/callback",
+		"https://codespace-8081.app.github.dev/api/oauth/callback",
+	} {
+		code, body := httpGet(t, opsTS.URL+"/oauth/authorize?"+url.Values{
+			"response_type":         {"code"},
+			"client_id":             {"sre-gateway-client"},
+			"redirect_uri":          {allowed},
+			"state":                 {"st-dev"},
+			"scope":                 {"openid profile remediation:write"},
+			"code_challenge":        {challenge},
+			"code_challenge_method": {"S256"},
+		}.Encode())
+		if code != http.StatusOK {
+			t.Errorf("GET /oauth/authorize(%s) = %d (%s), want 200", allowed, code, body)
+		}
+	}
+
+	for _, rejected := range []string{
+		"http://8081-cs-test.ql-us-west1.cloudshell.dev/api/oauth/callback",
+		"https://cloudshell.dev/api/oauth/callback",
+		"https://evil.example.com/api/oauth/callback",
+	} {
+		code, _ := httpGet(t, opsTS.URL+"/oauth/authorize?"+url.Values{
+			"response_type":         {"code"},
+			"client_id":             {"sre-gateway-client"},
+			"redirect_uri":          {rejected},
+			"state":                 {"st-bad"},
+			"scope":                 {"openid profile remediation:write"},
+			"code_challenge":        {challenge},
+			"code_challenge_method": {"S256"},
+		}.Encode())
+		if code != http.StatusBadRequest {
+			t.Errorf("GET /oauth/authorize(%s) = %d, want 400", rejected, code)
+		}
+	}
+
+	// Verify /oauth/token reports redirect_uri mismatch in error_description when redirect_uri differs.
+	authRedirect := "https://8081-cs-test.ql-us-west1.cloudshell.dev/api/oauth/callback"
+	authQuery := url.Values{
+		"response_type":         {"code"},
+		"client_id":             {"sre-gateway-client"},
+		"redirect_uri":          {authRedirect},
+		"state":                 {"st-mismatch"},
+		"scope":                 {"openid profile remediation:write"},
+		"code_challenge":        {challenge},
+		"code_challenge_method": {"S256"},
+	}
+	getResp, err := http.Get(opsTS.URL + "/oauth/authorize?" + authQuery.Encode())
+	if err != nil {
+		t.Fatal(err)
+	}
+	htmlBytes, _ := io.ReadAll(getResp.Body)
+	getResp.Body.Close()
+	var csrfCookie *http.Cookie
+	for _, c := range getResp.Cookies() {
+		if strings.Contains(c.Name, "opshub_csrf") {
+			csrfCookie = c
+		}
+	}
+	m := hiddenCSRFInput.FindStringSubmatch(string(htmlBytes))
+	form := url.Values{}
+	for k, v := range authQuery {
+		form[k] = v
+	}
+	form.Set("csrf_token", m[1])
+	form.Set("decision", "approve")
+
+	noRedirect := &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	postReq, _ := http.NewRequest(http.MethodPost, opsTS.URL+"/oauth/authorize", strings.NewReader(form.Encode()))
+	postReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	postReq.AddCookie(csrfCookie)
+	postResp, err := noRedirect.Do(postReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	postResp.Body.Close()
+	loc, _ := url.Parse(postResp.Header.Get("Location"))
+
+	mismatchResp, err := http.PostForm(opsTS.URL+"/oauth/token", url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {loc.Query().Get("code")},
+		"client_id":     {"sre-gateway-client"},
+		"redirect_uri":  {"http://127.0.0.1:8081/api/oauth/callback"},
+		"code_verifier": {verifier},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mismatchRaw, _ := io.ReadAll(mismatchResp.Body)
+	mismatchResp.Body.Close()
+	if mismatchResp.StatusCode != http.StatusBadRequest || !strings.Contains(string(mismatchRaw), "redirect_uri mismatch") {
+		t.Fatalf("POST /oauth/token with mismatched redirect_uri = %d (%s), want 400 with redirect_uri mismatch", mismatchResp.StatusCode, string(mismatchRaw))
+	}
+}

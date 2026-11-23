@@ -4,14 +4,14 @@
 
 **Goal:** let an actor call an authenticated external API without ever holding the credential.
 `HttpRuleEffects.replace_headers` lets a matching `https` rule replace a placeholder request header with a value that comes
-from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
+from an `ate-secret://PROVIDER_CLASS/PROVIDER_NAME/TAIL` reference
 (`api/ateapi/v1/ateapi.proto`, `CredentialHeader`), resolved at request time by dialing a
 **credential provider**, a small gRPC service (`api/credprovider/v1/credprovider.proto`).
 
 > **Fact-checked against the substrate checkout at `SUBSTRATE_REF` (v1.0.0):** substrate ships the built-in
 > `k8s.io` provider (`cmd/credential-provider/kubernetes-secrets`) with manifests in
 > `manifests/egress-credential-injection/` and a guide in `docs/egress-credential-injection.md`. It resolves
-> `ate-secret://k8s.io/default/<namespace>/<secret>/<key>` from a Kubernetes Secret, and it denies by default:
+> `ate-secret://k8s.io/default/NAMESPACE/SECRET/KEY` from a Kubernetes Secret, and it denies by default:
 > a ConfigMap (`k8s-credential-provider-namespace-policy`) lists which atespace may read which namespaces.
 > In `v0.4.0`+, the egress gateway always runs with MITM TLS termination enabled (`egress-mitm.ate.dev` CA) and
 > `ate-setup deploy` requires `--credential-provider` (`{"name":"k8s.io"}`, `{"enabled":false}`, or a custom

@@ -52,7 +52,7 @@ with **VOLUMES** fidelity (`SNAPSHOT_FIDELITY_VOLUMES`): Substrate saves only th
    ```
 6. Follow the actor's logs in a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`). The log stream follows the actor across workers and restarts:
    ```bash
-   source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
+   source scripts/env.sh     # in the new terminal, from agent-substrate-workshop/intro: puts bin/ (kubectl ate) on PATH
    kubectl ate logs actor memo -a workshop -f
    ```
    Most of the output comes from gVisor's runtime logging (`I…` and `W…` lines from `cli.go`,

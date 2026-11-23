@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -100,12 +101,29 @@ type A2ATaskRecord struct {
 }
 
 func (s *Server) resolveBaseURL(r *http.Request) string {
-	if r != nil && strings.TrimSpace(r.Host) != "" {
-		scheme := "http"
-		if isHTTPSRequest(r) {
-			scheme = "https"
+	if r != nil {
+		host := strings.TrimSpace(r.Host)
+		https := isHTTPSRequest(r)
+		if fwdHost := trustedForwardedHost(r); fwdHost != "" {
+			host = fwdHost
+			https = true
+		} else if (host == "" || isLoopbackHostPort(host)) && r.Header != nil {
+			if origin := strings.TrimSpace(r.Header.Get("Origin")); origin != "" {
+				if u, err := url.Parse(origin); err == nil && strings.EqualFold(u.Scheme, "https") {
+					if normHost, ok := normalizeTrustedDevProxyHost(u.Host); ok {
+						host = normHost
+						https = true
+					}
+				}
+			}
 		}
-		return scheme + "://" + strings.TrimSpace(r.Host)
+		if host != "" {
+			scheme := "http"
+			if https {
+				scheme = "https"
+			}
+			return scheme + "://" + host
+		}
 	}
 	if base := strings.TrimRight(strings.TrimSpace(s.cfg.SelfURL), "/"); base != "" {
 		return base
