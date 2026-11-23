@@ -68,7 +68,7 @@ done
   a quota, or a worker pod that cannot start."*
 - **`alert-resume-latency.json`** and **`alert-router-503.json`** are easier to trigger live. For the second
   one, turn the idle-suspender off, so nothing frees a worker once it's used (`internal/idle/idle.go`:
-  `IdleAfter <= 0` is a no-op), and saturate both workers for 7 minutes. Parked requests hit the router's
+  `IdleAfter` ≤ 0 is a no-op), and saturate both workers for 7 minutes. Parked requests hit the router's
   60s budget, error turns climb, and the alert's 5-minute condition holds while the load is still running:
   ```bash
   make idle-off                            # IDLE_AFTER=0s; restarts the gateway port-forward

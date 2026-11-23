@@ -45,37 +45,46 @@ If you create your own cluster in this section, plan for about 20 minutes.
 
 ### What you need
 - A Google Cloud project where you have the **Owner** role, and a GKE **1.37+** cluster in that project. The cluster requires Workload Identity,
-  managed OpenTelemetry, Managed Service for Prometheus, no node auto-upgrade (or an active maintenance exclusion), and no spot nodes. Use the cluster that your instructor created, or create one in Step 3 below (see also the [Substrate Google Cloud guide](https://github.com/ai-on-gke/substrate-gke/tree/main/tools/setup-gcp)).
+  managed OpenTelemetry, Managed Service for Prometheus, no node auto-upgrade (or an active maintenance exclusion), no spot nodes, and a homogeneous CPU platform across all nodes in the pool (do not use `e2-*`, which mixes Intel and AMD platforms across nodes and breaks cross-worker gVisor `MEMORY` snapshot restores). Use the cluster that your instructor created, or create one in Step 3 below.
 - `kubectl` configured to point at that cluster (`kubectl config current-context`).
 - Locally installed tools: `gcloud`, `kubectl`, `go` 1.27+, `ko`, `jq`, `envsubst` (gettext), `curl`, `git`, `python3`.
   You need a running **Docker** daemon with `buildx` only to build Substrate from source (empty `SUBSTRATE_IMAGE_REPO`).
-  Cloud Shell includes all of these tools except `ko`: run `go install github.com/google/ko@v0.19.1`.
+  Cloud Shell includes all of these tools except `ko`: run `go install github.com/google/ko@v0.19.1` and add `$(go env GOPATH)/bin` to your `PATH`.
 
 ### Steps
 
 1. **Activate Cloud Shell.** Open the Google Cloud console and click **Activate Cloud Shell** in the top-right
-   toolbar to launch Cloud Shell — a self-contained VM in your browser with all the required tools except `ko` — and run all the commands in this lab from there. Install `ko` first:
+   toolbar to launch Cloud Shell — a self-contained VM in your browser with all the required tools except `ko` — and run all the commands in this lab from there. Install `ko` and add `$(go env GOPATH)/bin` to your `PATH` first:
    ```bash
    go install github.com/google/ko@v0.19.1
+   export PATH="$(go env GOPATH)/bin:$PATH"
+   echo 'export PATH="$(go env GOPATH)/bin:$PATH"' >> ~/.bashrc
    ```
-2. **Clone the workshop repository.** Clone the repository and move into its root directory:
+2. **Clone the workshop repository.** Clone the repository and move into the `intro/` workshop directory:
    ```bash
    git clone https://github.com/GoogleCloudPlatform/agent-substrate-workshop
    cd agent-substrate-workshop/intro
    ```
-3. **Create a GKE cluster (if your instructor didn't pre-create one).** If your project already has a cluster (`gcloud container clusters list`), skip to Step 4. Otherwise, create a zonal GKE 1.37 cluster with Workload Identity, managed OpenTelemetry, Managed Service for Prometheus, and a 48-hour maintenance exclusion to block node auto-upgrades during the workshop:
+3. **Create a GKE cluster (if your instructor didn't pre-create one).** If your project already has a cluster (`gcloud container clusters list`), skip to Step 4. Otherwise, create a zonal GKE 1.37 cluster with Workload Identity, managed OpenTelemetry, Managed Service for Prometheus, 100 GB `pd-balanced` boot disks (for `atelet`'s `/var/lib/ate` image and checkpoint storage), and a 48-hour maintenance exclusion to block node auto-upgrades during the workshop:
    ```bash
    export PROJECT_ID="YOUR_PROJECT_ID"
    export CLUSTER_LOCATION="us-central1-a"
    export CLUSTER_NAME="ate-cluster"
 
-   gcloud services enable container.googleapis.com --project "$PROJECT_ID"
+   gcloud services enable \
+     container.googleapis.com \
+     monitoring.googleapis.com \
+     logging.googleapis.com \
+     cloudtrace.googleapis.com \
+     --project "$PROJECT_ID"
    gcloud beta container clusters create "$CLUSTER_NAME" \
      --project "$PROJECT_ID" \
      --location "$CLUSTER_LOCATION" \
      --release-channel rapid \
      --cluster-version 1.37 \
      --machine-type c3-standard-4 \
+     --disk-type pd-balanced \
+     --disk-size 100 \
      --num-nodes 2 \
      --workload-pool "$PROJECT_ID.svc.id.goog" \
      --enable-managed-prometheus \
@@ -89,18 +98,30 @@ If you create your own cluster in this section, plan for about 20 minutes.
      --add-maintenance-exclusion-end "$(date -u -d '+2 days' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+2d +%Y-%m-%dT%H:%M:%SZ)" \
      --add-maintenance-exclusion-scope no_minor_or_node_upgrades
    ```
+   If your project doesn't have `C3_CPUS` quota for `c3-standard-4`, use `--machine-type n2-standard-4 --min-cpu-platform="Intel Ice Lake"` (or `--machine-type n1-standard-4 --min-cpu-platform="Intel Skylake"`) instead. Do **not** use `e2-standard-4`, which mixes CPU platforms across nodes and breaks cross-worker `MEMORY` snapshot restores.
+
    Creating the cluster takes several minutes. While you wait, follow its progress in the Google Cloud console under
    **Kubernetes Engine** > **Clusters**, and read the next section, "Architecture tour", up to "Look around", which needs the
    installation from step 8.
-4. **Configure the environment.** Copy the example environment file and set `PROJECT_ID` and `CLUSTER_LOCATION` to your cluster's exact zone or
-   region from `gcloud container clusters list` (a zonal cluster such as `us-central1-a` won't match
-   `us-central1`). If your cluster isn't named `ate-cluster`, set `CLUSTER_NAME` as well. Leave `REGION` as `us-central1`:
+4. **Configure the environment and cluster credentials.** Generate `workshop.env` from the example file, set `PROJECT_ID`, `CLUSTER_LOCATION` (your cluster's exact zone or
+   region from `gcloud container clusters list`; a zonal cluster such as `us-central1-a` won't match
+   `us-central1`), and `CLUSTER_NAME`, and fetch `kubectl` credentials for the cluster. Leave `REGION` as `us-central1`:
    it's a region, not a zone, and it sets where the snapshot bucket and the Artifact Registry repository live. Every other
    variable has a working default.
    ```bash
-   gcloud container clusters list --project YOUR_PROJECT_ID    # NAME and LOCATION
-   cp workshop.env.example workshop.env
-   ${EDITOR:-nano} workshop.env
+   # If you skipped Step 3, set these to match `gcloud container clusters list`:
+   export PROJECT_ID="${PROJECT_ID:-YOUR_PROJECT_ID}"
+   export CLUSTER_LOCATION="${CLUSTER_LOCATION:-us-central1-a}"
+   export CLUSTER_NAME="${CLUSTER_NAME:-ate-cluster}"
+
+   sed \
+     -e "s|^PROJECT_ID=.*|PROJECT_ID=${PROJECT_ID}|" \
+     -e "s|^CLUSTER_NAME=.*|CLUSTER_NAME=${CLUSTER_NAME}|" \
+     -e "s|^CLUSTER_LOCATION=.*|CLUSTER_LOCATION=${CLUSTER_LOCATION}|" \
+     workshop.env.example > workshop.env
+   gcloud container clusters get-credentials "$CLUSTER_NAME" \
+     --location "$CLUSTER_LOCATION" \
+     --project "$PROJECT_ID"
    ```
 5. **Run preflight checks.** Verify your local tools and the cluster's version, Workload Identity, managed OpenTelemetry,
    and node pool settings. Fix any issues that the script flags before you continue.
@@ -115,13 +136,13 @@ If you create your own cluster in this section, plan for about 20 minutes.
    ```
 7. **Add `bin/` to your `PATH`.** The installer builds the `kubectl ate` plugin into `bin/kubectl-ate`. The
    `make` targets find it automatically, but `make install-status` and the "Hello actor" section onwards expect `kubectl ate`
-   on your shell's `PATH`. Run the following command from the repository root:
+   on your shell's `PATH`. Run the following commands from `agent-substrate-workshop/intro` to add `bin/` to your current shell and persist it in `~/.bashrc`:
    ```bash
    export PATH="$PWD/bin:$PATH"
+   echo 'export PATH="'"$PWD"'/bin:$PATH"' >> ~/.bashrc
    ```
-   This setting applies only to your current terminal session. To persist it, add the same line with the absolute repository path instead of `$PWD` to
-   `~/.zshrc` or `~/.bashrc`. If you use direnv, add `PATH_add bin` to an `.envrc` file at the repository root.
-   If Cloud Shell reconnects or you open a new tab, `cd` into the repository and run `source scripts/env.sh`: it loads
+   (If you use `zsh` locally, add the line to `~/.zshrc` as well; if you use direnv, add `PATH_add bin` to an `.envrc` file in this directory.)
+   If Cloud Shell reconnects or you open a new tab, `cd` into `agent-substrate-workshop/intro` and run `source scripts/env.sh`: it loads
    `workshop.env` and puts `bin/` back on your `PATH`.
 8. **Start the installation in the background.** This target clones Substrate at `SUBSTRATE_REF`, builds `kubectl ate`,
    deploys `ate-system`, pins a worker image that matches the control plane, and
@@ -222,8 +243,15 @@ It is separate from a Kubernetes namespace. Your `WorkerPool` lives in the Kuber
 
 ### Look around
 
+First, confirm that the background installation from Setup has finished (re-run `make install-status` until it prints `Agent Substrate is ready`):
+
 ```bash
-make install-status                              # wait for "Agent Substrate is ready"
+make install-status                              # repeat until "Agent Substrate is ready"
+```
+
+Once the installation is ready, inspect the control plane and cluster resources:
+
+```bash
 kubectl -n ate-system get deploy,ds,sts,svc
 kubectl get crd | grep ate.dev
 kubectl get sandboxconfigs                       # gvisor-default — the runtime profile actors use
@@ -386,7 +414,7 @@ with **VOLUMES** fidelity (`SNAPSHOT_FIDELITY_VOLUMES`): Substrate saves only th
    ```
 6. Follow the actor's logs in a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`). The log stream follows the actor across workers and restarts:
    ```bash
-   source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
+   source scripts/env.sh     # in the new terminal, from agent-substrate-workshop/intro: puts bin/ (kubectl ate) on PATH
    kubectl ate logs actor memo -a workshop -f
    ```
    Most of the output comes from gVisor's runtime logging (`I…` and `W…` lines from `cli.go`,
@@ -665,7 +693,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    ```
 2. **Generate traffic.** In a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`), send bursty chat traffic across the swarm for 3 minutes:
    ```bash
-   source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
+   source scripts/env.sh     # in the new terminal, from agent-substrate-workshop/intro: puts bin/ (kubectl ate) on PATH
    make load
    ```
 3. **Run queries in the Prometheus UI** (`http://localhost:9090` → **Graph**, or Web Preview `:9090` in Cloud Shell). More queries
@@ -694,7 +722,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    ```
    In a second terminal, resume `buddy` and record its worker Pod name:
    ```bash
-   source scripts/env.sh     # if this is a fresh terminal, from the repo root: puts bin/ (kubectl ate) on PATH
+   source scripts/env.sh     # if this is a fresh terminal, from agent-substrate-workshop/intro: puts bin/ (kubectl ate) on PATH
    kubectl ate resume actor buddy -a workshop
    FIRST=$(kubectl ate get actor buddy -a workshop -o json | jq -r .status.workerAssignment.workerPod)
    echo "$FIRST"
@@ -760,7 +788,7 @@ The goal of this section is to review how the primitives you used map to real-wo
 | What you built | Substrate primitive | Where production systems use it |
 |---|---|---|
 | `WorkerPool` `agents` | Generic, pre-started capacity | Every deployment |
-| Templates `agent-v1` → `agent-v3` | Immutable template and golden snapshot | **google/ax (`Task`)**: hashes image and env into `<task>-tmpl-<hash>` |
+| Templates `agent-v1` → `agent-v3` | Immutable template and golden snapshot | **google/ax (`Task`)**: hashes image and env into `TASK-tmpl-HASH` |
 | `hello`, `memo` | Suspend/resume, `MEMORY` vs. `VOLUMES` fidelity | **google/ax (`Workspace`)**: `/workspace` `durableDir` with `VOLUMES` fidelity |
 | Gateway `/v1/model` | Presence vs. cognition split | **always-on-agent**: presence service and suspendable cognition actor |
 | Gateway-only `EgressPolicy` | Deny-by-default egress | **agent-substrate/env**: sandboxed shells for LLM tools |
@@ -960,7 +988,7 @@ curl -s -X POST localhost:7777/v1alpha/envs/dev1/mcp \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"shell","arguments":{"command":"cat /note.txt"}}}' | jq
 ```
 
-Point any MCP client at that URL (`http://localhost:7777/v1alpha/envs/<id>/mcp`) and your LLM gets a
+Point any MCP client at that URL (`http://localhost:7777/v1alpha/envs/dev1/mcp`) and your LLM gets a
 persistent, sandboxed, suspendable shell plus file tools.
 
 #### 5. Lock down egress (env sets no policy)
@@ -1146,7 +1174,7 @@ kubectl ate get actor-template "$TMPL" -a ax-workshop -o yaml
 
 Compare that generated `ActorTemplate` with the ones you wrote by hand in Modules 2–4:
 
-- **Name (`demo-task-tmpl-<hash>`)**: `TaskReconciler` (`internal/controller/reconciler.go`) hashes the image and environment variables into the template name. Because both AX `Task`s and Substrate `ActorTemplate`s are immutable ([Module 3](#4)), changing a task's spec requires either a new task name or deleting and recreating the task (`ax delete task …` then `ax apply -f …`, which discards the previous actor state and generates a fresh template digest).
+- **Name (`demo-task-tmpl-HASH`)**: `TaskReconciler` (`internal/controller/reconciler.go`) hashes the image and environment variables into the template name. Because both AX `Task`s and Substrate `ActorTemplate`s are immutable ([Module 3](#4)), changing a task's spec requires either a new task name or deleting and recreating the task (`ax delete task …` then `ax apply -f …`, which discards the previous actor state and generates a fresh template digest).
 - **Entrypoint (`/ko-app/ax-task-runner`)**: AX never sets your `spec.command` as the container entrypoint. Instead, it injects the task and workspace YAML into `AX_TASK_YAML` and `AX_WORKSPACES_YAML` env vars and boots `ax-task-runner` as PID 1 on port 80 (`wakeupProbe: /healthz`, with `/readyz` reporting `200 OK` once `SetupWorkspace` finishes).
 - **Storage (`preferredFidelity: SNAPSHOT_FIDELITY_VOLUMES`, `durableDir: /workspace`)**: AX uses the disk-only snapshot fidelity from Module 3 Part B. Only `/workspace` is saved to GCS on suspend; on resume, `ax-task-runner` cold-boots, sees `/workspace/.ax/initialized-workspace`, skips workspace setup, and starts your command against the restored files.
 
@@ -1243,7 +1271,7 @@ jsonPayload."ate.atespace"="ax-workshop"
 
 In `.workshop/ax`:
 
-- `internal/controller/reconciler.go`: how `TaskReconciler.Reconcile` turns a `Task` + `Workspace`s into an `Atespace`, a digest-named `ActorTemplate` (`<task>-tmpl-<hash>`), and an `Actor`, then polls `/readyz?check=workspace` to set the `WorkspaceReady` and `Ready` conditions.
+- `internal/controller/reconciler.go`: how `TaskReconciler.Reconcile` turns a `Task` + `Workspace`s into an `Atespace`, a digest-named `ActorTemplate` (`TASK-tmpl-HASH`), and an `Actor`, then polls `/readyz?check=workspace` to set the `WorkspaceReady` and `Ready` conditions.
 - `internal/substrate/client.go`: `BuildActorTemplate` — compare the protobuf `ActorTemplate` it constructs with the YAML templates you wrote in Modules 2–4.
 - `internal/metadata/server.go`: how `ax-task-runner` serves `/healthz`, `/readyz`, `/metadata/v1alpha1/ax/{task,workspaces}`, and (when `spec.debug: true`) `github.com/agent-substrate/env/guest` on port 80 over `h2c`.
 - `internal/workspace/setup.go`: `SetupWorkspace` — how files, shallow/full Git clones, skills directories, and the maiden-run marker file (`MarkerName`) are initialized inside `/workspace`.
@@ -1581,7 +1609,7 @@ done
   a quota, or a worker pod that cannot start."*
 - **`alert-resume-latency.json`** and **`alert-router-503.json`** are easier to trigger live. For the second
   one, turn the idle-suspender off, so nothing frees a worker once it's used (`internal/idle/idle.go`:
-  `IdleAfter <= 0` is a no-op), and saturate both workers for 7 minutes. Parked requests hit the router's
+  `IdleAfter` ≤ 0 is a no-op), and saturate both workers for 7 minutes. Parked requests hit the router's
   60s budget, error turns climb, and the alert's 5-minute condition holds while the load is still running:
   ```bash
   make idle-off                            # IDLE_AFTER=0s; restarts the gateway port-forward
@@ -2012,14 +2040,14 @@ covers a kind-cluster path with Lima on Apple Silicon.
 
 **Goal:** let an actor call an authenticated external API without ever holding the credential.
 `HttpRuleEffects.replace_headers` lets a matching `https` rule replace a placeholder request header with a value that comes
-from an `ate-secret://<provider-class>/<provider-name>/<tail>` reference
+from an `ate-secret://PROVIDER_CLASS/PROVIDER_NAME/TAIL` reference
 (`api/ateapi/v1/ateapi.proto`, `CredentialHeader`), resolved at request time by dialing a
 **credential provider**, a small gRPC service (`api/credprovider/v1/credprovider.proto`).
 
 > **Fact-checked against the substrate checkout at `SUBSTRATE_REF` (v1.0.0):** substrate ships the built-in
 > `k8s.io` provider (`cmd/credential-provider/kubernetes-secrets`) with manifests in
 > `manifests/egress-credential-injection/` and a guide in `docs/egress-credential-injection.md`. It resolves
-> `ate-secret://k8s.io/default/<namespace>/<secret>/<key>` from a Kubernetes Secret, and it denies by default:
+> `ate-secret://k8s.io/default/NAMESPACE/SECRET/KEY` from a Kubernetes Secret, and it denies by default:
 > a ConfigMap (`k8s-credential-provider-namespace-policy`) lists which atespace may read which namespaces.
 > In `v0.4.0`+, the egress gateway always runs with MITM TLS termination enabled (`egress-mitm.ate.dev` CA) and
 > `ate-setup deploy` requires `--credential-provider` (`{"name":"k8s.io"}`, `{"enabled":false}`, or a custom

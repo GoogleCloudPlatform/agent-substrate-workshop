@@ -131,7 +131,7 @@ curl -s -X POST localhost:7777/v1alpha/envs/dev1/mcp \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"shell","arguments":{"command":"cat /note.txt"}}}' | jq
 ```
 
-Point any MCP client at that URL (`http://localhost:7777/v1alpha/envs/<id>/mcp`) and your LLM gets a
+Point any MCP client at that URL (`http://localhost:7777/v1alpha/envs/dev1/mcp`) and your LLM gets a
 persistent, sandboxed, suspendable shell plus file tools.
 
 ## 5. Lock down egress (env sets no policy)

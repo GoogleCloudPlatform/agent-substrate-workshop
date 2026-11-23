@@ -1114,7 +1114,7 @@ func TestModule05DynamicAgentRegistryAnnotationsAndDirectRemediationBypass403(t 
 
 	cloudUpstreamMCP := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var rpcReq struct {
-			ID     any `json:"id"`
+			ID     any    `json:"id"`
 			Method string `json:"method"`
 			Params struct {
 				Name string `json:"name"`
@@ -1331,4 +1331,481 @@ func TestModule05DynamicAgentRegistryAnnotationsAndDirectRemediationBypass403(t 
 	if deniedVerdicts < 3 {
 		t.Errorf("saw %d DENIED_DESTRUCTIVE_MCP policy events, want >= 3 (events=%+v)", deniedVerdicts, govDoc.Events)
 	}
+}
+
+func TestModule05CloudShellWebPreview3LOOAuth(t *testing.T) {
+	ledger := ledgersvc.NewServer(ledgersvc.Options{
+		Config:    ledgersvc.RuntimeConfig{MaxOpenConns: 2, IdleTimeoutSeconds: 0, AcquireTimeoutMs: 60},
+		LogOutput: io.Discard,
+	})
+	t.Cleanup(ledger.Close)
+	ledgerTS := httptest.NewServer(ledger.Handler())
+	t.Cleanup(ledgerTS.Close)
+
+	ops, err := opshub.NewServer(opshub.Options{
+		DataDir:       t.TempDir(),
+		SimNamespace:  "prod-sim",
+		LedgerAPIURL:  ledgerTS.URL,
+		Require3LO:    true,
+		OAuthClientID: "sre-gateway-3lo",
+	})
+	if err != nil {
+		t.Fatalf("opshub.NewServer: %v", err)
+	}
+	opsTS := httptest.NewServer(ops.Handler())
+	t.Cleanup(opsTS.Close)
+
+	gwSrv, err := broker.NewServer(broker.Config{
+		Namespace:          "workshop-301",
+		Atespace:           "workshop-301",
+		SimNamespace:       "prod-sim",
+		ProjectID:          "demo-project",
+		Region:             "us-central1",
+		MockLLM:            true,
+		OpsHubURL:          opsTS.URL,
+		LedgerAPIURL:       ledgerTS.URL,
+		GovernanceEnforced: true,
+		Require3LO:         true,
+		OAuthClientID:      "sre-gateway-3lo",
+	})
+	if err != nil {
+		t.Fatalf("broker.NewServer: %v", err)
+	}
+	t.Cleanup(func() { _ = gwSrv.Close() })
+	gwTS := httptest.NewServer(gwSrv.Handler())
+	t.Cleanup(gwTS.Close)
+
+	gwParsed, err := url.Parse(gwTS.URL)
+	if err != nil {
+		t.Fatalf("url.Parse(gwTS.URL): %v", err)
+	}
+	_, gwPort, err := net.SplitHostPort(gwParsed.Host)
+	if err != nil {
+		t.Fatalf("SplitHostPort(%q): %v", gwParsed.Host, err)
+	}
+
+	previewHost := gwPort + "-cs-test.ql-us-west1.cloudshell.dev"
+	previewOrigin := "https://" + previewHost
+	localhostHTTP := regexp.MustCompile(`(?i)(https?)(:|%3A)(//|%2F%2F)(localhost|127\.0\.0\.1)(:|%3A)` + regexp.QuoteMeta(gwPort))
+
+	var rawStartBody atomic.Value
+	rewritePreview := func(s string) string {
+		return localhostHTTP.ReplaceAllString(s, previewOrigin)
+	}
+
+	// Simulate Cloud Shell Web Preview VM gateway:
+	// - Rewrites Host to 127.0.0.1:<port>
+	// - Appends X-Forwarded-Host: <port>-cs-test.ql-us-west1.cloudshell.dev via Header.Add
+	// - Does NOT set X-Forwarded-Proto or Forwarded
+	// - Rewrites localhost/127.0.0.1:<port> URLs in JSON/HTML bodies and Location headers
+	doViaCloudShellPreview := func(method, pathAndQuery string, body string, extraHeaders map[string]string, cookies []*http.Cookie) (*http.Response, []byte) {
+		t.Helper()
+		var bodyReader io.Reader
+		if body != "" {
+			bodyReader = strings.NewReader(body)
+		}
+		req, err := http.NewRequest(method, gwTS.URL+pathAndQuery, bodyReader)
+		if err != nil {
+			t.Fatalf("NewRequest(%s %s): %v", method, pathAndQuery, err)
+		}
+		req.Host = "127.0.0.1:" + gwPort
+		for k, v := range extraHeaders {
+			req.Header.Add(k, v)
+		}
+		req.Header.Add("X-Forwarded-Host", previewHost)
+		for _, c := range cookies {
+			req.AddCookie(c)
+		}
+
+		noRedirect := &http.Client{
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
+		resp, err := noRedirect.Do(req)
+		if err != nil {
+			t.Fatalf("%s %s via preview: %v", method, pathAndQuery, err)
+		}
+		raw, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+
+		if pathAndQuery == "/api/oauth/start" {
+			rawStartBody.Store(string(raw))
+		}
+		if loc := resp.Header.Get("Location"); loc != "" {
+			resp.Header.Set("Location", rewritePreview(loc))
+		}
+		ct := strings.ToLower(resp.Header.Get("Content-Type"))
+		if strings.Contains(ct, "application/json") || strings.Contains(ct, "text/html") {
+			raw = []byte(rewritePreview(string(raw)))
+		}
+		return resp, raw
+	}
+
+	// 1. GET /.well-known/agent-card.json resolves https://<previewHost>/a2a directly without relying on proxy body rewriting.
+	cardReq, _ := http.NewRequest(http.MethodGet, gwTS.URL+"/.well-known/agent-card.json", nil)
+	cardReq.Host = "127.0.0.1:" + gwPort
+	cardReq.Header.Set("X-Forwarded-Host", previewHost)
+	cardResp, err := http.DefaultClient.Do(cardReq)
+	if err != nil {
+		t.Fatalf("GET /.well-known/agent-card.json: %v", err)
+	}
+	var card broker.A2AAgentCardDTO
+	_ = json.NewDecoder(cardResp.Body).Decode(&card)
+	cardResp.Body.Close()
+	if wantURL := previewOrigin + "/a2a"; card.URL != wantURL {
+		t.Errorf("AgentCard.URL = %q, want %q", card.URL, wantURL)
+	}
+
+	// 2. GET /api/session issues __Host-sre_csrf with Secure=true even without X-Forwarded-Proto.
+	sessResp, sessRaw := doViaCloudShellPreview(http.MethodGet, "/api/session", "", nil, nil)
+	if sessResp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/session status = %d (%s), want 200", sessResp.StatusCode, string(sessRaw))
+	}
+	var sessDoc struct {
+		CSRFToken string `json:"csrf_token"`
+	}
+	if err := json.Unmarshal(sessRaw, &sessDoc); err != nil {
+		t.Fatalf("decode /api/session: %v", err)
+	}
+	var sreCSRFCookie *http.Cookie
+	for _, c := range sessResp.Cookies() {
+		if c.Name == "__Host-sre_csrf" {
+			sreCSRFCookie = c
+		}
+	}
+	if sreCSRFCookie == nil || !sreCSRFCookie.Secure || !sreCSRFCookie.HttpOnly {
+		t.Errorf("expected Secure HttpOnly __Host-sre_csrf cookie on Cloud Shell Web Preview, got cookies=%+v", sessResp.Cookies())
+	}
+
+	// 3. POST /api/oauth/start emits auth_url and redirect_uri using https://<previewHost>.
+	var startCookies []*http.Cookie
+	if sreCSRFCookie != nil {
+		startCookies = append(startCookies, sreCSRFCookie)
+	} else {
+		startCookies = sessResp.Cookies()
+	}
+	startResp, startRaw := doViaCloudShellPreview(http.MethodPost, "/api/oauth/start", `{}`, map[string]string{
+		"Content-Type":   "application/json",
+		"Origin":         previewOrigin,
+		"Sec-Fetch-Site": "same-origin",
+		"X-CSRF-Token":   sessDoc.CSRFToken,
+	}, startCookies)
+	if startResp.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/oauth/start status = %d (%s), want 200", startResp.StatusCode, string(startRaw))
+	}
+
+	var startDoc struct {
+		AuthURL string `json:"auth_url"`
+		State   string `json:"state"`
+	}
+	if err := json.Unmarshal(startRaw, &startDoc); err != nil {
+		t.Fatalf("decode /api/oauth/start: %v", err)
+	}
+	parsedAuth, err := url.Parse(startDoc.AuthURL)
+	if err != nil {
+		t.Fatalf("url.Parse(auth_url=%q): %v", startDoc.AuthURL, err)
+	}
+	wantRedirectURI := previewOrigin + "/api/oauth/callback"
+	if gotRedirect := parsedAuth.Query().Get("redirect_uri"); gotRedirect != wantRedirectURI {
+		t.Errorf("auth_url redirect_uri = %q, want %q", gotRedirect, wantRedirectURI)
+	}
+	if unrewritten, _ := rawStartBody.Load().(string); strings.Contains(unrewritten, "127.0.0.1") {
+		t.Errorf("raw /api/oauth/start response still contained 127.0.0.1 before proxy rewrite: %s", unrewritten)
+	}
+
+	// 4. GET /oauth/authorize renders consent page and issues Secure __Host-opshub_csrf.
+	authPathAndQuery := parsedAuth.Path + "?" + parsedAuth.RawQuery
+	getAuthResp, authHTMLBytes := doViaCloudShellPreview(http.MethodGet, authPathAndQuery, "", nil, startCookies)
+	if getAuthResp.StatusCode != http.StatusOK {
+		t.Fatalf("GET %s status = %d (%s), want 200", authPathAndQuery, getAuthResp.StatusCode, string(authHTMLBytes))
+	}
+	var opsCSRFCookie *http.Cookie
+	for _, c := range getAuthResp.Cookies() {
+		if strings.Contains(c.Name, "opshub_csrf") {
+			opsCSRFCookie = c
+		}
+	}
+	if opsCSRFCookie == nil {
+		t.Fatalf("missing opshub_csrf cookie on GET /oauth/authorize")
+	}
+	if opsCSRFCookie.Name != "__Host-opshub_csrf" || !opsCSRFCookie.Secure {
+		t.Errorf("expected Secure __Host-opshub_csrf cookie, got %+v", opsCSRFCookie)
+	}
+	m := testCSRFInputRE.FindStringSubmatch(string(authHTMLBytes))
+	if len(m) < 2 {
+		t.Fatalf("missing csrf_token hidden input in consent HTML")
+	}
+
+	// 5. POST /oauth/authorize approves consent and redirects to https://<previewHost>/api/oauth/callback.
+	form := parsedAuth.Query()
+	form.Set("csrf_token", m[1])
+	form.Set("decision", "approve")
+	postAuthResp, postAuthRaw := doViaCloudShellPreview(http.MethodPost, "/oauth/authorize", form.Encode(), map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+		"Origin":       previewOrigin,
+	}, []*http.Cookie{opsCSRFCookie})
+	if postAuthResp.StatusCode != http.StatusFound {
+		t.Fatalf("POST /oauth/authorize status = %d (%s), want 302", postAuthResp.StatusCode, string(postAuthRaw))
+	}
+	cbLoc := postAuthResp.Header.Get("Location")
+	parsedCB, err := url.Parse(cbLoc)
+	if err != nil {
+		t.Fatalf("url.Parse(Location=%q): %v", cbLoc, err)
+	}
+	if parsedCB.Scheme+"://"+parsedCB.Host+parsedCB.Path != wantRedirectURI {
+		t.Fatalf("Location = %q, want prefix %q", cbLoc, wantRedirectURI)
+	}
+
+	// 6. GET /api/oauth/callback succeeds with 200 OK (JSON) instead of HTTP 400 invalid_grant!
+	cbResp, cbRaw := doViaCloudShellPreview(http.MethodGet, parsedCB.Path+"?"+parsedCB.RawQuery, "", map[string]string{
+		"Accept": "application/json",
+	}, startCookies)
+	if cbResp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/oauth/callback status = %d (%s), want 200 OK", cbResp.StatusCode, string(cbRaw))
+	}
+	var cbDoc struct {
+		Granted     bool   `json:"granted"`
+		OperatorSub string `json:"operator_sub"`
+	}
+	if err := json.Unmarshal(cbRaw, &cbDoc); err != nil || !cbDoc.Granted || cbDoc.OperatorSub != "sre-operator" {
+		t.Fatalf("callback payload = %s, want granted=true operator_sub=sre-operator", string(cbRaw))
+	}
+}
+
+func TestModule05DevProxyForwardedHeadersAndTokenErrorDiagnostics(t *testing.T) {
+	ledger := ledgersvc.NewServer(ledgersvc.Options{
+		Config:    ledgersvc.RuntimeConfig{MaxOpenConns: 2, IdleTimeoutSeconds: 0, AcquireTimeoutMs: 60},
+		LogOutput: io.Discard,
+	})
+	t.Cleanup(ledger.Close)
+	ledgerTS := httptest.NewServer(ledger.Handler())
+	t.Cleanup(ledgerTS.Close)
+
+	ops, err := opshub.NewServer(opshub.Options{
+		DataDir:       t.TempDir(),
+		SimNamespace:  "prod-sim",
+		LedgerAPIURL:  ledgerTS.URL,
+		Require3LO:    true,
+		OAuthClientID: "sre-gateway-3lo",
+	})
+	if err != nil {
+		t.Fatalf("opshub.NewServer: %v", err)
+	}
+	opsTS := httptest.NewServer(ops.Handler())
+	t.Cleanup(opsTS.Close)
+
+	gwSrv, err := broker.NewServer(broker.Config{
+		Namespace:          "workshop-301",
+		Atespace:           "workshop-301",
+		SimNamespace:       "prod-sim",
+		ProjectID:          "demo-project",
+		Region:             "us-central1",
+		MockLLM:            true,
+		OpsHubURL:          opsTS.URL,
+		LedgerAPIURL:       ledgerTS.URL,
+		GovernanceEnforced: true,
+		Require3LO:         true,
+		OAuthClientID:      "sre-gateway-3lo",
+	})
+	if err != nil {
+		t.Fatalf("broker.NewServer: %v", err)
+	}
+	t.Cleanup(func() { _ = gwSrv.Close() })
+	gwTS := httptest.NewServer(gwSrv.Handler())
+	t.Cleanup(gwTS.Close)
+
+	gwParsed, _ := url.Parse(gwTS.URL)
+
+	// 1. All trusted dev proxy suffixes (.cloudworkstations.dev, .googleusercontent.com, .github.dev)
+	// complete OAuth start + ops-hub authorize + callback cleanly.
+	for _, proxyHost := range []string{
+		"8081-myws.cluster-abc.cloudworkstations.dev",
+		"8081-idx-env.googleusercontent.com",
+		"codespace-abc-8081.app.github.dev",
+	} {
+		startReq, _ := http.NewRequest(http.MethodPost, gwTS.URL+"/api/oauth/start", strings.NewReader(`{}`))
+		startReq.Header.Set("Content-Type", "application/json")
+		startReq.Header.Set("X-Forwarded-Host", proxyHost)
+		startResp, err := http.DefaultClient.Do(startReq)
+		if err != nil {
+			t.Fatalf("POST /api/oauth/start (%s): %v", proxyHost, err)
+		}
+		var startDoc struct {
+			AuthURL string `json:"auth_url"`
+		}
+		_ = json.NewDecoder(startResp.Body).Decode(&startDoc)
+		startResp.Body.Close()
+
+		parsedAuth, err := url.Parse(startDoc.AuthURL)
+		if err != nil {
+			t.Fatalf("parse auth_url (%s): %v", proxyHost, err)
+		}
+		wantRedir := "https://" + proxyHost + "/api/oauth/callback"
+		if got := parsedAuth.Query().Get("redirect_uri"); got != wantRedir {
+			t.Fatalf("%s: redirect_uri = %q, want %q", proxyHost, got, wantRedir)
+		}
+
+		// Drive authorize + callback through gwTS while preserving X-Forwarded-Host.
+		noRedirect := &http.Client{
+			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+		}
+		getAuthReq, _ := http.NewRequest(http.MethodGet, gwTS.URL+parsedAuth.Path+"?"+parsedAuth.RawQuery, nil)
+		getAuthReq.Header.Set("X-Forwarded-Host", proxyHost)
+		getAuthResp, err := noRedirect.Do(getAuthReq)
+		if err != nil {
+			t.Fatalf("GET /oauth/authorize (%s): %v", proxyHost, err)
+		}
+		htmlBytes, _ := io.ReadAll(getAuthResp.Body)
+		getAuthResp.Body.Close()
+		if getAuthResp.StatusCode != http.StatusOK {
+			t.Fatalf("GET /oauth/authorize (%s) = %d (%s), want 200", proxyHost, getAuthResp.StatusCode, string(htmlBytes))
+		}
+		var csrfCookie *http.Cookie
+		for _, c := range getAuthResp.Cookies() {
+			if strings.Contains(c.Name, "opshub_csrf") {
+				csrfCookie = c
+			}
+		}
+		m := testCSRFInputRE.FindStringSubmatch(string(htmlBytes))
+		form := parsedAuth.Query()
+		form.Set("csrf_token", m[1])
+		form.Set("decision", "approve")
+
+		postAuthReq, _ := http.NewRequest(http.MethodPost, gwTS.URL+"/oauth/authorize", strings.NewReader(form.Encode()))
+		postAuthReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		postAuthReq.Header.Set("X-Forwarded-Host", proxyHost)
+		postAuthReq.AddCookie(csrfCookie)
+		postAuthResp, err := noRedirect.Do(postAuthReq)
+		if err != nil {
+			t.Fatalf("POST /oauth/authorize (%s): %v", proxyHost, err)
+		}
+		postAuthResp.Body.Close()
+		if postAuthResp.StatusCode != http.StatusFound {
+			t.Fatalf("POST /oauth/authorize (%s) = %d, want 302", proxyHost, postAuthResp.StatusCode)
+		}
+		cbURL, _ := url.Parse(postAuthResp.Header.Get("Location"))
+		cbReq, _ := http.NewRequest(http.MethodGet, gwTS.URL+cbURL.Path+"?"+cbURL.RawQuery, nil)
+		cbReq.Header.Set("X-Forwarded-Host", proxyHost)
+		cbResp, err := noRedirect.Do(cbReq)
+		if err != nil {
+			t.Fatalf("GET /api/oauth/callback (%s): %v", proxyHost, err)
+		}
+		cbRaw, _ := io.ReadAll(cbResp.Body)
+		cbResp.Body.Close()
+		if cbResp.StatusCode != http.StatusSeeOther {
+			t.Fatalf("browser GET /api/oauth/callback (%s) = %d (%s), want 303 See Other", proxyHost, cbResp.StatusCode, string(cbRaw))
+		}
+
+		// Revoke before next iteration so StartOrRetrieve issues a fresh PKCE challenge.
+		revResp, _ := http.Post(gwTS.URL+"/api/oauth/revoke", "application/json", strings.NewReader(`{}`))
+		if revResp != nil {
+			revResp.Body.Close()
+		}
+	}
+
+	// 2. RFC 7239 Forwarded header + Header.Add spoofing resistance + untrusted host rejection.
+	t.Run("ForwardedHeaderAndSpoofingGuards", func(t *testing.T) {
+		// RFC 7239 Forwarded: proto=https;host=...
+		fwdReq, _ := http.NewRequest(http.MethodGet, gwTS.URL+"/.well-known/agent-card.json", nil)
+		fwdReq.Header.Set("Forwarded", `for=192.0.2.60;proto=https;host="8081-cs-rfc7239.ql.cloudshell.dev"`)
+		fwdResp, err := http.DefaultClient.Do(fwdReq)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var card broker.A2AAgentCardDTO
+		_ = json.NewDecoder(fwdResp.Body).Decode(&card)
+		fwdResp.Body.Close()
+		if card.URL != "https://8081-cs-rfc7239.ql.cloudshell.dev/a2a" {
+			t.Errorf("RFC 7239 Forwarded AgentCard.URL = %q, want https://8081-cs-rfc7239.ql.cloudshell.dev/a2a", card.URL)
+		}
+
+		// Client-injected X-Forwarded-Host before proxy Header.Add must not override the proxy-appended value.
+		spoofReq, _ := http.NewRequest(http.MethodGet, gwTS.URL+"/.well-known/agent-card.json", nil)
+		spoofReq.Header.Add("X-Forwarded-Host", "8081-cs-attacker.ql.cloudshell.dev")
+		spoofReq.Header.Add("X-Forwarded-Host", "8081-cs-legit.ql.cloudshell.dev")
+		spoofResp, err := http.DefaultClient.Do(spoofReq)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = json.NewDecoder(spoofResp.Body).Decode(&card)
+		spoofResp.Body.Close()
+		if card.URL != "https://8081-cs-legit.ql.cloudshell.dev/a2a" {
+			t.Errorf("Header.Add precedence AgentCard.URL = %q, want https://8081-cs-legit.ql.cloudshell.dev/a2a", card.URL)
+		}
+
+		// Untrusted or path-smuggled X-Forwarded-Host must be ignored in favor of r.Host.
+		for _, badXFH := range []string{
+			"evil.example.com",
+			"evil.example.com/steal?x=.cloudshell.dev",
+			"evil.example.com@.cloudshell.dev",
+			".cloudshell.dev",
+		} {
+			badReq, _ := http.NewRequest(http.MethodGet, gwTS.URL+"/.well-known/agent-card.json", nil)
+			badReq.Header.Set("X-Forwarded-Host", badXFH)
+			badResp, err := http.DefaultClient.Do(badReq)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_ = json.NewDecoder(badResp.Body).Decode(&card)
+			badResp.Body.Close()
+			want := "http://" + gwParsed.Host + "/a2a"
+			if card.URL != want {
+				t.Errorf("untrusted X-Forwarded-Host %q produced URL %q, want %q", badXFH, card.URL, want)
+			}
+		}
+	})
+
+	// 3. Token endpoint non-2xx JSON {error, error_description} is surfaced in /api/oauth/callback error response.
+	t.Run("SurfaceTokenEndpointErrorDetails", func(t *testing.T) {
+		badOps := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"error":             "invalid_grant",
+				"error_description": "redirect_uri mismatch on authorization code",
+			})
+		}))
+		t.Cleanup(badOps.Close)
+
+		errSrv, err := broker.NewServer(broker.Config{
+			Namespace:     "workshop-301",
+			Atespace:      "workshop-301",
+			SimNamespace:  "prod-sim",
+			MockLLM:       true,
+			OpsHubURL:     badOps.URL,
+			LedgerAPIURL:  ledgerTS.URL,
+			Require3LO:    true,
+			OAuthClientID: "sre-gateway-3lo",
+		})
+		if err != nil {
+			t.Fatalf("broker.NewServer: %v", err)
+		}
+		t.Cleanup(func() { _ = errSrv.Close() })
+		errTS := httptest.NewServer(errSrv.Handler())
+		t.Cleanup(errTS.Close)
+
+		startResp, err := http.Post(errTS.URL+"/api/oauth/start", "application/json", strings.NewReader(`{}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var startDoc struct {
+			State string `json:"state"`
+		}
+		_ = json.NewDecoder(startResp.Body).Decode(&startDoc)
+		startResp.Body.Close()
+
+		cbResp, err := http.Get(errTS.URL + "/api/oauth/callback?code=bad-code-123&state=" + url.QueryEscape(startDoc.State))
+		if err != nil {
+			t.Fatal(err)
+		}
+		cbRaw, _ := io.ReadAll(cbResp.Body)
+		cbResp.Body.Close()
+		if cbResp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("callback status = %d, want 400", cbResp.StatusCode)
+		}
+		if !strings.Contains(string(cbRaw), "invalid_grant") || !strings.Contains(string(cbRaw), "redirect_uri mismatch") {
+			t.Errorf("callback error body = %s, want surfaced invalid_grant and error_description", string(cbRaw))
+		}
+	})
 }

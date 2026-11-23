@@ -44,7 +44,7 @@ published and source install modes (`make e2e` passed with real Gemini; optional
      `v1.0.0` uses directly (`make preflight` checks that `v1` or `v1beta1` is served).
    - **Workload Identity** and **managed OpenTelemetry** with `--managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS`.
    - **Managed Prometheus** enabled (`--enable-managed-prometheus`) — Module 6's Prometheus UI reads through it.
-   - Machine type **`c3-standard-4`**, 2 nodes, **no node auto-upgrade**, **no spot/preemptible nodes** (an
+   - Machine type **`c3-standard-4`** (or `n2-standard-4 --min-cpu-platform="Intel Ice Lake"` / `n1-standard-4 --min-cpu-platform="Intel Skylake"` if `C3_CPUS` quota is unavailable; do **not** use `e2-*`, which mixes Intel and AMD CPU platforms across nodes and breaks cross-worker gVisor `MEMORY` snapshot restores), 100 GB `pd-balanced` boot disks, 2 nodes, **no node auto-upgrade**, **no spot/preemptible nodes** (an
      upgrade or a spot reclaim mid-workshop disrupts running workers and loses whatever wasn't already snapshotted).
 
    `--managed-otel-scope` is a **beta** flag: plain `gcloud container clusters create` rejects it
@@ -58,9 +58,11 @@ published and source install modes (`make e2e` passed with real Gemini; optional
    accepts an active `no_minor_or_node_upgrades` exclusion in place of `--no-enable-autoupgrade`. A zonal
    cluster matching the list above:
    ```bash
+   gcloud services enable container.googleapis.com monitoring.googleapis.com logging.googleapis.com cloudtrace.googleapis.com \
+     --project "$PROJECT_ID"
    gcloud beta container clusters create "$CLUSTER_NAME" --project "$PROJECT_ID" --location us-central1-a \
      --release-channel rapid --cluster-version 1.37 \
-     --machine-type c3-standard-4 --num-nodes 2 \
+     --machine-type c3-standard-4 --disk-type pd-balanced --disk-size 100 --num-nodes 2 \
      --workload-pool "$PROJECT_ID.svc.id.goog" --enable-managed-prometheus \
      --managed-otel-scope=COLLECTION_AND_INSTRUMENTATION_COMPONENTS
    # Start must be in the past (or now) for preflight to count it; cover the workshop day with the end.
