@@ -39,7 +39,7 @@ your first actor in "Hello actor".
 
 1. **Activate Cloud Shell.** Open the Google Cloud console and click **Activate Cloud Shell** in the top-right
    toolbar to launch Cloud Shell — a self-contained VM in your browser — and run all the commands in this lab from there.
-2. **Clone the workshop repository.** Clone the repository and move into its root directory:
+2. **Clone the workshop repository.** Clone the repository and move into the `intro/` workshop directory:
    ```bash
    git clone https://github.com/GoogleCloudPlatform/agent-substrate-workshop
    cd agent-substrate-workshop/intro
@@ -69,7 +69,7 @@ your first actor in "Hello actor".
    echo 'export PATH="'"$PWD"'/bin:$PATH"' >> ~/.bashrc
    kubectl ate --help
    </ql-code-block>
-   If Cloud Shell reconnects or you open a new tab later, `cd` into `agent-substrate-workshop` and run `source scripts/env.sh` to load `workshop.env` and ensure `bin/` is on your `PATH`.
+   If Cloud Shell reconnects or you open a new tab later, `cd` into `agent-substrate-workshop/intro` and run `source scripts/env.sh` to load `workshop.env` and ensure `bin/` is on your `PATH`.
 5. **Run preflight checks.** Verify your local tools, cluster configuration, Workload Identity, and managed OpenTelemetry:
    ```bash
    make preflight
@@ -311,7 +311,7 @@ with **VOLUMES** fidelity (`SNAPSHOT_FIDELITY_VOLUMES`): Substrate saves only th
    ```
 6. Follow the actor's logs in a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`). The log stream follows the actor across workers and restarts:
    ```bash
-   source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
+   source scripts/env.sh     # in the new terminal, from agent-substrate-workshop/intro: puts bin/ (kubectl ate) on PATH
    kubectl ate logs actor memo -a workshop -f
    ```
    Most of the output comes from gVisor's runtime logging (`I…` and `W…` lines from `cli.go`,
@@ -587,7 +587,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    ```
 2. **Generate traffic.** In a second terminal (`cd` into your workshop checkout first if a new tab starts in `$HOME`), send bursty chat traffic across the swarm for 3 minutes:
    ```bash
-   source scripts/env.sh     # in the new terminal, from the repo root: puts bin/ (kubectl ate) on PATH
+   source scripts/env.sh     # in the new terminal, from agent-substrate-workshop/intro: puts bin/ (kubectl ate) on PATH
    make load
    ```
 3. **Run queries in the Prometheus UI** (`http://localhost:9090` → **Graph**, or Web Preview `:9090` in Cloud Shell). More queries
@@ -616,7 +616,7 @@ Both sources write to Cloud Monitoring, so you can query them together using Pro
    ```
    In a second terminal, resume `buddy` and record its worker Pod name:
    ```bash
-   source scripts/env.sh     # if this is a fresh terminal, from the repo root: puts bin/ (kubectl ate) on PATH
+   source scripts/env.sh     # if this is a fresh terminal, from agent-substrate-workshop/intro: puts bin/ (kubectl ate) on PATH
    kubectl ate resume actor buddy -a workshop
    FIRST=$(kubectl ate get actor buddy -a workshop -o json | jq -r .status.workerAssignment.workerPod)
    echo "$FIRST"
@@ -681,7 +681,7 @@ The goal of this section is to review how the primitives you used map to real-wo
 | What you built | Substrate primitive | Where production systems use it |
 |---|---|---|
 | `WorkerPool` `agents` | Generic, pre-started capacity | Every deployment |
-| Templates `agent-v1` → `agent-v3` | Immutable template and golden snapshot | **google/ax (`Task`)**: hashes image and env into `<task>-tmpl-<hash>` |
+| Templates `agent-v1` → `agent-v3` | Immutable template and golden snapshot | **google/ax (`Task`)**: hashes image and env into `TASK-tmpl-HASH` |
 | `hello`, `memo` | Suspend/resume, `MEMORY` vs. `VOLUMES` fidelity | **google/ax (`Workspace`)**: `/workspace` `durableDir` with `VOLUMES` fidelity |
 | Gateway `/v1/model` | Presence vs. cognition split | **always-on-agent**: presence service and suspendable cognition actor |
 | Gateway-only `EgressPolicy` | Deny-by-default egress | **agent-substrate/env**: sandboxed shells for LLM tools |
