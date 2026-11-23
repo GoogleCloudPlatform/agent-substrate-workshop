@@ -13,7 +13,7 @@ require (
 	go.opentelemetry.io/proto/otlp v1.11.0
 	google.golang.org/adk/v2 v2.6.0
 	google.golang.org/genai v1.79.1
-	google.golang.org/grpc v1.84.0
+	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12
 	sigs.k8s.io/yaml v1.6.0
 )
