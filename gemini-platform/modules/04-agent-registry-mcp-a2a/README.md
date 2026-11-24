@@ -12,7 +12,7 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
 |---|---|---|
 | **GKE auto-registration & A2A Agent Card** | `Deployment/sre-gateway` (`registry.gke.io/functional-type: "AGENT"`, `a2a-protocol.org/agent-card`) + `GET /.well-known/agent-card.json` & `POST /a2a` | GKE **Agent Registry** ingests `Platform SRE Triage Agent` metadata automatically; peer orchestrators invoke `message/send` and `tasks/get` over JSON-RPC 2.0 across the **Governed Broker**. |
 | **Dynamic MCP discovery (`adk/v2/agentregistry`)** | `brokerclient.NewAgentRegistryClient` + `brokerclient.DiscoverMCPToolsets` -> `sre-gateway/mcp/{logging-mcp,container-mcp,ops-hub-mcp}` | Keyless **Incident Actors** discover MCP servers and tool safety annotations (`readOnlyHint`, `destructiveHint`) at startup; `sre-gateway` attaches cloud credentials outside the sandbox and blocks unapproved `destructiveHint: true` tools (`HTTP 403`). |
-| **Zero-Compute Remediation Gate (`0 vCPU` -> `< 400ms` wake)** | `brokerclient.NewRemediationTools` (`push_git_branch` + `apply_remediation_pr` with `RequireConfirmation: true`) + `POST /api/incidents/INC-402/remediation/{approve,reject}` | When the model invokes `apply_remediation_pr`, ADK emits `adk_request_confirmation` into **Gemini Sessions** and exits `/turn` cleanly; `sre-gateway` immediately calls `ateapi.SuspendActor` (`0 vCPU` in GCS). Approving wakes `inc-402` in `< 400ms` with `/workspace/ledger-api` intact to merge `fix/inc-402-pool-leak` and restore `ledger-api` `/healthz` to `200 OK`. |
+| **Zero-Compute Remediation Gate (`0 vCPU` -> under 400 ms wake)** | `brokerclient.NewRemediationTools` (`push_git_branch` + `apply_remediation_pr` with `RequireConfirmation: true`) + `POST /api/incidents/INC-402/remediation/{approve,reject}` | When the model invokes `apply_remediation_pr`, ADK emits `adk_request_confirmation` into **Gemini Sessions** and exits `/turn` cleanly; `sre-gateway` immediately calls `ateapi.SuspendActor` (`0 vCPU` in GCS). Approving wakes `inc-402` in under 400 ms with `/workspace/ledger-api` intact to merge `fix/inc-402-pool-leak` and restore `ledger-api` `/healthz` to `200 OK`. |
 
 ## Steps
 
@@ -29,7 +29,7 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
    ```bash
    cloudshell edit app/cmd/agent/main.go
    ```
-   In `app/cmd/agent/main.go`, select the **entire `buildRunner` function** (from `func buildRunner(...)` through its closing `}`) and replace it with the complete `buildRunner` function below, then save the file (`Ctrl+S` or `Cmd+S`—or compare against `modules/04-agent-registry-mcp-a2a/solution/main.go`):
+   In `app/cmd/agent/main.go`, select the entire `buildRunner` function (from `func buildRunner(...)` through its closing `}`) and replace it with the complete `buildRunner` function below, then save the file (`Ctrl+S` or `Cmd+S`—or compare against `modules/04-agent-registry-mcp-a2a/solution/main.go`):
    ```go
    func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
    	llm, err := brokerclient.NewModel(ctx, cfg.BrokerURL, cfg.ModelName, nil)
@@ -121,7 +121,8 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
    ```bash
    make build-agent
    scripts/render.sh modules/04-agent-registry-mcp-a2a/manifests/template-v4.yaml.tmpl | kubectl ate create actor-template -f -
-   until kubectl ate get actor-template sre-agent-v4 -a "$ATESPACE" -o json | jq -e '.status.goldenSnapshotStatus.goldenTag.name' >/dev/null; do sleep 2; done
+   until kubectl ate get actor-template sre-agent-v4 -a "$ATESPACE" -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus | (.goldenTag.name // .errorMessage)' >/dev/null; do sleep 2; done
+   kubectl ate get actor-template sre-agent-v4 -a "$ATESPACE"
    DEFAULT_ACTOR_TEMPLATE=sre-agent-v4 make gateway
    make forward-gateway
    ```
@@ -148,7 +149,7 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
      kubectl ate get actor inc-402 -a "$ATESPACE"
      ```
 
-5. **Approve the Remediation Gate and verify `< 400ms` resume + `ledger-api` recovery.** Open `http://localhost:8081/` (`Investigations`):
+5. **Approve the Remediation Gate and verify under-400 ms resume + `ledger-api` recovery.** Open `http://localhost:8081/` (`Investigations`):
    - Inspect the staged unified diff in **Actor `/workspace` checkout & staged diff** and notice the yellow **Remediation gate paused · awaiting operator approval** banner with the `Suspended · 0 vCPU` badge.
    - Click **Approve remediation** in the banner (or run the `curl` command below):
    ```bash
@@ -156,7 +157,7 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
      -H 'Content-Type: application/json' \
      -d '{}' | jq '{actor_name, remediation_gate_pending, resume_duration_ms, reply}'
    ```
-   `atenet-router` restores `inc-402` from Cloud Storage (`< 400ms`) with `/workspace/ledger-api` intact, ADK executes `apply_remediation_pr` through `/mcp/ops-hub-mcp`, `ops-hub` merges `PR-1` into `main` and reloads `ledger-api`, `INC-402` flips to `RESOLVED`, and `Target service telemetry (ledger-api)` turns green (`Healthy · SLO met`, `/healthz` `200 OK`)!
+   `atenet-router` restores `inc-402` from Cloud Storage (under 400 ms) with `/workspace/ledger-api` intact, ADK executes `apply_remediation_pr` through `/mcp/ops-hub-mcp`, `ops-hub` merges `PR-1` into `main` and reloads `ledger-api`, `INC-402` flips to `RESOLVED`, and `Target service telemetry (ledger-api)` turns green (`Healthy · SLO met`, `/healthz` `200 OK`)!
 
 6. **Test A2A peer invocation (`POST /a2a`).** Confirm an external A2A client can invoke the **Platform SRE Triage Agent** via JSON-RPC 2.0 `message/send`:
    ```bash
@@ -178,7 +179,7 @@ In Module 04, you build `sre-agent-v4`, the final **Incident Actor** image used 
    ```
    **What this does and why it matters:**
    - **Standard peer-agent discovery and interoperability (`/.well-known/agent-card.json` + `/a2a`)**: Any external orchestrator or peer agent (in **Agent Registry**, **Gemini Enterprise**, or another team's service) discovers the **Platform SRE Triage Agent** via its standard **A2A Agent Card** and invokes `message/send` over JSON-RPC 2.0—without needing `kubectl-ate` or any Agent Substrate SDK.
-   - **Transparent `< 400ms` wake from `0 vCPU` across the Actor Boundary**: Behind `POST /a2a`, `sre-gateway` maps `"contextId": "inc-403"` to the `inc-403` **Incident Actor**, wakes its gVisor sandbox from Cloud Storage (`0 vCPU` -> active), recalls **Consolidated Memory** from `INC-402` across the **Actor Boundary**, and returns a standard A2A `"state": "completed"` task response.
+   - **Transparent sub-400 ms wake from `0 vCPU` across the Actor Boundary**: Behind `POST /a2a`, `sre-gateway` maps `"contextId": "inc-403"` to the `inc-403` **Incident Actor**, wakes its gVisor sandbox from Cloud Storage (`0 vCPU` -> active), recalls **Consolidated Memory** from `INC-402` across the **Actor Boundary**, and returns a standard A2A `"state": "completed"` task response.
 
 ## Checkpoint
 
@@ -188,6 +189,6 @@ Verify your Module 04 state:
 make verify MODULE=4
 ```
 
-**Need to catch up or reset `sre-agent-v4`?** Run `make catch-up MODULE=5` (add `RESET=1` to rebuild `sre-agent-v4` from `modules/04-agent-registry-mcp-a2a/solution/main.go`).
+**Need to catch up?** Run `make catch-up MODULE=5` (add `RESET=1` to rebuild `sre-agent-v4` from `modules/04-agent-registry-mcp-a2a/solution/main.go`).
 
 Next: [Zero-trust governance across the actor boundary](../05-zero-trust-governance/README.md)

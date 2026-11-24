@@ -133,7 +133,7 @@ type sessionWireDTO struct {
 // agentEngineProxy serves keyless /agentengine/* routes for Gemini Sessions
 // (Session Ledger) and Gemini Memory Bank (Consolidated Memory). When a
 // ReasoningEngine runtime ID is configured and MockLLM is false, it delegates
-// over authenticated HTTPS to Gemini Enterprise Agent Platform while keeping a
+// over authenticated HTTPS to Gemini platform while keeping a
 // synchronized durable broker index for zero-wake operator reads and fallback.
 // sessionStateObserver receives notifications when durable broker session state changes.
 type sessionStateObserver interface {
@@ -267,7 +267,7 @@ func (p *agentEngineProxy) backendLabel() string {
 
 func (p *agentEngineProxy) backendLabelLocked() string {
 	if p.cloudEnabledLocked() {
-		return "gemini-agent-platform"
+		return "gemini-platform"
 	}
 	return "broker-session-ledger"
 }
@@ -319,7 +319,7 @@ func (p *agentEngineProxy) bootstrapReasoningEngine(ctx context.Context) {
 	}
 	createBody := map[string]string{
 		"displayName": wantDisplayName,
-		"description": "Managed session ledger and consolidated memory runtime for Agent Substrate 301",
+		"description": "Managed session ledger and consolidated memory runtime for Agent Substrate on Gemini platform",
 	}
 	if _, err := p.doCloudJSON(ctx, http.MethodPost, enginesURL, createBody, &createOp); err != nil {
 		return
@@ -1542,7 +1542,7 @@ func truncateText(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
-// --- Managed Gemini Enterprise Agent Platform REST Delegation ---
+// --- Managed Gemini platform REST Delegation ---
 
 func (p *agentEngineProxy) cloudCreateSession(ctx context.Context, sessionID, userID string, state map[string]any) (string, error) {
 	endpoint := p.cloudParentURL() + "/sessions"

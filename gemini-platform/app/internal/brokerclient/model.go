@@ -30,7 +30,7 @@ import (
 	"google.golang.org/genai"
 )
 
-// DefaultModelName is the default Gemini model on Gemini Enterprise Agent Platform.
+// DefaultModelName is the default Gemini model on Gemini platform.
 const DefaultModelName = "gemini-3.8-flash"
 
 // NewModel constructs an ADK Go v2 model.LLM that sends Gemini requests over HTTP

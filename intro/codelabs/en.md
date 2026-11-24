@@ -2,7 +2,7 @@
 id: agent-substrate
 summary: Build and operate your own fleet of AI agents on Agent Substrate, starting from a bare GKE cluster.
 authors: Mofi Rahman, Olivier Bourgeois
-categories: GKE, Gemini Enterprise Agent Platform, Agent Substrate
+categories: GKE, Gemini platform, Agent Substrate
 tags: GKE, Gemini, Agent Substrate
 feedback_link: https://github.com/googlecodelabs/feedback/issues/new?title=[agent-substrate]:&labels[]=content-platform&labels[]=cloud
 analytics_account: UA-66226300-1

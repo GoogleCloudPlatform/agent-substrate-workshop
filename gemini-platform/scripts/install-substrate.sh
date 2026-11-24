@@ -141,7 +141,7 @@ kubectl -n ate-system rollout status ds/atelet --timeout=10m
 ok "Agent Substrate is ready"
 kubectl -n ate-system get pods
 
-if [[ "$(state_get install-complete || true)" != *"SUBSTRATE_REF=$SUBSTRATE_REF" ]]; then
+if [[ " $(state_get install-complete || true) " != *" SUBSTRATE_REF=${SUBSTRATE_REF} "* ]]; then
   rm -f "$STATE_DIR/gateway-image" "$STATE_DIR/agent-image"
 fi
 state_put install-complete "$(date -u +%Y-%m-%dT%H:%M:%SZ) SUBSTRATE_REF=$SUBSTRATE_REF"

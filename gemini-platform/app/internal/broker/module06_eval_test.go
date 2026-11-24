@@ -429,7 +429,7 @@ func TestModule06LiveGeminiStructuredJudgeScoring(t *testing.T) {
 				SessionID:    "inc-402",
 				Status:       "OK",
 				SpanNames:    []string{"invoke_gateway_turn", "model_armor.screen", "atenet.wake_and_route", "invoke_agent", "execute_tool", "genai.generate_content", "mcp.call_tool", "substrate.suspend_actor"},
-				GenAISystem:  "gemini_enterprise_agent_platform",
+				GenAISystem:  "gemini_platform",
 				InputTokens:  420,
 				OutputTokens: 180,
 			},
@@ -453,8 +453,8 @@ func TestModule06LiveGeminiStructuredJudgeScoring(t *testing.T) {
 	if judgeCalls.Load() != 1 {
 		t.Fatalf("judgeCalls = %d, want 1", judgeCalls.Load())
 	}
-	if rep.JudgeBackend != "gemini-agent-platform" || !rep.Passed {
-		t.Fatalf("rep = %+v, want JudgeBackend=gemini-agent-platform Passed=true", rep)
+	if rep.JudgeBackend != "gemini-platform" || !rep.Passed {
+		t.Fatalf("rep = %+v, want JudgeBackend=gemini-platform Passed=true", rep)
 	}
 	if !strings.Contains(receivedPrompt, "responseMimeType") || !strings.Contains(receivedPrompt, "application/json") {
 		t.Errorf("expected structured JSON responseMimeType in Gemini judge request, got: %s", receivedPrompt)

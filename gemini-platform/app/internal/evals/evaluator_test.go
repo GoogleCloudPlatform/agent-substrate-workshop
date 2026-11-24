@@ -195,7 +195,7 @@ func TestCallGeminiJudgeCompactsLarge300EventSnapshotIntoValidJSON(t *testing.T)
 				SessionID:   "inc-402",
 				Status:      "OK",
 				SpanNames:   []string{"invoke_gateway_turn", "mcp.call_tool", "substrate.suspend_actor"},
-				GenAISystem: "gemini_enterprise_agent_platform",
+				GenAISystem: "gemini_platform",
 			},
 		},
 		ScrubbedSpanAttrs:    3,

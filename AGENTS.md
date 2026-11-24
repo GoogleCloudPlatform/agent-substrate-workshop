@@ -8,7 +8,7 @@ Hands-on workshop repository for building, running, and governing stateful AI ag
 
 The repository is structured into two self-contained workshops:
 - **`intro/`**: *Untrusted Code on Secure Runtimes: Agent Substrate on Kubernetes* (Substrate fundamentals, Actor lifecycle, golden snapshots, suspend/resume, density/idle, and 10 advanced optional labs in `intro/optional/`).
-- **`gemini-platform/`**: *Enterprise AI Agents with Agent Substrate and Gemini Agent Platform on GKE* (ADK Go v2 SRE Triage Agent, Actor Boundary, Gemini Sessions, Gemini Memory Bank, Skill Registry, Agent Registry MCP & A2A, Agent Identity, Ingress `GCPAgentGateway`, Model Armor & Auth Manager 3LO, and OpenTelemetry GenAI traces & online evals).
+- **`gemini-platform/`**: *Enterprise AI Agents with Agent Substrate and Gemini platform on GKE* (ADK Go v2 SRE Triage Agent, Actor Boundary, Gemini Sessions, Gemini Memory Bank, Skill Registry, Agent Registry MCP & A2A, Agent Identity, Ingress `GCPAgentGateway`, Model Armor & Auth Manager 3LO, and OpenTelemetry GenAI traces & online evals).
 
 ## Repository Layout
 
@@ -26,7 +26,7 @@ The repository is structured into two self-contained workshops:
 │   ├── Makefile           # Intro build and test orchestration
 │   ├── AGENTS.md          # Intro agent guide and sync contract
 │   └── README.md          # Intro curriculum landing page
-├── gemini-platform/       # Gemini Platform workshop: Enterprise Agent Platform
+├── gemini-platform/       # Gemini platform workshop: Enterprise AI Agents on GKE
 │   ├── app/               # ADK Go v2 SRE triage agent, broker, & simulation binaries
 │   ├── modules/           # 8 core modules (00-setup .. 07-wrap-up)
 │   ├── codelabs/          # Consolidated Codelabs edition (claat)
@@ -34,9 +34,9 @@ The repository is structured into two self-contained workshops:
 │   ├── docs/              # ADRs (0001..0004) and architecture specifications
 │   ├── instructor/        # Runbook and troubleshooting guide
 │   ├── scripts/           # Makefile automation & verification tests
-│   ├── Makefile           # Gemini Platform build and test orchestration
-│   ├── AGENTS.md          # Gemini Platform agent guide and sync contract
-│   └── README.md          # Gemini Platform curriculum landing page
+│   ├── Makefile           # Gemini platform build and test orchestration
+│   ├── AGENTS.md          # Gemini platform agent guide and sync contract
+│   └── README.md          # Gemini platform curriculum landing page
 ├── Makefile               # Top-level delegation (make test -> intro + gemini-platform)
 ├── renovate.json          # Dependency tracking for intro/app/go.mod & gemini-platform/app/go.mod
 ├── CONTRIBUTING.md        # Open-source contribution guidelines
@@ -47,7 +47,7 @@ The repository is structured into two self-contained workshops:
 
 ## Branding & Hygiene Rules
 
-- **Platform Branding**: Always use **Gemini Enterprise Agent Platform** (or shorthand **Agent Platform** / **Gemini on Agent Platform**), never retired platform naming.
+- **Platform Branding**: Always use **Gemini platform** (never retired platform naming; keep technical DevSite Nomenclature tag `product:AgentPlatform` in `keywords:` frontmatter where required by DevSite).
 - **Personal Identifiers**: Never hardcode personal GKE cluster, project, org, or node names in docs, Makefiles, manifests, or scripts; derive defaults from `workshop.env`, `kubectl config current-context`, or `gcloud config get-value project`.
 - **Public Compute Terminology**: Never use internal compute terminology in public-facing prose, manifests, or comments (use "compute obtainability" where relevant).
 
@@ -67,7 +67,7 @@ Workshop content across both tracks is maintained in three synchronized formats:
    - Omits YAML frontmatter (starts directly with `# Title`), omits `Duration:` lines, and omits `## Appendix: Optional content` plus all references/links to optional overlays.
    - Synchronized with `CloudVLab/gcp-devrel-content`:
      - **Intro Workshop**: `labs/gke005-agent-substrate-intro` (and `labs/gke004-kubecon-2026`). Enforced by `intro/scripts/test/qwiklabs_test.sh`.
-     - **Gemini Platform Workshop**: `labs/gke006-agent-substrate-platform`. Pre-provisions non-Substrate infrastructure in Terraform and `substrate-prewarm` Job, unpacks `.prewarm/gemini-platform-prewarm.tar.gz`, and omits `### Clean up`. Enforced by `gemini-platform/scripts/test/docs_sync_test.sh`.
+     - **Gemini platform Workshop**: `labs/gke006-agent-substrate-platform`. Pre-provisions non-Substrate infrastructure in Terraform and `substrate-prewarm` Job, unpacks `.prewarm/gemini-platform-prewarm.tar.gz`, and omits `### Clean up`. Enforced by `gemini-platform/scripts/test/docs_sync_test.sh`.
 
 Whenever editing instructions, code blocks, or SVG diagrams in `modules/`, apply matching updates to `codelabs/` and `qwiklabs/`.
 
@@ -82,7 +82,7 @@ make test
 # Run Intro workshop test suite
 make -C intro test
 
-# Run Gemini Platform workshop test suite
+# Run Gemini platform workshop test suite
 make -C gemini-platform test
 
 # Run Go race detector on workshop applications
