@@ -70,7 +70,7 @@ CHECK="Managed Prometheus enabled" HINT="gcloud container clusters update $CLUST
 need bash -c 'jq -e ".monitoringConfig.managedPrometheusConfig.enabled == true" <<<"$DESC" >/dev/null 2>&1'
 
 CHECK="no node auto-upgrade" HINT="disable node auto-upgrade or add a maintenance exclusion with scope no_minor_or_node_upgrades"
-need bash -c 'jq -e "([.nodePools[].management.autoUpgrade // false] | all(. == false))
+need bash -c 'jq -e "([.nodePools[]? | (.management.autoUpgrade // false)] | (length > 0) and all(. == false))
   or ((now | todate) as \$t | [.maintenancePolicy.window.maintenanceExclusions // {} | .[]
       | select(.maintenanceExclusionOptions.scope == \"NO_MINOR_OR_NODE_UPGRADES\" or .maintenanceExclusionOptions.scope == \"NO_UPGRADES\")
       | select(.startTime <= \$t and \$t < .endTime)] | length > 0)" <<<"$DESC" >/dev/null 2>&1'

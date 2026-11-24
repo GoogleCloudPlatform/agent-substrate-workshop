@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Enterprise AI Agents with Agent Substrate and Gemini Agent Platform on GKE. Run `make help` for targets.
+# Enterprise AI Agents with Agent Substrate and Gemini platform on GKE. Run `make help` for targets.
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 MODULE ?=
@@ -27,6 +27,10 @@ help: ## Show targets
 	@echo "  Knobs in [brackets] go after the target: make verify MODULE=0"
 	@echo "  Everything else is set in workshop.env (WORKSHOP_ENV_FILE=path picks another file)."
 
+setup: ## Run full setup end-to-end (env, ko, cluster, APIs, IAM, Substrate, prod-sim, tools, verify)
+	@scripts/setup.sh
+create-cluster: ## Enable core APIs, create the uniform-CPU GKE 1.37+ cluster, freeze upgrades, and fetch credentials
+	@scripts/create-cluster.sh
 preflight: ## Check local tools, uniform-CPU node pools, and GKE 1.37+ prerequisites
 	@scripts/preflight.sh
 gcp: ## Enable APIs, create bucket/registry/IAM, and start async gateway & runtime bootstrap
@@ -89,11 +93,11 @@ test: test-go test-scripts ## Run all offline Go and shell contract tests
 test-go: ## Run go vet and the Go behavioral tests
 	@cd app && go vet ./... && go test ./...
 test-scripts: ## Run the offline shell and hygiene tests
-	@bash scripts/test/lib_test.sh && bash scripts/test/preflight_test.sh && bash scripts/test/render_test.sh && bash scripts/test/solutions_test.sh && bash scripts/test/skill_publish_test.sh && bash scripts/test/governance_test.sh && bash scripts/test/observability_test.sh && bash scripts/test/hygiene_test.sh && bash scripts/test/docs_sync_test.sh
+	@bash scripts/test/lib_test.sh && bash scripts/test/preflight_test.sh && bash scripts/test/setup_test.sh && bash scripts/test/render_test.sh && bash scripts/test/solutions_test.sh && bash scripts/test/skill_publish_test.sh && bash scripts/test/governance_test.sh && bash scripts/test/observability_test.sh && bash scripts/test/hygiene_test.sh && bash scripts/test/docs_sync_test.sh
 teardown: ## Delete workshop resources while keeping the cluster [ALL=1 YES=1]
 	@scripts/teardown.sh $(if $(ALL),--all)
 delete-cluster: ## Release PersistentVolumes and delete the GKE cluster [YES=1]
 	@scripts/delete-cluster.sh
 clean: ## Remove local build output (bin/, dist/)
 	@rm -rf bin dist
-.PHONY: help preflight gcp computeclass install install-bg install-status patch-router prod-sim build-agent build-gateway gateway publish-skill governance audit-snapshot observe eval e2e tools forward-gateway forward-ops-hub forward-ledger stop-forwards catch-up verify test test-go test-scripts teardown delete-cluster clean
+.PHONY: help setup create-cluster preflight gcp computeclass install install-bg install-status patch-router prod-sim build-agent build-gateway gateway publish-skill governance audit-snapshot observe eval e2e tools forward-gateway forward-ops-hub forward-ledger stop-forwards catch-up verify test test-go test-scripts teardown delete-cluster clean

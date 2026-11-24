@@ -6,7 +6,7 @@ In Module 01, your keyless **Incident Actor** (`sre-agent-v1`) cloned `ledger-ap
 
 ## Snapshots vs. Session Ledger vs. Consolidated Memory
 
-Agent Substrate's Cloud Storage checkpoints and **Gemini Enterprise Agent Platform**'s state services solve distinct layers of stateful agent operations:
+Agent Substrate's Cloud Storage checkpoints and **Gemini platform**'s state services solve distinct layers of stateful agent operations:
 
 | Layer | Where it lives | What it preserves | Lifecycle & visibility |
 |---|---|---|---|
@@ -22,7 +22,7 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
    ```bash
    cloudshell edit app/cmd/agent/main.go
    ```
-   In `app/cmd/agent/main.go`, select the **entire `buildRunner` function** (from `func buildRunner(...)` through its closing `}`) and replace it with the complete `buildRunner` function below, then save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically update the Go `import` block for you):
+   In `app/cmd/agent/main.go`, select the entire `buildRunner` function (from `func buildRunner(...)` through its closing `}`) and replace it with the complete `buildRunner` function below, then save the file (`Ctrl+S` or `Cmd+S`—Cloud Shell Editor's Go tooling and `make build-agent` automatically update the Go `import` block for you):
    ```go
    func buildRunner(ctx context.Context, cfg agentruntime.Config, workspaceTools []tool.Tool) (*runner.Runner, error) {
    	llm, err := brokerclient.NewModel(ctx, cfg.BrokerURL, cfg.ModelName, nil)
@@ -84,7 +84,8 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
    source scripts/env.sh
    make build-agent
    scripts/render.sh modules/02-sessions-and-memory/manifests/template-v2.yaml.tmpl | kubectl ate create actor-template -f -
-   until kubectl ate get actor-template sre-agent-v2 -a "$ATESPACE" -o json | jq -e '.status.goldenSnapshotStatus.goldenTag.name' >/dev/null; do sleep 2; done
+   until kubectl ate get actor-template sre-agent-v2 -a "$ATESPACE" -o json 2>/dev/null | jq -e '.status.goldenSnapshotStatus | (.goldenTag.name // .errorMessage)' >/dev/null; do sleep 2; done
+   kubectl ate get actor-template sre-agent-v2 -a "$ATESPACE"
    ```
    Point `sre-gateway` at `sre-agent-v2` (which also picks up `.workshop/reasoning-engine-id` automatically when your background runtime bootstrap finished) and reconnect the local port-forward:
    ```bash
@@ -142,9 +143,9 @@ Because `app/cmd/agent` remains **100% keyless**, `brokerclient.NewSessionServic
    curl -s http://localhost:8081/api/ledger/sessions/inc-402 | jq '{session_id, actor_state, compute_badge, event_count, events: [(.events // [])[] | {kind, author, summary}]}'
    kubectl ate get actor inc-402 -a "$ATESPACE" -o json | jq -r '.status.state'
    ```
-   Notice that `actor_state` is `"SUSPENDED"` (`Suspended · 0 vCPU · <400ms wake`), while `event_count` and `events` return the full ordered log of user prompts, tool calls, and model replies directly from the **Session Ledger** without waking the actor.
+   Notice that `actor_state` is `"SUSPENDED"` ("Suspended · 0 vCPU · <400ms wake"), while `event_count` and `events` return the full ordered log of user prompts, tool calls, and model replies directly from the **Session Ledger** without waking the actor.
    Open `http://localhost:8081/sessions` (**Session ledger & memory** in the left navigation of the **Incident Console**):
-   - Click **Inspect events** on `inc-402` to expand each structured prompt, tool call, and tool response while the **Actor compute** badge stays `Suspended · 0 vCPU · < 400ms wake`.
+   - Click **Inspect events** on `inc-402` to expand each structured prompt, tool call, and tool response while the **Actor compute** badge stays **Suspended · 0 vCPU · < 400ms wake**.
    - Use the **Consolidated memory** search bar at the bottom of `/sessions` (for example, search `MAX_OPEN_CONNS` or `rows.Close`) to test live `SearchMemory` recall.
 
 5. **Prove cross-rollout survival and sibling Incident Actor (`INC-403`) recall.** First, delete `inc-402` to discard its sandbox `/workspace` and raw checkpoint completely, wait for deletion to finish, and ask a newly instantiated `inc-402` (`sre-agent-v2`) to summarize `INC-402` from memory without re-cloning:
@@ -182,6 +183,6 @@ Verify your Module 02 state:
 make verify MODULE=2
 ```
 
-**Need to catch up or reset `sre-agent-v2`?** Run `make catch-up MODULE=3` (add `RESET=1` to rebuild `sre-agent-v2` from `modules/02-sessions-and-memory/solution/main.go`).
+**Need to catch up?** Run `make catch-up MODULE=3` (add `RESET=1` to rebuild `sre-agent-v2` from `modules/02-sessions-and-memory/solution/main.go`).
 
 Next: [Dynamic procedural skills with Skill Registry](../03-skill-registry/README.md)

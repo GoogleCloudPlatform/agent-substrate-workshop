@@ -404,8 +404,8 @@ func TestModule06W3CTraceparentWaterfallScrubbingCloudTraceAndMetrics(t *testing
 	}
 
 	wantURN := "projects/demo-project/locations/us-central1/agents/platform-sre-triage-agent"
-	if got := rootAttrs["gen_ai.system"]; got != "gemini_enterprise_agent_platform" {
-		t.Errorf("gen_ai.system = %v, want gemini_enterprise_agent_platform", got)
+	if got := rootAttrs["gen_ai.system"]; got != "gemini_platform" {
+		t.Errorf("gen_ai.system = %v, want gemini_platform", got)
 	}
 	if got := rootAttrs["gen_ai.agent.id"]; got != wantURN {
 		t.Errorf("gen_ai.agent.id = %v, want %s", got, wantURN)

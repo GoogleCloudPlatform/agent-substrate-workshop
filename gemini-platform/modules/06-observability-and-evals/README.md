@@ -4,9 +4,9 @@ In Modules 01–05, you built a stateful **ADK Go v2** **Incident Actor** (`sre-
 
 1. **Low-cardinality `ActorTemplate` Prometheus metrics (`/metrics` + GMP `PodMonitoring`)** on `sre-gateway` for fleet SLO alerting (turn latency histograms, Gemini token counters, Model Armor blocks, MCP policy verdicts, and online eval gauges), intentionally omitting `session_id`, `actor_id`, and `trace_id` labels.
 2. **End-to-end W3C `traceparent` propagation & secret-scrubbed OpenTelemetry GenAI waterfalls** across `sre-gateway -> atenet-router -> Incident Actor -> /otlp/v1/traces -> Google Cloud Trace`, stamping `gen_ai.*` and `ate.*` attributes while stripping `Authorization`/`Cookie` headers, bearer tokens, PII, and raw tool payloads.
-3. **Pure-Go Online Evals (`make eval` / `cmd/evalrunner`) + out-of-band Security Command Center Anomaly Detection** scoring live **Session Ledger**, **Consolidated Memory**, **Skill Registry**, and **Cloud Trace** evidence across 4 rubrics with **Gemini on Agent Platform**, while **Security Command Center** monitors `GKE_WORKLOAD` logs and traces asynchronously with zero inline latency.
+3. **Pure-Go Online Evals (`make eval` / `cmd/evalrunner`) + out-of-band Security Command Center Anomaly Detection** scoring live **Session Ledger**, **Consolidated Memory**, **Skill Registry**, and **Cloud Trace** evidence across 4 rubrics with **Gemini platform**, while **Security Command Center** monitors `GKE_WORKLOAD` logs and traces asynchronously with zero inline latency.
 
-Like Module 05, Module 06 requires **zero `cmd/agent` edits or `ActorTemplate` rebuilds**: `sre-agent-v4` and `sre-gateway` already carry the keyless OTLP bridge and W3C context propagation.
+Like Module 05, Module 06 requires **zero** `cmd/agent` **edits or** `ActorTemplate` **rebuilds**: `sre-agent-v4` and `sre-gateway` already carry the keyless OTLP bridge and W3C context propagation.
 
 ![End-to-end W3C traceparent waterfall, secret scrubbing, Managed Prometheus metrics, pure-Go Online Evals, and SCC Anomaly Detection](../img/06-observability-flywheel.svg)
 
@@ -16,7 +16,7 @@ Like Module 05, Module 06 requires **zero `cmd/agent` edits or `ActorTemplate` r
 |---|---|---|---|
 | **GMP `PodMonitoring` (`/metrics`)** | Partitioned by `template` (`sre-agent-v4`), `model`, `outcome`, `verdict` (omitting `actor_id` and `session_id`) | Google Cloud Managed Service for Prometheus | Thousands of ephemeral per-incident Actors (`inc-402`, `inc-403`, ...) can spawn and suspend per day without unbounded Prometheus label cardinality. |
 | **OpenTelemetry GenAI waterfall (`/otlp/v1/traces`)** | Per-turn W3C `traceparent` (`00-traceId-spanId-01`) with `gen_ai.conversation.id`, `gen_ai.agent.id`, `ate.actor.id` | Google Cloud Trace + Incident Console **Trace & online evals** tab | High-cardinality debugging (`inc-402` wake latency, `execute_tool`, `genai.generate_content`, `auth_manager.inject_3lo`, `substrate.suspend_actor`) lives in distributed traces rather than metric labels. |
-| **Pure-Go Online Evals (`cmd/evalrunner`)** | 4 rubrics (`0.0`–`1.0`) over scrubbed trajectory snapshots | `POST /api/evals/run`, `.workshop/eval-report.json`, and `sre_gateway_online_eval_score` | Zero Python/virtualenv dependencies; combines deterministic safety/trajectory assertions with structured JSON rubric scoring on **Gemini on Agent Platform**. |
+| **Pure-Go Online Evals (`cmd/evalrunner`)** | 4 rubrics (`0.0`–`1.0`) over scrubbed trajectory snapshots | `POST /api/evals/run`, `.workshop/eval-report.json`, and `sre_gateway_online_eval_score` | Zero Python/virtualenv dependencies; combines deterministic safety/trajectory assertions with structured JSON rubric scoring on **Gemini platform**. |
 | **SCC Anomaly Detection** | Out-of-band correlation over `GKE_WORKLOAD` audit/container logs + OTel GenAI spans | Security Command Center Findings | Detects behavioral drift (OWASP Agentic Top-10) asynchronously without adding a single millisecond to critical-path incident triage. |
 
 ## Steps

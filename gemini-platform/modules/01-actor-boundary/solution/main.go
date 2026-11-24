@@ -15,7 +15,7 @@
 // Command agent is the Platform SRE Triage Agent running inside an Agent Substrate
 // gVisor Incident Actor on port 80.
 //
-// Module 01 completed solution: keyless Gemini on Agent Platform via sre-gateway
+// Module 01 completed solution: keyless Gemini platform access via sre-gateway
 // plus /workspace repository inspection and patch staging tools.
 package main
 

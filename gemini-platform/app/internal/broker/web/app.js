@@ -1400,8 +1400,8 @@
   function renderSessionsView() {
     const backendPill = document.getElementById("sessions-backend-pill");
     if (backendPill) {
-      backendPill.textContent = "Zero-wake · " + (state.ledgerBackend === "gemini-agent-platform"
-        ? "Gemini Enterprise Agent Platform"
+      backendPill.textContent = "Zero-wake · " + (state.ledgerBackend === "gemini-platform"
+        ? "Gemini platform"
         : "Governed broker session ledger");
     }
 
