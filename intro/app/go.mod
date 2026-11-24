@@ -4,7 +4,7 @@ go 1.27.0
 
 require (
 	github.com/prometheus/client_golang v1.25.0
-	go.ate.dev/substrate v1.0.0
+	go.ate.dev/substrate v1.0.1
 	google.golang.org/genai v1.79.1
 	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12

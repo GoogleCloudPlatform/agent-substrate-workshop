@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	cloud.google.com/go/auth v0.24.4
 	github.com/spf13/pflag v1.1.0
-	go.ate.dev/substrate v1.0.0
+	go.ate.dev/substrate v1.0.1
 	go.opentelemetry.io/otel v1.47.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.47.0
 	go.opentelemetry.io/otel/sdk v1.47.0
